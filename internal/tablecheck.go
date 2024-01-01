@@ -2,6 +2,7 @@ package internal
 
 import (
 	"fmt"
+	"strings"
 
 	"golang.org/x/tools/go/analysis"
 	"golang.org/x/tools/go/analysis/passes/buildssa"
@@ -31,43 +32,35 @@ func run(pass *analysis.Pass) (any, error) {
 	fmt.Println("\trankdir=\"LR\"")
 
 	callerFuncs := make([]*ssa.Function, 0)
-	calledFunc := make(map[*ssa.Function]bool)
 	cg := static.CallGraph(ssaProg.Pkg.Prog)
+	fnKindTableMemo := make(map[string]bool)
 	for _, q := range foundQueries {
-		if q == nil {
+		k := fmt.Sprintf("%s#%s#%s", q.fn.Name(), q.kind, q.tables[0])
+		if fnKindTableMemo[k] {
 			continue
 		}
-		if node, ok := cg.Nodes[q.fn]; ok {
-			if q.kind == "SELECT" {
-				continue
-				fmt.Printf("\t\"%s\" -> \"%s\"[weight=100, style=dotted];\n", q.fn.Name(), q.tables[0])
-			} else if q.kind == "INSERT" {
-				fmt.Printf("\t\"%s\" -> \"%s\"[weight=100, style=solid, color=green];\n", q.fn.Name(), q.tables[0])
-			} else if q.kind == "UPDATE" {
-				fmt.Printf("\t\"%s\" -> \"%s\"[weight=100, style=bold, color=orange];\n", q.fn.Name(), q.tables[0])
-			} else if q.kind == "DELETE" {
-				fmt.Printf("\t\"%s\" -> \"%s\"[weight=100, style=bold, color=red];\n", q.fn.Name(), q.tables[0])
-			}
-			if calledFunc[q.fn] {
-				continue
-			}
-			calledFunc[q.fn] = true
-			for _, edge := range node.In {
-				caller := edge.Caller.Func
-				callee := edge.Callee.Func
-				fmt.Printf("\t\"%s\" -> \"%s\"[style=dashed];\n", caller.Name(), callee.Name())
-				callerFuncs = append(callerFuncs, caller)
-			}
+		fnKindTableMemo[k] = true
+		if q.kind == "SELECT" {
+			fmt.Printf("\t\"%s\" -> \"%s\"[style=dotted];\n", q.fn.Name(), q.tables[0])
+			//continue
+		} else if q.kind == "INSERT" {
+			fmt.Printf("\t\"%s\" -> \"%s\"[style=solid, color=green];\n", q.fn.Name(), q.tables[0])
+		} else if q.kind == "UPDATE" {
+			fmt.Printf("\t\"%s\" -> \"%s\"[style=bold, color=orange];\n", q.fn.Name(), q.tables[0])
+		} else if q.kind == "DELETE" {
+			fmt.Printf("\t\"%s\" -> \"%s\"[style=bold, color=red];\n", q.fn.Name(), q.tables[0])
 		}
+		callerFuncs = append(callerFuncs, q.fn)
 	}
 
+	done := make(map[*ssa.Function]bool)
 	for len(callerFuncs) > 0 {
 		fn := callerFuncs[0]
 		callerFuncs = callerFuncs[1:]
-		if calledFunc[fn] {
+		if done[fn] {
 			continue
 		}
-		calledFunc[fn] = true
+		done[fn] = true
 		if node, ok := cg.Nodes[fn]; ok {
 			for _, edge := range node.In {
 				caller := edge.Caller.Func
@@ -75,35 +68,33 @@ func run(pass *analysis.Pass) (any, error) {
 				fmt.Printf("\t\"%s\" -> \"%s\"[style=dashed];\n", caller.Name(), callee.Name())
 				callerFuncs = append(callerFuncs, caller)
 			}
+
+			if len(node.In) == 0 {
+				fmt.Printf("\t{rank = min; \"%s\"}\n", fn.Name())
+			}
 		}
 	}
 
-	fmt.Print("\t{rank = max;")
-	for _, q := range foundQueries {
-		fmt.Printf(" \"%s\";", q.tables[0])
+	// table node position
+	fmt.Printf("\t{rank = max; %s}\n", strings.Join(q.tables, "; "))
+
+	// table node style
+	for _, table := range q.tables {
+		kindMap := make(map[string]bool)
+		for _, qq := range q.queriesByTable[table] {
+			kindMap[qq.kind] = true
+		}
+		if kindMap["DELETE"] {
+			fmt.Printf("\t\"%s\"[shape=box, style=bold, color=red, fontsize=\"21\", pad=1];\n", table)
+		} else if kindMap["UPDATE"] {
+			fmt.Printf("\t\"%s\"[shape=box, style=bold, color=orange, fontsize=\"21\", pad=1];\n", table)
+		} else if kindMap["INSERT"] {
+			fmt.Printf("\t\"%s\"[shape=box, style=solid, color=green, fontsize=\"21\", pad=1];\n", table)
+		} else if kindMap["SELECT"] {
+			fmt.Printf("\t\"%s\"[shape=box, style=dashed, fontsize=\"21\", pad=1];\n", table)
+		}
 	}
+
 	fmt.Println("}")
-
-	for _, q := range foundQueries {
-		fmt.Printf("\t\"%s\"[shape=box, style=dashed, fontsize=\"21\", pad=1];\n", q.tables[0])
-	}
-	for _, q := range foundQueries {
-		if q.kind == "INSERT" {
-			fmt.Printf("\t\"%s\"[shape=box, style=bold, color=green, fontsize=\"21\", pad=1];\n", q.tables[0])
-		}
-	}
-	for _, q := range foundQueries {
-		if q.kind == "UPDATE" {
-			fmt.Printf("\t\"%s\"[shape=box, style=bold, color=orange, fontsize=\"21\", pad=1];\n", q.tables[0])
-		}
-	}
-	for _, q := range foundQueries {
-		if q.kind == "DELETE" {
-			fmt.Printf("\t\"%s\"[shape=box, style=bold, color=red, fontsize=\"21\", pad=1];\n", q.tables[0])
-		}
-	}
-
-	fmt.Println("}")
-
 	return nil, nil
 }

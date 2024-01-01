@@ -2,7 +2,7 @@ package main
 
 import (
 	"github.com/haijima/scone/internal"
-	"golang.org/x/tools/go/analysis/unitchecker"
+	"golang.org/x/tools/go/analysis/singlechecker"
 )
 
-func main() { unitchecker.Main(internal.Analyzer) }
+func main() { singlechecker.Main(internal.Analyzer) }

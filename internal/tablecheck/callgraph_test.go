@@ -8,8 +8,8 @@ import (
 	"golang.org/x/tools/go/analysis/analysistest"
 )
 
-// TestAnalyzer is a test for Analyzer.
+// TestAnalyzer is a test for CallGraphAnalyzer.
 func TestAnalyzer(t *testing.T) {
 	testdata := testutil.WithModules(t, analysistest.TestData(), nil)
-	analysistest.Run(t, testdata, tablecheck.Analyzer, "isucon13")
+	analysistest.Run(t, testdata, tablecheck.CallGraphAnalyzer, "isucon13")
 }

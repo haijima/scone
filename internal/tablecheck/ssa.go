@@ -29,10 +29,6 @@ func BuildSSA(pkg *packages.Package) (*buildssa.SSA, error) {
 	for _, f := range pkg.Syntax {
 		for _, decl := range f.Decls {
 			if fdecl, ok := decl.(*ast.FuncDecl); ok {
-				// (init functions have distinct Func
-				// objects named "init" and distinct
-				// ssa.Functions named "init#1", ...)
-
 				fn := pkg.TypesInfo.Defs[fdecl.Name].(*types.Func)
 				if fn == nil {
 					panic(fn)

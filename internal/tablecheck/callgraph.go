@@ -11,11 +11,11 @@ import (
 	"golang.org/x/tools/go/ssa"
 )
 
-const doc = "tablecheck is ..."
+const doc = "callgraph is ..."
 
-// Analyzer is ...
-var Analyzer = &analysis.Analyzer{
-	Name: "tablecheck",
+// CallGraphAnalyzer is ...
+var CallGraphAnalyzer = &analysis.Analyzer{
+	Name: "callgraph",
 	Doc:  doc,
 	Run: func(pass *analysis.Pass) (interface{}, error) {
 		ssaProg := pass.ResultOf[buildssa.Analyzer].(*buildssa.SSA)

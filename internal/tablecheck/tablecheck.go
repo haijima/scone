@@ -1,4 +1,4 @@
-package internal
+package tablecheck
 
 import (
 	"fmt"
@@ -6,6 +6,7 @@ import (
 
 	"golang.org/x/tools/go/analysis"
 	"golang.org/x/tools/go/analysis/passes/buildssa"
+	"golang.org/x/tools/go/callgraph"
 	"golang.org/x/tools/go/callgraph/static"
 	"golang.org/x/tools/go/ssa"
 )
@@ -16,16 +17,18 @@ const doc = "tablecheck is ..."
 var Analyzer = &analysis.Analyzer{
 	Name: "tablecheck",
 	Doc:  doc,
-	Run:  run,
+	Run: func(pass *analysis.Pass) (interface{}, error) {
+		ssaProg := pass.ResultOf[buildssa.Analyzer].(*buildssa.SSA)
+		q := pass.ResultOf[ExtractQueryAnalyzer].(*QueryResult)
+		return CallGraph(ssaProg, q)
+	},
 	Requires: []*analysis.Analyzer{
 		buildssa.Analyzer,
 		ExtractQueryAnalyzer,
 	},
 }
 
-func run(pass *analysis.Pass) (any, error) {
-	ssaProg := pass.ResultOf[buildssa.Analyzer].(*buildssa.SSA)
-	q := pass.ResultOf[ExtractQueryAnalyzer].(*queryResult)
+func CallGraph(ssaProg *buildssa.SSA, q *QueryResult) (any, error) {
 	foundQueries := q.queries
 
 	fmt.Println("digraph {")
@@ -97,4 +100,22 @@ func run(pass *analysis.Pass) (any, error) {
 
 	fmt.Println("}")
 	return nil, nil
+}
+
+func getRootFn(cg callgraph.Graph, fn *ssa.Function) []*ssa.Function {
+	node, ok := cg.Nodes[fn]
+	if !ok {
+		return []*ssa.Function{}
+	}
+
+	if len(node.In) == 0 {
+		return []*ssa.Function{fn}
+	}
+
+	result := make([]*ssa.Function, 0)
+	for _, edge := range node.In {
+		caller := edge.Caller.Func
+		result = append(result, getRootFn(cg, caller)...)
+	}
+	return result
 }

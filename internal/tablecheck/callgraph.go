@@ -56,14 +56,14 @@ func CallGraph(ssaProg *buildssa.SSA, q *QueryResult) (any, error) {
 		callerFuncs = append(callerFuncs, q.fn)
 	}
 
-	done := make(map[*ssa.Function]bool)
+	seen := make(map[*ssa.Function]bool)
 	for len(callerFuncs) > 0 {
 		fn := callerFuncs[0]
 		callerFuncs = callerFuncs[1:]
-		if done[fn] {
+		if seen[fn] {
 			continue
 		}
-		done[fn] = true
+		seen[fn] = true
 		if node, ok := cg.Nodes[fn]; ok {
 			for _, edge := range node.In {
 				caller := edge.Caller.Func

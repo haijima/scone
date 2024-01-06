@@ -12,7 +12,7 @@ import (
 	"github.com/spf13/viper"
 )
 
-func NewCallGraphCmd(v *viper.Viper, _ afero.Fs) *cobra.Command {
+func NewCommand(v *viper.Viper, _ afero.Fs) *cobra.Command {
 	cmd := &cobra.Command{}
 	cmd.Use = "callgraph"
 	cmd.Short = "Generate a call graph"

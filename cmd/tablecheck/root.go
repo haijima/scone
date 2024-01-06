@@ -18,7 +18,7 @@ func NewRootCmd(v *viper.Viper, fs afero.Fs) *cobra.Command {
 		return cobrax.RootPersistentPreRunE(cmd, v, fs, args)
 	}
 
-	cmd.AddCommand(callgraph.NewCallGraphCmd(v, fs))
+	cmd.AddCommand(callgraph.NewCommand(v, fs))
 
 	return cmd
 }

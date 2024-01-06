@@ -1,8 +1,11 @@
 package tablecheck
 
-import "golang.org/x/tools/go/analysis/passes/buildssa"
+import (
+	"github.com/haijima/scone/internal/tablecheck/query"
+	"golang.org/x/tools/go/analysis/passes/buildssa"
+)
 
-func Analyze(dir, pattern string) (*buildssa.SSA, *QueryResult, error) {
+func Analyze(dir, pattern string) (*buildssa.SSA, *query.Result, error) {
 	pkgs, err := LoadPackages(dir, pattern)
 	if err != nil {
 		return nil, nil, err
@@ -13,7 +16,7 @@ func Analyze(dir, pattern string) (*buildssa.SSA, *QueryResult, error) {
 		return nil, nil, err
 	}
 
-	queryResult, err := ExtractQuery(ssa)
+	queryResult, err := query.ExtractQuery(ssa)
 	if err != nil {
 		return nil, nil, err
 	}

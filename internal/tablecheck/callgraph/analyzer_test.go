@@ -1,15 +1,15 @@
-package tablecheck_test
+package callgraph_test
 
 import (
 	"testing"
 
 	"github.com/gostaticanalysis/testutil"
-	"github.com/haijima/scone/internal/tablecheck"
+	"github.com/haijima/scone/internal/tablecheck/callgraph"
 	"golang.org/x/tools/go/analysis/analysistest"
 )
 
-// TestAnalyzer is a test for CallGraphAnalyzer.
+// TestAnalyzer is a test for Analyzer.
 func TestAnalyzer(t *testing.T) {
 	testdata := testutil.WithModules(t, analysistest.TestData(), nil)
-	analysistest.Run(t, testdata, tablecheck.CallGraphAnalyzer, "isucon13")
+	analysistest.Run(t, testdata, callgraph.Analyzer, "isucon13")
 }

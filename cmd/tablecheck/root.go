@@ -2,6 +2,7 @@ package main
 
 import (
 	"github.com/haijima/cobrax"
+	"github.com/haijima/scone/cmd/tablecheck/callgraph"
 	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -17,7 +18,7 @@ func NewRootCmd(v *viper.Viper, fs afero.Fs) *cobra.Command {
 		return cobrax.RootPersistentPreRunE(cmd, v, fs, args)
 	}
 
-	cmd.AddCommand(NewCallGraphCmd(v, fs))
+	cmd.AddCommand(callgraph.NewCallGraphCmd(v, fs))
 
 	return cmd
 }

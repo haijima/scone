@@ -1,4 +1,4 @@
-package tablecheck
+package query
 
 import (
 	"go/ast"
@@ -10,11 +10,10 @@ import (
 
 	"golang.org/x/tools/go/analysis"
 	"golang.org/x/tools/go/analysis/passes/buildssa"
-	"golang.org/x/tools/go/ssa"
 )
 
-// ExtractQueryAnalyzer is ...
-var ExtractQueryAnalyzer = &analysis.Analyzer{
+// Analyzer is ...
+var Analyzer = &analysis.Analyzer{
 	Name: "extractquery",
 	Doc:  "tablecheck is ...",
 	Run: func(pass *analysis.Pass) (interface{}, error) {
@@ -24,34 +23,16 @@ var ExtractQueryAnalyzer = &analysis.Analyzer{
 	Requires: []*analysis.Analyzer{
 		buildssa.Analyzer,
 	},
-	ResultType: reflect.TypeOf(new(QueryResult)),
+	ResultType: reflect.TypeOf(new(Result)),
 }
 
-type QueryResult struct {
-	queries        []*Query
-	tables         []string
-	queriesByTable map[string][]*Query
+type Result struct {
+	Queries        []*Query
+	Tables         []string
+	QueriesByTable map[string][]*Query
 }
 
-type Query struct {
-	kind   QueryKind
-	fn     *ssa.Function
-	name   string
-	raw    string
-	tables []string
-}
-
-type QueryKind int
-
-const (
-	Unknown QueryKind = iota
-	Select
-	Insert
-	Delete
-	Update
-)
-
-func ExtractQuery(ssaProg *buildssa.SSA) (*QueryResult, error) {
+func ExtractQuery(ssaProg *buildssa.SSA) (*Result, error) {
 	foundQueries := make([]*Query, 0)
 	foundTableMap := make(map[string]any)
 	queriesByTable := make(map[string][]*Query)
@@ -59,13 +40,13 @@ func ExtractQuery(ssaProg *buildssa.SSA) (*QueryResult, error) {
 		ast.Inspect(member.Syntax(), func(n ast.Node) bool {
 			if lit, ok := n.(*ast.BasicLit); ok && lit.Kind == token.STRING {
 				if q, ok := toSqlQuery(lit.Value); ok {
-					q.fn = member
-					q.name = member.Name()
+					q.Func = member
+					q.Name = member.Name()
 					foundQueries = append(foundQueries, q)
-					for _, t := range q.tables {
+					for _, t := range q.Tables {
 						foundTableMap[t] = struct{}{}
 					}
-					for _, t := range q.tables {
+					for _, t := range q.Tables {
 						if _, ok := queriesByTable[t]; !ok {
 							queriesByTable[t] = make([]*Query, 0)
 						}
@@ -81,7 +62,7 @@ func ExtractQuery(ssaProg *buildssa.SSA) (*QueryResult, error) {
 	for t := range foundTableMap {
 		foundTables = append(foundTables, t)
 	}
-	return &QueryResult{queries: foundQueries, tables: foundTables, queriesByTable: queriesByTable}, nil
+	return &Result{Queries: foundQueries, Tables: foundTables, QueriesByTable: queriesByTable}, nil
 }
 
 var sqlPattern = regexp.MustCompile(`^(?i)(SELECT .+ FROM|INSERT INTO|UPDATE|DELETE FROM) ([a-zA-Z0-9_]+)`)
@@ -100,17 +81,17 @@ func toSqlQuery(str string) (*Query, bool) {
 	}
 
 	q := &Query{
-		raw:    str,
-		tables: sqlPattern.FindStringSubmatch(str)[2:],
+		Raw:    str,
+		Tables: sqlPattern.FindStringSubmatch(str)[2:],
 	}
 	if matches := selectPattern.FindStringSubmatch(str); len(matches) > 2 {
-		q.kind = Select
+		q.Kind = Select
 	} else if matches := insertPattern.FindStringSubmatch(str); len(matches) > 2 {
-		q.kind = Insert
+		q.Kind = Insert
 	} else if matches := updatePattern.FindStringSubmatch(str); len(matches) > 2 {
-		q.kind = Update
+		q.Kind = Update
 	} else if matches := deletePattern.FindStringSubmatch(str); len(matches) > 2 {
-		q.kind = Delete
+		q.Kind = Delete
 	} else {
 		return nil, false
 	}

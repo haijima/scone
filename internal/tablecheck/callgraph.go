@@ -2,11 +2,11 @@ package tablecheck
 
 import (
 	"fmt"
+	"reflect"
 	"strings"
 
 	"golang.org/x/tools/go/analysis"
 	"golang.org/x/tools/go/analysis/passes/buildssa"
-	"golang.org/x/tools/go/callgraph"
 	"golang.org/x/tools/go/callgraph/static"
 	"golang.org/x/tools/go/ssa"
 )
@@ -20,40 +20,113 @@ var CallGraphAnalyzer = &analysis.Analyzer{
 	Run: func(pass *analysis.Pass) (interface{}, error) {
 		ssaProg := pass.ResultOf[buildssa.Analyzer].(*buildssa.SSA)
 		q := pass.ResultOf[ExtractQueryAnalyzer].(*QueryResult)
-		return CallGraph(ssaProg, q)
+		return CallGraph(ssaProg, q, defaultCallGraphOption)
 	},
 	Requires: []*analysis.Analyzer{
 		buildssa.Analyzer,
 		ExtractQueryAnalyzer,
 	},
+	ResultType: reflect.TypeOf(new(CallGraphResult)),
 }
 
-func CallGraph(ssaProg *buildssa.SSA, q *QueryResult) (any, error) {
+type CallGraphResult struct {
+	Nodes map[string]*Node
+}
+
+func (r *CallGraphResult) Add(caller, callee *Node, edge *Edge) {
+	if _, ok := r.Nodes[caller.Name]; !ok {
+		r.Nodes[caller.Name] = caller
+	}
+	if _, ok := r.Nodes[callee.Name]; !ok {
+		r.Nodes[callee.Name] = callee
+	}
+
+	edge.Caller = caller.Name
+	edge.Callee = callee.Name
+
+	r.Nodes[caller.Name].Out = append(r.Nodes[caller.Name].Out, edge)
+	r.Nodes[callee.Name].In = append(r.Nodes[callee.Name].In, edge)
+}
+
+func TopologicalSort(nodes map[string]*Node) []*Node {
+	visited := make(map[*Node]bool)
+	sorted := make([]*Node, 0, len(nodes))
+	var visit func(*Node)
+	visit = func(node *Node) {
+		if visited[node] {
+			return
+		}
+		visited[node] = true
+		for _, edge := range node.Out {
+			visit(nodes[edge.Callee])
+		}
+		sorted = append(sorted, node)
+	}
+	for _, node := range nodes {
+		visit(node)
+	}
+	return sorted
+}
+
+type Node struct {
+	Name string
+	In   []*Edge
+	Out  []*Edge
+	Func *ssa.Function
+}
+
+type Edge struct {
+	SqlValue *SqlValue
+	Caller   string
+	Callee   string
+}
+
+type SqlValue struct {
+	Kind   QueryKind
+	RawSQL string
+}
+
+type CallGraphOption struct {
+	IgnoreSelect bool
+}
+
+var defaultCallGraphOption = CallGraphOption{
+	IgnoreSelect: false,
+}
+
+func CallGraph(ssaProg *buildssa.SSA, q *QueryResult, opt CallGraphOption) (*CallGraphResult, error) {
+	result := &CallGraphResult{
+		Nodes: make(map[string]*Node),
+	}
 	foundQueries := q.queries
-
-	fmt.Println("digraph {")
-	fmt.Println("\trankdir=\"LR\"")
-
-	callerFuncs := make([]*ssa.Function, 0)
 	cg := static.CallGraph(ssaProg.Pkg.Prog)
-	fnKindTableMemo := make(map[string]bool)
+	callerFuncs := make([]*ssa.Function, 0, len(foundQueries))
+	queryEdgeMemo := make(map[string]bool)
 	for _, q := range foundQueries {
-		k := fmt.Sprintf("%s#%s#%s", q.fn.Name(), q.kind, q.tables[0])
-		if fnKindTableMemo[k] {
-			continue
+		for _, t := range q.tables {
+			if q.kind == Select && opt.IgnoreSelect {
+				if _, ok := result.Nodes[t]; !ok {
+					result.Nodes[t] = &Node{Name: t}
+				}
+				continue
+			}
+
+			k := fmt.Sprintf("%s#%s#%s", q.fn.Name(), q.kind, t)
+			if queryEdgeMemo[k] {
+				continue
+			}
+			queryEdgeMemo[k] = true
+
+			if q.fn.Name() == "main" || q.fn.Name() == "init" {
+				continue
+			}
+			if strings.HasPrefix(q.fn.Name(), "initializeHandler") {
+				continue
+			}
+			result.Add(&Node{Name: q.fn.Name(), Func: q.fn}, &Node{Name: t}, &Edge{SqlValue: &SqlValue{Kind: q.kind, RawSQL: q.raw}})
+
+			callerFuncs = append(callerFuncs, q.fn)
 		}
-		fnKindTableMemo[k] = true
-		if q.kind == "SELECT" {
-			fmt.Printf("\t\"%s\" -> \"%s\"[style=dotted];\n", q.fn.Name(), q.tables[0])
-			//continue
-		} else if q.kind == "INSERT" {
-			fmt.Printf("\t\"%s\" -> \"%s\"[style=solid, color=green];\n", q.fn.Name(), q.tables[0])
-		} else if q.kind == "UPDATE" {
-			fmt.Printf("\t\"%s\" -> \"%s\"[style=bold, color=orange];\n", q.fn.Name(), q.tables[0])
-		} else if q.kind == "DELETE" {
-			fmt.Printf("\t\"%s\" -> \"%s\"[style=bold, color=red];\n", q.fn.Name(), q.tables[0])
-		}
-		callerFuncs = append(callerFuncs, q.fn)
 	}
 
 	seen := make(map[*ssa.Function]bool)
@@ -67,55 +140,11 @@ func CallGraph(ssaProg *buildssa.SSA, q *QueryResult) (any, error) {
 		if node, ok := cg.Nodes[fn]; ok {
 			for _, edge := range node.In {
 				caller := edge.Caller.Func
-				callee := edge.Callee.Func
-				fmt.Printf("\t\"%s\" -> \"%s\"[style=dashed];\n", caller.Name(), callee.Name())
+				result.Add(&Node{Name: caller.Name(), Func: caller}, &Node{Name: fn.Name(), Func: fn}, &Edge{})
+
 				callerFuncs = append(callerFuncs, caller)
 			}
-
-			if len(node.In) == 0 {
-				fmt.Printf("\t{rank = min; \"%s\"}\n", fn.Name())
-			}
 		}
 	}
-
-	// table node position
-	fmt.Printf("\t{rank = max; %s}\n", strings.Join(q.tables, "; "))
-
-	// table node style
-	for _, table := range q.tables {
-		kindMap := make(map[string]bool)
-		for _, qq := range q.queriesByTable[table] {
-			kindMap[qq.kind] = true
-		}
-		if kindMap["DELETE"] {
-			fmt.Printf("\t\"%s\"[shape=box, style=bold, color=red, fontsize=\"21\", pad=1];\n", table)
-		} else if kindMap["UPDATE"] {
-			fmt.Printf("\t\"%s\"[shape=box, style=bold, color=orange, fontsize=\"21\", pad=1];\n", table)
-		} else if kindMap["INSERT"] {
-			fmt.Printf("\t\"%s\"[shape=box, style=solid, color=green, fontsize=\"21\", pad=1];\n", table)
-		} else if kindMap["SELECT"] {
-			fmt.Printf("\t\"%s\"[shape=box, style=dashed, fontsize=\"21\", pad=1];\n", table)
-		}
-	}
-
-	fmt.Println("}")
-	return nil, nil
-}
-
-func getRootFn(cg callgraph.Graph, fn *ssa.Function) []*ssa.Function {
-	node, ok := cg.Nodes[fn]
-	if !ok {
-		return []*ssa.Function{}
-	}
-
-	if len(node.In) == 0 {
-		return []*ssa.Function{fn}
-	}
-
-	result := make([]*ssa.Function, 0)
-	for _, edge := range node.In {
-		caller := edge.Caller.Func
-		result = append(result, getRootFn(cg, caller)...)
-	}
-	return result
+	return result, nil
 }

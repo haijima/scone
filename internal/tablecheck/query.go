@@ -34,12 +34,22 @@ type QueryResult struct {
 }
 
 type Query struct {
-	kind   string
+	kind   QueryKind
 	fn     *ssa.Function
 	name   string
 	raw    string
 	tables []string
 }
+
+type QueryKind int
+
+const (
+	Unknown QueryKind = iota
+	Select
+	Insert
+	Delete
+	Update
+)
 
 func ExtractQuery(ssaProg *buildssa.SSA) (*QueryResult, error) {
 	foundQueries := make([]*Query, 0)
@@ -94,13 +104,13 @@ func toSqlQuery(str string) (*Query, bool) {
 		tables: sqlPattern.FindStringSubmatch(str)[2:],
 	}
 	if matches := selectPattern.FindStringSubmatch(str); len(matches) > 2 {
-		q.kind = "SELECT"
+		q.kind = Select
 	} else if matches := insertPattern.FindStringSubmatch(str); len(matches) > 2 {
-		q.kind = "INSERT"
+		q.kind = Insert
 	} else if matches := updatePattern.FindStringSubmatch(str); len(matches) > 2 {
-		q.kind = "UPDATE"
+		q.kind = Update
 	} else if matches := deletePattern.FindStringSubmatch(str); len(matches) > 2 {
-		q.kind = "DELETE"
+		q.kind = Delete
 	} else {
 		return nil, false
 	}

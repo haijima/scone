@@ -39,7 +39,7 @@ func ExtractQuery(ssaProg *buildssa.SSA) (*Result, error) {
 	for _, member := range ssaProg.SrcFuncs {
 		ast.Inspect(member.Syntax(), func(n ast.Node) bool {
 			if lit, ok := n.(*ast.BasicLit); ok && lit.Kind == token.STRING {
-				if q, ok := toSqlQuery(lit.Value); ok {
+				if q, ok := toSqlQuery(lit); ok {
 					q.Func = member
 					q.Name = member.Name()
 					foundQueries = append(foundQueries, q)
@@ -72,13 +72,13 @@ var insertPattern = regexp.MustCompile(`^(?i)(INSERT INTO) ([a-z0-9_]+)`)
 var updatePattern = regexp.MustCompile(`^(?i)(UPDATE) ([a-z0-9_]+)`)
 var deletePattern = regexp.MustCompile(`^(?i)(DELETE FROM) ([a-z0-9_]+)`)
 
-func toSqlQuery(str string) (*Query, bool) {
-	str, err := normalize(str)
+func toSqlQuery(lit *ast.BasicLit) (*Query, bool) {
+	str, err := normalize(lit.Value)
 	if err != nil {
 		return nil, false
 	}
 
-	q := &Query{Raw: str}
+	q := &Query{Raw: str, Pos: lit.Pos()}
 	if matches := selectPattern.FindStringSubmatch(str); len(matches) > 2 {
 		q.Kind = Select
 		//q.Tables = sqlPattern.FindStringSubmatch(str)[2:]

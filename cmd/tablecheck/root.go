@@ -3,6 +3,7 @@ package main
 import (
 	"github.com/haijima/cobrax"
 	"github.com/haijima/scone/cmd/tablecheck/callgraph"
+	"github.com/haijima/scone/cmd/tablecheck/query"
 	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -19,6 +20,7 @@ func NewRootCmd(v *viper.Viper, fs afero.Fs) *cobra.Command {
 	}
 
 	cmd.AddCommand(callgraph.NewCommand(v, fs))
+	cmd.AddCommand(query.NewCommand(v, fs))
 
 	return cmd
 }

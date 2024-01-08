@@ -17,13 +17,7 @@ func NewCommand(v *viper.Viper, _ afero.Fs) *cobra.Command {
 	cmd.Use = "callgraph"
 	cmd.Short = "Generate a call graph"
 	cmd.RunE = func(cmd *cobra.Command, args []string) error {
-		dir := v.GetString("dir")
-		pattern := v.GetString("pattern")
-		ignoreSelect := v.GetBool("ignore-select")
-		opt := callgraph.CallGraphOption{
-			IgnoreSelect: ignoreSelect,
-		}
-		return run(cmd, dir, pattern, opt)
+		return run(cmd, v)
 	}
 
 	cmd.Flags().StringP("dir", "d", ".", "The directory to analyze")
@@ -35,7 +29,14 @@ func NewCommand(v *viper.Viper, _ afero.Fs) *cobra.Command {
 	return cmd
 }
 
-func run(cmd *cobra.Command, dir, pattern string, opt callgraph.CallGraphOption) error {
+func run(cmd *cobra.Command, v *viper.Viper) error {
+	dir := v.GetString("dir")
+	pattern := v.GetString("pattern")
+	ignoreSelect := v.GetBool("ignore-select")
+	opt := callgraph.CallGraphOption{
+		IgnoreSelect: ignoreSelect,
+	}
+
 	ssa, queryResult, err := tablecheck.Analyze(dir, pattern)
 	if err != nil {
 		return err
@@ -51,37 +52,23 @@ func run(cmd *cobra.Command, dir, pattern string, opt callgraph.CallGraphOption)
 func printGraphviz(w io.Writer, cg *callgraph.CallGraph) error {
 	fmt.Fprintln(w, "digraph {")
 	fmt.Fprintln(w, "\trankdir=\"LR\"")
+	fmt.Fprintln(w)
 
 	for _, node := range cg.Nodes {
-		if node.Func == nil {
-			// Print table node styles
-			fmt.Fprintln(w, &GraphvizNode{Name: node.Name, Shape: "box"})
-			// Print table node positions
-			fmt.Fprintf(w, "\t{rank = max; \"%s\"}\n", node.Name)
-		} else if len(node.In) == 0 {
-			// Print root node styles
-			fmt.Fprintf(w, "\t{rank = min; \"%s\"}\n", node.Name)
-		}
-
 		// Print edges
 		for _, edge := range node.Out {
-			gve := &GraphvizEdge{From: edge.Caller, To: edge.Callee, Style: "solid"}
+			gve := &GraphvizEdge{From: edge.Caller, To: edge.Callee, Style: "bold", Weight: 100}
 			if edge.SqlValue != nil {
 				switch edge.SqlValue.Kind {
 				case query.Select:
 					gve.Style = "dotted"
-					//gve.Color = "blue"
+					gve.Weight = 1
 				case query.Insert:
 					gve.Color = "green"
-					gve.Weight = 100
 				case query.Update:
-					gve.Style = "bold"
 					gve.Color = "orange"
-					gve.Weight = 100
 				case query.Delete:
-					gve.Style = "bold"
 					gve.Color = "red"
-					gve.Weight = 100
 				default:
 				}
 			} else {
@@ -92,10 +79,13 @@ func printGraphviz(w io.Writer, cg *callgraph.CallGraph) error {
 		}
 	}
 
-	// Print cacheable func node styles
+	fmt.Fprintln(w)
+
+	// Print cacheable func and table node styles
 	selectOnlyNodes := make(map[string]query.QueryKind)
 	for _, node := range callgraph.TopologicalSort(cg.Nodes) {
-		if node.Func == nil { // table node
+		// table node
+		if node.Func == nil {
 			kind := query.Select
 			for _, q := range node.In {
 				if q.SqlValue != nil {
@@ -106,6 +96,7 @@ func printGraphviz(w io.Writer, cg *callgraph.CallGraph) error {
 			continue
 		}
 
+		// func node
 		selectOnly := true
 		kind := query.Unknown
 		for _, edge := range node.Out {
@@ -121,7 +112,6 @@ func printGraphviz(w io.Writer, cg *callgraph.CallGraph) error {
 			selectOnlyNodes[node.Name] = kind
 		}
 	}
-
 	for n, k := range selectOnlyNodes {
 		gvn := &GraphvizNode{Name: n, Style: "bold,filled", FontSize: "21"}
 		if k == query.Select {
@@ -130,13 +120,33 @@ func printGraphviz(w io.Writer, cg *callgraph.CallGraph) error {
 		} else if k == query.Insert {
 			gvn.Color = "green"
 			gvn.FillColor = "darkolivegreen1"
-		} else if k == query.Update || k == query.Delete {
+		} else if k == query.Update {
 			gvn.Style = "solid"
-			gvn.Color = "orangered"
-			//gvn.FillColor = "rosybrown1"
+			gvn.Color = "orange"
+		} else if k == query.Delete {
+			gvn.Style = "solid"
+			gvn.Color = "red"
+		}
+		if cg.Nodes[n].Func == nil {
+			gvn.Shape = "box"
 		}
 		fmt.Fprintln(w, gvn)
 	}
+
+	fmt.Fprintln(w)
+
+	// Print node positions
+	minNodeNames := make([]string, 0)
+	maxNodeNames := make([]string, 0)
+	for _, node := range cg.Nodes {
+		if node.Func == nil {
+			maxNodeNames = append(maxNodeNames, node.Name)
+		} else if len(node.In) == 0 {
+			minNodeNames = append(minNodeNames, node.Name)
+		}
+	}
+	fmt.Fprintln(w, GraphvizRank("min", minNodeNames...))
+	fmt.Fprintln(w, GraphvizRank("max", maxNodeNames...))
 
 	fmt.Fprintln(w, "}")
 	return nil

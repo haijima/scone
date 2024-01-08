@@ -2,6 +2,7 @@ package callgraph
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 )
 
@@ -64,4 +65,12 @@ func (e *GraphvizEdge) String() string {
 		return fmt.Sprintf("\t\"%s\" -> \"%s\";", e.From, e.To)
 	}
 	return fmt.Sprintf("\t\"%s\" -> \"%s\"[%s];", e.From, e.To, strings.Join(attributes, ", "))
+}
+
+func GraphvizRank(rank string, nodes ...string) string {
+	n := make([]string, 0, len(nodes))
+	for _, node := range nodes {
+		n = append(n, strconv.Quote(node))
+	}
+	return fmt.Sprintf("\t{rank = %s; %s}", rank, strings.Join(n, "; "))
 }

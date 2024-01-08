@@ -65,12 +65,12 @@ func ExtractQuery(ssaProg *buildssa.SSA) (*Result, error) {
 	return &Result{Queries: foundQueries, Tables: foundTables, QueriesByTable: queriesByTable}, nil
 }
 
-var selectPattern = regexp.MustCompile(`^(?i)(SELECT .+ FROM) ([a-z0-9_]+)`)
-var joinPattern = regexp.MustCompile(`(?i)(?:JOIN ([a-z0-9_]+) (?:[a-z0-9_]+ )?ON)+`)
-var subqueryPattern = regexp.MustCompile(`(?i)(SELECT .+ FROM) ([a-z0-9_]+)`)
-var insertPattern = regexp.MustCompile(`^(?i)(INSERT INTO) ([a-z0-9_]+)`)
-var updatePattern = regexp.MustCompile(`^(?i)(UPDATE) ([a-z0-9_]+)`)
-var deletePattern = regexp.MustCompile(`^(?i)(DELETE FROM) ([a-z0-9_]+)`)
+var selectPattern = regexp.MustCompile("^(?i)(SELECT .+ FROM) `?(?:[a-z0-9_]+\\.)?([a-z0-9_]+)`?")
+var joinPattern = regexp.MustCompile("(?i)(?:JOIN `?(?:[a-z0-9_]+\\.)?([a-z0-9_]+)`? (?:[a-z0-9_]+ )?ON)+")
+var subqueryPattern = regexp.MustCompile("(?i)(SELECT .+ FROM) `?(?:[a-z0-9_]+\\.)?([a-z0-9_]+)`?")
+var insertPattern = regexp.MustCompile("^(?i)(INSERT INTO) `?(?:[a-z0-9_]+\\.)?([a-z0-9_]+)`?")
+var updatePattern = regexp.MustCompile("^(?i)(UPDATE) `?(?:[a-z0-9_]+\\.)?([a-z0-9_]+)`? SET")
+var deletePattern = regexp.MustCompile("^(?i)(DELETE FROM) `?(?:[a-z0-9_]+\\.)?([a-z0-9_]+)`?")
 
 func toSqlQuery(lit *ast.BasicLit) (*Query, bool) {
 	str, err := normalize(lit.Value)

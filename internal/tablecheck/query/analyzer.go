@@ -67,12 +67,12 @@ func ExtractQuery(ssaProg *buildssa.SSA) (*Result, error) {
 	return &Result{Queries: foundQueries, Tables: foundTables, QueriesByTable: queriesByTable}, nil
 }
 
-var selectPattern = regexp.MustCompile("^(?i)(SELECT .+ FROM) `?(?:[a-z0-9_]+\\.)?([a-z0-9_]+)`?")
-var joinPattern = regexp.MustCompile("(?i)(?:JOIN `?(?:[a-z0-9_]+\\.)?([a-z0-9_]+)`? (?:[a-z0-9_]+ )?ON)+")
-var subqueryPattern = regexp.MustCompile("(?i)(SELECT .+ FROM) `?(?:[a-z0-9_]+\\.)?([a-z0-9_]+)`?")
-var insertPattern = regexp.MustCompile("^(?i)(INSERT INTO) `?(?:[a-z0-9_]+\\.)?([a-z0-9_]+)`?")
-var updatePattern = regexp.MustCompile("^(?i)(UPDATE) `?(?:[a-z0-9_]+\\.)?([a-z0-9_]+)`? SET")
-var deletePattern = regexp.MustCompile("^(?i)(DELETE FROM) `?(?:[a-z0-9_]+\\.)?([a-z0-9_]+)`?")
+var selectPattern = regexp.MustCompile("^(?i)(SELECT .+? FROM `?(?:[a-z0-9_]+\\.)?)([a-z0-9_]+)(`?)")
+var joinPattern = regexp.MustCompile("(?i)(JOIN `?(?:[a-z0-9_]+\\.)?)([a-z0-9_]+)(`?(?:(?: as)? [a-z0-9_]+)? (?:ON|USING)?)")
+var subqueryPattern = regexp.MustCompile("(?i)(SELECT .+? FROM `?(?:[a-z0-9_]+\\.)?)([a-z0-9_]+)(`?)")
+var insertPattern = regexp.MustCompile("^(?i)(INSERT(?: IGNORE)?(?: INTO)? `?(?:[a-z0-9_]+\\.)?)([a-z0-9_]+)(`?)")
+var updatePattern = regexp.MustCompile("^(?i)(UPDATE(?: IGNORE)? `?(?:[a-z0-9_]+\\.)?)([a-z0-9_]+)(`? SET)")
+var deletePattern = regexp.MustCompile("^(?i)(DELETE(?: IGNORE)? FROM `?(?:[a-z0-9_]+\\.)?)([a-z0-9_]+)(`?)")
 
 func toSqlQuery(str string) (*Query, bool) {
 	str, err := normalize(str)
@@ -83,7 +83,6 @@ func toSqlQuery(str string) (*Query, bool) {
 	q := &Query{Raw: str}
 	if matches := selectPattern.FindStringSubmatch(str); len(matches) > 2 {
 		q.Kind = Select
-		//q.Tables = sqlPattern.FindStringSubmatch(str)[2:]
 		q.Tables = make([]string, 0)
 		if subqueryPattern.MatchString(str) {
 			for _, m := range subqueryPattern.FindAllStringSubmatch(str, -1) {
@@ -92,12 +91,12 @@ func toSqlQuery(str string) (*Query, bool) {
 		}
 		if joinPattern.MatchString(str) {
 			for _, m := range joinPattern.FindAllStringSubmatch(str, -1) {
-				q.Tables = append(q.Tables, m[1])
+				q.Tables = append(q.Tables, m[2])
 			}
 		}
 	} else if matches := insertPattern.FindStringSubmatch(str); len(matches) > 2 {
 		q.Kind = Insert
-		q.Tables = insertPattern.FindStringSubmatch(str)[2:]
+		q.Tables = []string{insertPattern.FindStringSubmatch(str)[2]}
 		if subqueryPattern.MatchString(str) {
 			for _, m := range subqueryPattern.FindAllStringSubmatch(str, -1) {
 				q.Tables = append(q.Tables, m[2])
@@ -105,7 +104,7 @@ func toSqlQuery(str string) (*Query, bool) {
 		}
 	} else if matches := updatePattern.FindStringSubmatch(str); len(matches) > 2 {
 		q.Kind = Update
-		q.Tables = updatePattern.FindStringSubmatch(str)[2:]
+		q.Tables = []string{updatePattern.FindStringSubmatch(str)[2]}
 		if subqueryPattern.MatchString(str) {
 			for _, m := range subqueryPattern.FindAllStringSubmatch(str, -1) {
 				q.Tables = append(q.Tables, m[2])
@@ -113,7 +112,7 @@ func toSqlQuery(str string) (*Query, bool) {
 		}
 	} else if matches := deletePattern.FindStringSubmatch(str); len(matches) > 2 {
 		q.Kind = Delete
-		q.Tables = deletePattern.FindStringSubmatch(str)[2:]
+		q.Tables = []string{deletePattern.FindStringSubmatch(str)[2]}
 		if subqueryPattern.MatchString(str) {
 			for _, m := range subqueryPattern.FindAllStringSubmatch(str, -1) {
 				q.Tables = append(q.Tables, m[2])

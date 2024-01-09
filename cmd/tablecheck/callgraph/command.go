@@ -24,7 +24,7 @@ func NewCommand(v *viper.Viper, _ afero.Fs) *cobra.Command {
 	cmd.Flags().StringP("dir", "d", ".", "The directory to analyze")
 	cmd.Flags().StringP("pattern", "p", "./...", "The pattern to analyze")
 	cmd.Flags().String("format", "dot", "The output format {dot|mermaid|text}")
-	cmd.Flags().Bool("ignore-select", false, "Ignore SELECT statements")
+	cmd.Flags().StringSlice("exclude-queries", []string{}, "The `SHA1s` of queries to exclude")
 	_ = cmd.MarkFlagDirname("dir")
 
 	return cmd
@@ -33,19 +33,16 @@ func NewCommand(v *viper.Viper, _ afero.Fs) *cobra.Command {
 func run(cmd *cobra.Command, v *viper.Viper) error {
 	dir := v.GetString("dir")
 	pattern := v.GetString("pattern")
-	ignoreSelect := v.GetBool("ignore-select")
-	opt := callgraph.CallGraphOption{
-		IgnoreSelect: ignoreSelect,
-	}
+	excludeQueries := v.GetStringSlice("exclude-queries")
 
-	result, err := tablecheck.Analyze(dir, pattern)
+	result, err := tablecheck.Analyze(dir, pattern, &query.QueryOption{ExcludeQueries: excludeQueries})
 	if err != nil {
 		return err
 	}
 
 	cgs := make([]*callgraph.CallGraph, 0, len(result))
 	for _, res := range result {
-		cg, err := callgraph.BuildCallGraph(res.SSA, res.QueryResult, opt)
+		cg, err := callgraph.BuildCallGraph(res.SSA, res.QueryResult)
 		if err != nil {
 			return err
 		}

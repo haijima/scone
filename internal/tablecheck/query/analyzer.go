@@ -1,6 +1,8 @@
 package query
 
 import (
+	"crypto/sha1"
+	"fmt"
 	"go/ast"
 	"go/token"
 	"reflect"
@@ -18,7 +20,7 @@ var Analyzer = &analysis.Analyzer{
 	Doc:  "tablecheck is ...",
 	Run: func(pass *analysis.Pass) (interface{}, error) {
 		ssaProg := pass.ResultOf[buildssa.Analyzer].(*buildssa.SSA)
-		return ExtractQuery(ssaProg)
+		return ExtractQuery(ssaProg, &QueryOption{})
 	},
 	Requires: []*analysis.Analyzer{
 		buildssa.Analyzer,
@@ -32,7 +34,24 @@ type Result struct {
 	QueriesByTable map[string][]*Query
 }
 
-func ExtractQuery(ssaProg *buildssa.SSA) (*Result, error) {
+type QueryOption struct {
+	ExcludeQueries      []string
+	ExcludePackages     []string
+	ExcludePackagePaths []string
+	ExcludeFiles        []string
+	ExcludeFunctions    []string
+	ExcludeQueryTypes   []string
+	ExcludeTables       []string
+	FilterQueries       []string
+	FilterPackages      []string
+	FilterPackagePaths  []string
+	FilterFiles         []string
+	FilterFunctions     []string
+	FilterQueryTypes    []string
+	FilterTables        []string
+}
+
+func ExtractQuery(ssaProg *buildssa.SSA, opt *QueryOption) (*Result, error) {
 	foundQueries := make([]*Query, 0)
 	foundTableMap := make(map[string]any)
 	queriesByTable := make(map[string][]*Query)
@@ -44,6 +63,10 @@ func ExtractQuery(ssaProg *buildssa.SSA) (*Result, error) {
 					q.Name = member.Name()
 					q.Pos = ssaProg.Pkg.Prog.Fset.Position(lit.Pos())
 					q.Package = ssaProg.Pkg.Pkg
+					if !filter(q, opt) {
+						return true
+					}
+
 					foundQueries = append(foundQueries, q)
 					for _, t := range q.Tables {
 						foundTableMap[t] = struct{}{}
@@ -135,4 +158,44 @@ func normalize(str string) (string, error) {
 	str = strings.Trim(str, " ")
 	str = strings.ToLower(str)
 	return str, nil
+}
+
+func filter(q *Query, opt *QueryOption) bool {
+	pkgName := q.Package.Name()
+	pkgPath := q.Package.Path()
+	file := q.Pos.Filename
+	funcName := q.Func.Name()
+	queryType := q.Kind.String()
+	table := q.Tables[0]
+	h := sha1.New()
+	h.Write([]byte(q.Raw))
+	hash := fmt.Sprintf("%x", h.Sum(nil))
+
+	return filterAndExclude(pkgName, opt.FilterPackages, opt.ExcludePackages) &&
+		filterAndExclude(pkgPath, opt.FilterPackagePaths, opt.ExcludePackagePaths) &&
+		filterAndExclude(file, opt.FilterFiles, opt.ExcludeFiles) &&
+		filterAndExclude(funcName, opt.FilterFunctions, opt.ExcludeFunctions) &&
+		filterAndExclude(queryType, opt.FilterQueryTypes, opt.ExcludeQueryTypes) &&
+		filterAndExclude(table, opt.FilterTables, opt.ExcludeTables) &&
+		filterAndExclude(hash, opt.FilterQueries, opt.ExcludeQueries)
+}
+
+func filterAndExclude(target string, filters []string, excludes []string) bool {
+	match := true
+	if filters != nil && len(filters) > 0 {
+		match = false
+		for _, f := range filters {
+			if f == target {
+				match = true
+			}
+		}
+	}
+	if excludes != nil && len(excludes) > 0 {
+		for _, e := range excludes {
+			if e == target {
+				match = false
+			}
+		}
+	}
+	return match
 }

@@ -1,12 +1,15 @@
 package callgraph
 
 import (
+	"go/types"
+
 	"github.com/haijima/scone/internal/tablecheck/query"
 	"golang.org/x/tools/go/ssa"
 )
 
 type CallGraph struct {
-	Nodes map[string]*Node
+	Package *types.Package
+	Nodes   map[string]*Node
 }
 
 func (r *CallGraph) AddNode(n *Node) {

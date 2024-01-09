@@ -2,17 +2,19 @@ package query
 
 import (
 	"go/token"
+	"go/types"
 
 	"golang.org/x/tools/go/ssa"
 )
 
 type Query struct {
-	Kind   QueryKind
-	Func   *ssa.Function
-	Pos    token.Pos
-	Name   string
-	Raw    string
-	Tables []string
+	Kind    QueryKind
+	Func    *ssa.Function
+	Pos     token.Position
+	Package *types.Package
+	Name    string
+	Raw     string
+	Tables  []string
 }
 
 type QueryKind int

@@ -39,9 +39,11 @@ func ExtractQuery(ssaProg *buildssa.SSA) (*Result, error) {
 	for _, member := range ssaProg.SrcFuncs {
 		ast.Inspect(member.Syntax(), func(n ast.Node) bool {
 			if lit, ok := n.(*ast.BasicLit); ok && lit.Kind == token.STRING {
-				if q, ok := toSqlQuery(lit); ok {
+				if q, ok := toSqlQuery(lit.Value); ok {
 					q.Func = member
 					q.Name = member.Name()
+					q.Pos = ssaProg.Pkg.Prog.Fset.Position(lit.Pos())
+					q.Package = ssaProg.Pkg.Pkg
 					foundQueries = append(foundQueries, q)
 					for _, t := range q.Tables {
 						foundTableMap[t] = struct{}{}
@@ -72,13 +74,13 @@ var insertPattern = regexp.MustCompile("^(?i)(INSERT INTO) `?(?:[a-z0-9_]+\\.)?(
 var updatePattern = regexp.MustCompile("^(?i)(UPDATE) `?(?:[a-z0-9_]+\\.)?([a-z0-9_]+)`? SET")
 var deletePattern = regexp.MustCompile("^(?i)(DELETE FROM) `?(?:[a-z0-9_]+\\.)?([a-z0-9_]+)`?")
 
-func toSqlQuery(lit *ast.BasicLit) (*Query, bool) {
-	str, err := normalize(lit.Value)
+func toSqlQuery(str string) (*Query, bool) {
+	str, err := normalize(str)
 	if err != nil {
 		return nil, false
 	}
 
-	q := &Query{Raw: str, Pos: lit.Pos()}
+	q := &Query{Raw: str}
 	if matches := selectPattern.FindStringSubmatch(str); len(matches) > 2 {
 		q.Kind = Select
 		//q.Tables = sqlPattern.FindStringSubmatch(str)[2:]

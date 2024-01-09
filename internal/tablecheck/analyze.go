@@ -5,21 +5,31 @@ import (
 	"golang.org/x/tools/go/analysis/passes/buildssa"
 )
 
-func Analyze(dir, pattern string) (*buildssa.SSA, *query.Result, error) {
+type QueryResultWithSSA struct {
+	QueryResult *query.Result
+	SSA         *buildssa.SSA
+}
+
+func Analyze(dir, pattern string) ([]*QueryResultWithSSA, error) {
 	pkgs, err := LoadPackages(dir, pattern)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
-	ssa, err := BuildSSA(pkgs[0])
-	if err != nil {
-		return nil, nil, err
+	results := make([]*QueryResultWithSSA, 0, len(pkgs))
+	for _, pkg := range pkgs {
+		ssa, err := BuildSSA(pkg)
+		if err != nil {
+			return nil, err
+		}
+
+		queryResult, err := query.ExtractQuery(ssa)
+		if err != nil {
+			return nil, err
+		}
+
+		results = append(results, &QueryResultWithSSA{QueryResult: queryResult, SSA: ssa})
 	}
 
-	queryResult, err := query.ExtractQuery(ssa)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	return ssa, queryResult, nil
+	return results, nil
 }

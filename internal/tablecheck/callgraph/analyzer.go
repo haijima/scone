@@ -39,7 +39,8 @@ var defaultCallGraphOption = CallGraphOption{
 
 func BuildCallGraph(ssaProg *buildssa.SSA, q *query.Result, opt CallGraphOption) (*CallGraph, error) {
 	result := &CallGraph{
-		Nodes: make(map[string]*Node),
+		Package: ssaProg.Pkg.Pkg,
+		Nodes:   make(map[string]*Node),
 	}
 	foundQueries := q.Queries
 	cg := static.CallGraph(ssaProg.Pkg.Prog)

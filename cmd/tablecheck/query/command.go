@@ -141,9 +141,11 @@ func printSimple(w io.Writer, queries []*query.Query) {
 }
 
 func printWithTableWriter(w *tablewriter.Table, queries []*query.Query) {
-	w.SetHeader([]string{"Package", "Package Path", "File", "Function", "Type", "Table", "Tables", "Sha1", "Query"})
-	for _, q := range queries {
-		w.Append(row(q))
+	w.SetHeader([]string{"#", "Package", "Package Path", "File", "Function", "Type", "Table", "Tables", "Sha1", "Query"})
+	for i, q := range queries {
+		r := []string{strconv.Itoa(i + 1)}
+		r = append(r, row(q)...)
+		w.Append(r)
 	}
 	w.Render()
 }
@@ -153,12 +155,14 @@ func printCSV(w io.Writer, queries []*query.Query, isTSV bool) error {
 	if isTSV {
 		writer.Comma = '\t'
 	}
-	err := writer.Write([]string{"Package", "Package Path", "File", "Function", "Type", "Table", "Tables", "Sha1", "Query"})
+	err := writer.Write([]string{"#", "Package", "Package Path", "File", "Function", "Type", "Table", "Tables", "Sha1", "Query"})
 	if err != nil {
 		return err
 	}
-	for _, q := range queries {
-		if err := writer.Write(row(q)); err != nil {
+	for i, q := range queries {
+		r := []string{strconv.Itoa(i + 1)}
+		r = append(r, row(q)...)
+		if err := writer.Write(r); err != nil {
 			return err
 		}
 	}

@@ -46,7 +46,7 @@ func NewCommand(v *viper.Viper, _ afero.Fs) *cobra.Command {
 	cmd.Flags().StringSlice("filter-query-types", []string{}, "The `types` of queries to filter {select|insert|update|delete}")
 	cmd.Flags().StringSlice("filter-tables", []string{}, "The `names` of tables to filter")
 	cmd.Flags().StringSlice("cols", []string{}, "The `columns` to show {"+strings.Join(headerColumns, "|")+"}")
-	cmd.Flags().Bool("show-rownum", false, "Show row number")
+	cmd.Flags().Bool("hide-rownum", false, "Hide row number")
 
 	_ = cmd.MarkFlagDirname("dir")
 
@@ -76,7 +76,7 @@ func run(cmd *cobra.Command, v *viper.Viper) error {
 	filterQueryTypes := v.GetStringSlice("filter-query-types")
 	filterTables := v.GetStringSlice("filter-tables")
 	cols := v.GetStringSlice("cols")
-	showRowNum := v.GetBool("show-rownum")
+	hideRowNum := v.GetBool("hide-rownum")
 
 	opt := &query.QueryOption{
 		ExcludeQueries:      excludeQueries,
@@ -103,7 +103,7 @@ func run(cmd *cobra.Command, v *viper.Viper) error {
 	for _, res := range result {
 		queries = append(queries, res.QueryResult.Queries...)
 	}
-	printOpt := &PrintOption{Cols: defaultHeaderIndex, ShowRowNum: showRowNum}
+	printOpt := &PrintOption{Cols: defaultHeaderIndex, HideRowNum: hideRowNum}
 	if len(cols) > 0 {
 		printOpt.Cols = make([]int, 0, len(cols))
 		for _, col := range cols {
@@ -136,7 +136,7 @@ func run(cmd *cobra.Command, v *viper.Viper) error {
 
 type PrintOption struct {
 	Cols       []int
-	ShowRowNum bool
+	HideRowNum bool
 }
 
 func printTable(w io.Writer, queries []*query.Query, opt *PrintOption) {
@@ -175,7 +175,7 @@ func printWithTableWriter(w *tablewriter.Table, queries []*query.Query, opt *Pri
 	w.SetHeader(makeHeader(opt))
 	for i, q := range queries {
 		r := row(q, opt)
-		if opt.ShowRowNum {
+		if !opt.HideRowNum {
 			r = append([]string{strconv.Itoa(i + 1)}, r...)
 		}
 		w.Append(r)
@@ -193,7 +193,7 @@ func printCSV(w io.Writer, queries []*query.Query, isTSV bool, opt *PrintOption)
 	}
 	for i, q := range queries {
 		r := row(q, opt)
-		if opt.ShowRowNum {
+		if !opt.HideRowNum {
 			r = append([]string{strconv.Itoa(i + 1)}, r...)
 		}
 		if err := writer.Write(r); err != nil {
@@ -206,7 +206,7 @@ func printCSV(w io.Writer, queries []*query.Query, isTSV bool, opt *PrintOption)
 
 func makeHeader(opt *PrintOption) []string {
 	header := make([]string, 0)
-	if opt.ShowRowNum {
+	if !opt.HideRowNum {
 		header = append(header, "#")
 	}
 	for _, col := range opt.Cols {

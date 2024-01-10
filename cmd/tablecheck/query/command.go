@@ -28,7 +28,7 @@ func NewCommand(v *viper.Viper, _ afero.Fs) *cobra.Command {
 	cmd.Flags().StringP("dir", "d", ".", "The directory to analyze")
 	cmd.Flags().StringP("pattern", "p", "./...", "The pattern to analyze")
 	cmd.Flags().String("format", "table", "The output format {table|md|csv|tsv|simple}")
-	cmd.Flags().StringArray("sort", []string{"file"}, "The sort `keys` {file|type|table}")
+	cmd.Flags().StringSlice("sort", []string{"file"}, "The sort `keys` {file|function|type|table|sha1}")
 	cmd.Flags().StringSlice("exclude-queries", []string{}, "The `SHA1s` of queries to exclude")
 	cmd.Flags().StringSlice("exclude-packages", []string{}, "The `names` of packages to exclude")
 	cmd.Flags().StringSlice("exclude-package-paths", []string{}, "The `paths` of packages to exclude")
@@ -75,6 +75,7 @@ func run(cmd *cobra.Command, v *viper.Viper) error {
 	filterTables := v.GetStringSlice("filter-tables")
 	cols := v.GetStringSlice("cols")
 	hideRowNum := v.GetBool("hide-rownum")
+	sortKeys := v.GetStringSlice("sort")
 
 	opt := &query.QueryOption{
 		ExcludeQueries:      excludeQueries,
@@ -101,6 +102,40 @@ func run(cmd *cobra.Command, v *viper.Viper) error {
 	for _, res := range result {
 		queries = append(queries, res.QueryResult.Queries...)
 	}
+
+	for _, sortKey := range sortKeys {
+		if sortKey != "file" && sortKey != "function" && sortKey != "type" && sortKey != "table" && sortKey != "sha1" {
+			return fmt.Errorf("unknown sort key: %s", sortKey)
+		}
+	}
+	if !slices.Contains(sortKeys, "file") {
+		sortKeys = append(sortKeys, "file")
+	}
+	slices.SortFunc(queries, func(a, b *query.Query) int {
+		for _, sortKey := range sortKeys {
+			if sortKey == "function" && a.Func.Name() != b.Func.Name() {
+				return strings.Compare(a.Func.Name(), b.Func.Name())
+			} else if sortKey == "type" && a.Kind != b.Kind {
+				return int(a.Kind) - int(b.Kind)
+			} else if sortKey == "table" && a.Tables[0] != b.Tables[0] {
+				return strings.Compare(a.Tables[0], b.Tables[0])
+			} else if sortKey == "sha1" && a.Sha() != b.Sha() {
+				return strings.Compare(a.Sha(), b.Sha())
+			} else if sortKey == "file" {
+				if a.Package.Pkg.Path() != b.Package.Pkg.Path() {
+					return strings.Compare(a.Package.Pkg.Path(), b.Package.Pkg.Path())
+				} else if a.Position().Filename != b.Position().Filename {
+					return strings.Compare(a.Position().Filename, b.Position().Filename)
+				} else if a.Position().Line != b.Position().Line {
+					return a.Position().Line - b.Position().Line
+				} else if a.Position().Column != b.Position().Column {
+					return a.Position().Column - b.Position().Column
+				}
+			}
+		}
+		return 0
+	})
+
 	printOpt := &PrintOption{Cols: defaultHeaderIndex, HideRowNum: hideRowNum}
 	if len(cols) > 0 {
 		printOpt.Cols = make([]int, 0, len(cols))

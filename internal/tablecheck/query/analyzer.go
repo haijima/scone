@@ -4,14 +4,17 @@ import (
 	"crypto/sha1"
 	"fmt"
 	"go/ast"
+	"go/constant"
 	"go/token"
 	"reflect"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 
 	"golang.org/x/tools/go/analysis"
 	"golang.org/x/tools/go/analysis/passes/buildssa"
+	"golang.org/x/tools/go/ssa"
 )
 
 // Analyzer is ...
@@ -29,9 +32,7 @@ var Analyzer = &analysis.Analyzer{
 }
 
 type Result struct {
-	Queries        []*Query
-	Tables         []string
-	QueriesByTable map[string][]*Query
+	Queries []*Query
 }
 
 type QueryOption struct {
@@ -53,41 +54,115 @@ type QueryOption struct {
 
 func ExtractQuery(ssaProg *buildssa.SSA, opt *QueryOption) (*Result, error) {
 	foundQueries := make([]*Query, 0)
-	foundTableMap := make(map[string]any)
-	queriesByTable := make(map[string][]*Query)
 	for _, member := range ssaProg.SrcFuncs {
-		ast.Inspect(member.Syntax(), func(n ast.Node) bool {
-			if lit, ok := n.(*ast.BasicLit); ok && lit.Kind == token.STRING {
-				if q, ok := toSqlQuery(lit.Value); ok {
-					q.Func = member
-					q.Name = member.Name()
-					q.Pos = ssaProg.Pkg.Prog.Fset.Position(lit.Pos())
-					q.Package = ssaProg.Pkg.Pkg
-					if !filter(q, opt) {
-						return true
-					}
+		foundQueries = append(foundQueries, analyzeFunc(ssaProg.Pkg, member, []token.Pos{}, opt)...)
+		//foundQueries = append(foundQueries, analyzeFuncByAst(member, opt)...)
+	}
 
+	slices.SortFunc(foundQueries, func(a, b *Query) int {
+		if a.Position().Offset == b.Position().Offset {
+			if a.Raw == b.Raw {
+				return 0
+			}
+			if a.Raw < b.Raw {
+				return -1
+			}
+			return 1
+		}
+		if a.Position().Offset < b.Position().Offset {
+			return -1
+		}
+		return 1
+	})
+	foundQueries = slices.CompactFunc(foundQueries, func(a, b *Query) bool {
+		return a.Raw == b.Raw && a.Position().Offset == b.Position().Offset
+	})
+	return &Result{Queries: foundQueries}, nil
+}
+
+func analyzeFunc(pkg *ssa.Package, fn *ssa.Function, pos []token.Pos, opt *QueryOption) []*Query {
+	foundQueries := make([]*Query, 0)
+	for _, block := range fn.Blocks {
+		for _, instr := range block.Instrs {
+			foundQueries = append(foundQueries, analyzeInstr(pkg, instr, append([]token.Pos{fn.Pos()}, pos...), opt)...)
+		}
+	}
+	for _, anon := range fn.AnonFuncs {
+		foundQueries = append(foundQueries, analyzeFunc(pkg, anon, append([]token.Pos{anon.Pos(), fn.Pos()}, pos...), opt)...)
+	}
+	return foundQueries
+}
+
+func analyzeInstr(pkg *ssa.Package, instr ssa.Instruction, pos []token.Pos, opt *QueryOption) []*Query {
+	foundQueries := make([]*Query, 0)
+	switch i := instr.(type) {
+	case *ssa.Call:
+		foundQueries = append(foundQueries, callToQueries(pkg, i, instr.Parent(), pos, opt)...)
+	case *ssa.Phi:
+		foundQueries = append(foundQueries, phiToQueries(pkg, i, instr.Parent(), pos, opt)...)
+	}
+	return foundQueries
+}
+
+func callToQueries(pkg *ssa.Package, i *ssa.Call, fn *ssa.Function, pos []token.Pos, opt *QueryOption) []*Query {
+	res := make([]*Query, 0)
+	pos = append([]token.Pos{i.Pos()}, pos...)
+	for _, arg := range i.Common().Args {
+		switch a := arg.(type) {
+		case *ssa.Phi:
+			res = append(res, phiToQueries(pkg, a, fn, pos, opt)...)
+		case *ssa.Const:
+			if q, ok := constToQuery(pkg, a, fn, pos, opt); ok {
+				res = append(res, q)
+			}
+		}
+	}
+	return res
+}
+
+func phiToQueries(pkg *ssa.Package, a *ssa.Phi, fn *ssa.Function, pos []token.Pos, opt *QueryOption) []*Query {
+	res := make([]*Query, 0)
+	for _, edge := range a.Edges {
+		switch e := edge.(type) {
+		case *ssa.Const:
+			if q, ok := constToQuery(pkg, e, fn, append([]token.Pos{a.Pos()}, pos...), opt); ok {
+				res = append(res, q)
+			}
+		}
+	}
+	return res
+}
+
+func constToQuery(pkg *ssa.Package, a *ssa.Const, fn *ssa.Function, pos []token.Pos, opt *QueryOption) (*Query, bool) {
+	if a.Value != nil && a.Value.Kind() == constant.String {
+		if q, ok := toSqlQuery(a.Value.ExactString()); ok {
+			q.Func = fn
+			q.Pos = append([]token.Pos{a.Pos()}, pos...)
+			q.Package = pkg
+			if filter(q, opt) {
+				return q, true
+			}
+		}
+	}
+	return nil, false
+}
+
+func analyzeFuncByAst(pkg *ssa.Package, fn *ssa.Function, pos []token.Pos, opt *QueryOption) []*Query {
+	foundQueries := make([]*Query, 0)
+	ast.Inspect(fn.Syntax(), func(n ast.Node) bool {
+		if lit, ok := n.(*ast.BasicLit); ok && lit.Kind == token.STRING {
+			if q, ok := toSqlQuery(lit.Value); ok {
+				q.Func = fn
+				q.Pos = append([]token.Pos{lit.Pos()}, pos...)
+				q.Package = pkg
+				if filter(q, opt) {
 					foundQueries = append(foundQueries, q)
-					for _, t := range q.Tables {
-						foundTableMap[t] = struct{}{}
-					}
-					for _, t := range q.Tables {
-						if _, ok := queriesByTable[t]; !ok {
-							queriesByTable[t] = make([]*Query, 0)
-						}
-						queriesByTable[t] = append(queriesByTable[t], q)
-					}
 				}
 			}
-			return true
-		})
-	}
-
-	foundTables := make([]string, 0)
-	for t := range foundTableMap {
-		foundTables = append(foundTables, t)
-	}
-	return &Result{Queries: foundQueries, Tables: foundTables, QueriesByTable: queriesByTable}, nil
+		}
+		return true
+	})
+	return foundQueries
 }
 
 var selectPattern = regexp.MustCompile("^(?i)(SELECT .+? FROM `?(?:[a-z0-9_]+\\.)?)([a-z0-9_]+)(`?)")
@@ -161,9 +236,9 @@ func normalize(str string) (string, error) {
 }
 
 func filter(q *Query, opt *QueryOption) bool {
-	pkgName := q.Package.Name()
-	pkgPath := q.Package.Path()
-	file := q.Pos.Filename
+	pkgName := q.Package.Pkg.Name()
+	pkgPath := q.Package.Pkg.Path()
+	file := q.Position().Filename
 	funcName := q.Func.Name()
 	queryType := q.Kind.String()
 	table := q.Tables[0]

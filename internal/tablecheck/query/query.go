@@ -2,7 +2,6 @@ package query
 
 import (
 	"go/token"
-	"go/types"
 
 	"golang.org/x/tools/go/ssa"
 )
@@ -10,11 +9,21 @@ import (
 type Query struct {
 	Kind    QueryKind
 	Func    *ssa.Function
-	Pos     token.Position
-	Package *types.Package
-	Name    string
+	Pos     []token.Pos
+	Package *ssa.Package
 	Raw     string
 	Tables  []string
+}
+
+func (q *Query) Position() token.Position {
+	p := token.NoPos
+	for _, pos := range q.Pos {
+		if pos.IsValid() {
+			p = pos
+			break
+		}
+	}
+	return q.Package.Prog.Fset.Position(p)
 }
 
 type QueryKind int

@@ -177,7 +177,7 @@ var updatePattern = regexp.MustCompile("^(?i)(UPDATE(?: IGNORE)? `?(?:[a-z0-9_]+
 var deletePattern = regexp.MustCompile("^(?i)(DELETE(?: IGNORE)? FROM `?(?:[a-z0-9_]+\\.)?)([a-z0-9_]+)(`?)")
 
 func row(q *query.Query) []string {
-	file := fmt.Sprintf("%s:%d:%d", filepath.Base(q.Pos.Filename), q.Pos.Line, q.Pos.Column)
+	file := fmt.Sprintf("%s:%d:%d", filepath.Base(q.Position().Filename), q.Position().Line, q.Position().Column)
 	sqlType := q.Kind.String()
 	switch q.Kind {
 	case query.Select:
@@ -202,8 +202,8 @@ func row(q *query.Query) []string {
 	h.Write([]byte(q.Raw))
 
 	return []string{
-		q.Package.Name(),
-		q.Package.Path(),
+		q.Package.Pkg.Name(),
+		q.Package.Pkg.Path(),
 		file,
 		q.Func.Name(),
 		sqlType,

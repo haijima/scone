@@ -7,7 +7,9 @@ import (
 	"io"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strconv"
+	"strings"
 	"unicode"
 
 	"github.com/fatih/color"
@@ -43,11 +45,16 @@ func NewCommand(v *viper.Viper, _ afero.Fs) *cobra.Command {
 	cmd.Flags().StringSlice("filter-functions", []string{}, "The `names` of functions to filter")
 	cmd.Flags().StringSlice("filter-query-types", []string{}, "The `types` of queries to filter {select|insert|update|delete}")
 	cmd.Flags().StringSlice("filter-tables", []string{}, "The `names` of tables to filter")
+	cmd.Flags().StringSlice("cols", []string{}, "The `columns` to show {"+strings.Join(headerColumns, "|")+"}")
+	cmd.Flags().Bool("show-rownum", false, "Show row number")
 
 	_ = cmd.MarkFlagDirname("dir")
 
 	return cmd
 }
+
+var headerColumns = []string{"package", "package-path", "file", "function", "type", "table", "tables", "sha1", "query", "raw-query"}
+var defaultHeaderIndex = []int{0, 1, 2, 3, 4, 5, 6, 7, 8}
 
 func run(cmd *cobra.Command, v *viper.Viper) error {
 	dir := v.GetString("dir")
@@ -68,6 +75,8 @@ func run(cmd *cobra.Command, v *viper.Viper) error {
 	filterFunctions := v.GetStringSlice("filter-functions")
 	filterQueryTypes := v.GetStringSlice("filter-query-types")
 	filterTables := v.GetStringSlice("filter-tables")
+	cols := v.GetStringSlice("cols")
+	showRowNum := v.GetBool("show-rownum")
 
 	opt := &query.QueryOption{
 		ExcludeQueries:      excludeQueries,
@@ -94,37 +103,58 @@ func run(cmd *cobra.Command, v *viper.Viper) error {
 	for _, res := range result {
 		queries = append(queries, res.QueryResult.Queries...)
 	}
+	printOpt := &PrintOption{Cols: defaultHeaderIndex, ShowRowNum: showRowNum}
+	if len(cols) > 0 {
+		printOpt.Cols = make([]int, 0, len(cols))
+		for _, col := range cols {
+			if !slices.Contains(headerColumns, col) {
+				return fmt.Errorf("unknown columns: %s", col)
+			}
+			for i, header := range headerColumns {
+				if col == header {
+					printOpt.Cols = append(printOpt.Cols, i)
+					break
+				}
+			}
+		}
+	}
 	if format == "table" {
-		printTable(cmd.OutOrStdout(), queries)
+		printTable(cmd.OutOrStdout(), queries, printOpt)
 	} else if format == "md" {
-		printMarkdown(cmd.OutOrStdout(), queries)
+		printMarkdown(cmd.OutOrStdout(), queries, printOpt)
 	} else if format == "simple" {
-		printSimple(cmd.OutOrStdout(), queries)
+		printSimple(cmd.OutOrStdout(), queries, printOpt)
 	} else if format == "csv" {
-		return printCSV(cmd.OutOrStdout(), queries, false)
+		return printCSV(cmd.OutOrStdout(), queries, false, printOpt)
 	} else if format == "tsv" {
-		return printCSV(cmd.OutOrStdout(), queries, true)
+		return printCSV(cmd.OutOrStdout(), queries, true, printOpt)
 	} else {
 		return fmt.Errorf("unknown format: %s", format)
 	}
 	return nil
 }
 
-func printTable(w io.Writer, queries []*query.Query) {
-	table := tablewriter.NewWriter(w)
-	table.SetColWidth(tablewriter.MAX_ROW_WIDTH * 4)
-	printWithTableWriter(table, queries)
+type PrintOption struct {
+	Cols       []int
+	ShowRowNum bool
 }
 
-func printMarkdown(w io.Writer, queries []*query.Query) {
+func printTable(w io.Writer, queries []*query.Query, opt *PrintOption) {
+	table := tablewriter.NewWriter(w)
+	table.SetColWidth(tablewriter.MAX_ROW_WIDTH * 4)
+	table.SetAutoWrapText(false)
+	printWithTableWriter(table, queries, opt)
+}
+
+func printMarkdown(w io.Writer, queries []*query.Query, opt *PrintOption) {
 	table := tablewriter.NewWriter(w)
 	table.SetAutoWrapText(false)
 	table.SetBorders(tablewriter.Border{Left: true, Top: false, Right: true, Bottom: false})
 	table.SetCenterSeparator("|")
-	printWithTableWriter(table, queries)
+	printWithTableWriter(table, queries, opt)
 }
 
-func printSimple(w io.Writer, queries []*query.Query) {
+func printSimple(w io.Writer, queries []*query.Query, opt *PrintOption) {
 	table := tablewriter.NewWriter(w)
 	table.SetAutoWrapText(false)
 	table.SetAutoFormatHeaders(true)
@@ -138,31 +168,34 @@ func printSimple(w io.Writer, queries []*query.Query) {
 	//table.SetTablePadding("\t") // pad with tabs
 	table.SetTablePadding(" ")
 	table.SetNoWhiteSpace(true)
-	printWithTableWriter(table, queries)
+	printWithTableWriter(table, queries, opt)
 }
 
-func printWithTableWriter(w *tablewriter.Table, queries []*query.Query) {
-	w.SetHeader([]string{"#", "Package", "Package Path", "File", "Function", "Type", "Table", "Tables", "Sha1", "Query"})
+func printWithTableWriter(w *tablewriter.Table, queries []*query.Query, opt *PrintOption) {
+	w.SetHeader(makeHeader(opt))
 	for i, q := range queries {
-		r := []string{strconv.Itoa(i + 1)}
-		r = append(r, row(q)...)
+		r := row(q, opt)
+		if opt.ShowRowNum {
+			r = append([]string{strconv.Itoa(i + 1)}, r...)
+		}
 		w.Append(r)
 	}
 	w.Render()
 }
 
-func printCSV(w io.Writer, queries []*query.Query, isTSV bool) error {
+func printCSV(w io.Writer, queries []*query.Query, isTSV bool, opt *PrintOption) error {
 	writer := csv.NewWriter(w)
 	if isTSV {
 		writer.Comma = '\t'
 	}
-	err := writer.Write([]string{"#", "Package", "Package Path", "File", "Function", "Type", "Table", "Tables", "Sha1", "Query"})
-	if err != nil {
+	if err := writer.Write(makeHeader(opt)); err != nil {
 		return err
 	}
 	for i, q := range queries {
-		r := []string{strconv.Itoa(i + 1)}
-		r = append(r, row(q)...)
+		r := row(q, opt)
+		if opt.ShowRowNum {
+			r = append([]string{strconv.Itoa(i + 1)}, r...)
+		}
 		if err := writer.Write(r); err != nil {
 			return err
 		}
@@ -171,13 +204,24 @@ func printCSV(w io.Writer, queries []*query.Query, isTSV bool) error {
 	return nil
 }
 
+func makeHeader(opt *PrintOption) []string {
+	header := make([]string, 0)
+	if opt.ShowRowNum {
+		header = append(header, "#")
+	}
+	for _, col := range opt.Cols {
+		header = append(header, strings.ReplaceAll(headerColumns[col], "-", " "))
+	}
+	return header
+}
+
 var joinPattern = regexp.MustCompile("(?i)(JOIN `?(?:[a-z0-9_]+\\.)?)([a-z0-9_]+)(`?(?:(?: as)? [a-z0-9_]+)? (?:ON|USING)?)")
 var subqueryPattern = regexp.MustCompile("(?i)(SELECT .+? FROM `?(?:[a-z0-9_]+\\.)?)([a-z0-9_]+)(`?)")
 var insertPattern = regexp.MustCompile("^(?i)(INSERT(?: IGNORE)?(?: INTO)? `?(?:[a-z0-9_]+\\.)?)([a-z0-9_]+)(`?)")
 var updatePattern = regexp.MustCompile("^(?i)(UPDATE(?: IGNORE)? `?(?:[a-z0-9_]+\\.)?)([a-z0-9_]+)(`? SET)")
 var deletePattern = regexp.MustCompile("^(?i)(DELETE(?: IGNORE)? FROM `?(?:[a-z0-9_]+\\.)?)([a-z0-9_]+)(`?)")
 
-func row(q *query.Query) []string {
+func row(q *query.Query, opt *PrintOption) []string {
 	file := fmt.Sprintf("%s:%d:%d", filepath.Base(q.Position().Filename), q.Position().Line, q.Position().Column)
 	sqlType := q.Kind.String()
 	switch q.Kind {
@@ -216,7 +260,7 @@ func row(q *query.Query) []string {
 	h := sha1.New()
 	h.Write([]byte(q.Raw))
 
-	return []string{
+	fullRow := []string{
 		q.Package.Pkg.Name(),
 		q.Package.Pkg.Path(),
 		file,
@@ -228,4 +272,10 @@ func row(q *query.Query) []string {
 		ellipsis,
 		raw,
 	}
+
+	res := make([]string, 0, len(opt.Cols))
+	for _, col := range opt.Cols {
+		res = append(res, fullRow[col])
+	}
+	return res
 }

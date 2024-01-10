@@ -1,8 +1,6 @@
 package query
 
 import (
-	"crypto/sha1"
-	"fmt"
 	"go/ast"
 	"go/constant"
 	"go/token"
@@ -242,9 +240,7 @@ func filter(q *Query, opt *QueryOption) bool {
 	funcName := q.Func.Name()
 	queryType := q.Kind.String()
 	table := q.Tables[0]
-	h := sha1.New()
-	h.Write([]byte(q.Raw))
-	hash := fmt.Sprintf("%x", h.Sum(nil))
+	hash := q.Sha()
 
 	return filterAndExclude(pkgName, opt.FilterPackages, opt.ExcludePackages) &&
 		filterAndExclude(pkgPath, opt.FilterPackagePaths, opt.ExcludePackagePaths) &&

@@ -1,7 +1,6 @@
 package query
 
 import (
-	"crypto/sha1"
 	"encoding/csv"
 	"fmt"
 	"io"
@@ -250,9 +249,6 @@ func row(q *query.Query, opt *PrintOption) []string {
 		}
 	}
 
-	h := sha1.New()
-	h.Write([]byte(q.Raw))
-
 	fullRow := []string{
 		q.Package.Pkg.Name(),
 		q.Package.Pkg.Path(),
@@ -261,7 +257,7 @@ func row(q *query.Query, opt *PrintOption) []string {
 		sqlType,
 		q.Tables[0],
 		strconv.Itoa(len(q.Tables)),
-		fmt.Sprintf("%x", h.Sum(nil))[:8],
+		q.Sha(),
 		ellipsis,
 		raw,
 	}

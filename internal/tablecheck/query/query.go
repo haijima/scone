@@ -1,6 +1,8 @@
 package query
 
 import (
+	"crypto/sha1"
+	"fmt"
 	"go/token"
 
 	"golang.org/x/tools/go/ssa"
@@ -24,6 +26,12 @@ func (q *Query) Position() token.Position {
 		}
 	}
 	return q.Package.Prog.Fset.Position(p)
+}
+
+func (q *Query) Sha() string {
+	h := sha1.New()
+	h.Write([]byte(q.Raw))
+	return fmt.Sprintf("%x", h.Sum(nil))[:8]
 }
 
 type QueryKind int

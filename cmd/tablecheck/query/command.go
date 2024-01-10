@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strconv"
+	"unicode"
 
 	"github.com/fatih/color"
 	"github.com/haijima/scone/internal/tablecheck"
@@ -198,6 +199,20 @@ func row(q *query.Query) []string {
 	raw = updatePattern.ReplaceAllString(raw, "$1"+emphasize("$2")+"$3")
 	raw = deletePattern.ReplaceAllString(raw, "$1"+emphasize("$2")+"$3")
 
+	ellipsis := raw
+	if len(ellipsis) > 60 {
+		lastSpaceIx := -1
+		for i, r := range ellipsis {
+			if unicode.IsSpace(r) {
+				lastSpaceIx = i
+			}
+			if i >= 60-4 && lastSpaceIx != -1 {
+				ellipsis = ellipsis[:lastSpaceIx] + " ..."
+				break
+			}
+		}
+	}
+
 	h := sha1.New()
 	h.Write([]byte(q.Raw))
 
@@ -210,6 +225,7 @@ func row(q *query.Query) []string {
 		q.Tables[0],
 		strconv.Itoa(len(q.Tables)),
 		fmt.Sprintf("%x", h.Sum(nil))[:8],
+		ellipsis,
 		raw,
 	}
 }

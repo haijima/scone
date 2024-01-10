@@ -177,22 +177,26 @@ func filter(q *Query, opt *QueryOption) bool {
 		filterAndExclude(funcName, opt.FilterFunctions, opt.ExcludeFunctions) &&
 		filterAndExclude(queryType, opt.FilterQueryTypes, opt.ExcludeQueryTypes) &&
 		filterAndExclude(table, opt.FilterTables, opt.ExcludeTables) &&
-		filterAndExclude(hash, opt.FilterQueries, opt.ExcludeQueries)
+		filterAndExcludeFunc(hash, opt.FilterQueries, opt.ExcludeQueries, strings.HasPrefix)
 }
 
 func filterAndExclude(target string, filters []string, excludes []string) bool {
+	return filterAndExcludeFunc(target, filters, excludes, func(target, input string) bool { return target == input })
+}
+
+func filterAndExcludeFunc(target string, filters []string, excludes []string, fn func(target, input string) bool) bool {
 	match := true
 	if filters != nil && len(filters) > 0 {
 		match = false
 		for _, f := range filters {
-			if f == target {
+			if fn(target, f) {
 				match = true
 			}
 		}
 	}
 	if excludes != nil && len(excludes) > 0 {
 		for _, e := range excludes {
-			if e == target {
+			if fn(target, e) {
 				match = false
 			}
 		}

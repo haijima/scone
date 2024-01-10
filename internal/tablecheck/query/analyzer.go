@@ -165,12 +165,12 @@ func analyzeFuncByAst(pkg *ssa.Package, fn *ssa.Function, pos []token.Pos, opt *
 	return foundQueries
 }
 
-var selectPattern = regexp.MustCompile("^(?i)(SELECT .+? FROM `?(?:[a-z0-9_]+\\.)?)([a-z0-9_]+)(`?)")
-var joinPattern = regexp.MustCompile("(?i)(JOIN `?(?:[a-z0-9_]+\\.)?)([a-z0-9_]+)(`?(?:(?: as)? [a-z0-9_]+)? (?:ON|USING)?)")
-var subqueryPattern = regexp.MustCompile("(?i)(SELECT .+? FROM `?(?:[a-z0-9_]+\\.)?)([a-z0-9_]+)(`?)")
-var insertPattern = regexp.MustCompile("^(?i)(INSERT(?: IGNORE)?(?: INTO)? `?(?:[a-z0-9_]+\\.)?)([a-z0-9_]+)(`?)")
-var updatePattern = regexp.MustCompile("^(?i)(UPDATE(?: IGNORE)? `?(?:[a-z0-9_]+\\.)?)([a-z0-9_]+)(`? SET)")
-var deletePattern = regexp.MustCompile("^(?i)(DELETE(?: IGNORE)? FROM `?(?:[a-z0-9_]+\\.)?)([a-z0-9_]+)(`?)")
+var SelectPattern = regexp.MustCompile("^(?i)(SELECT .+? FROM `?(?:[a-z0-9_]+\\.)?)([a-z0-9_]+)(`?)")
+var JoinPattern = regexp.MustCompile("(?i)(JOIN `?(?:[a-z0-9_]+\\.)?)([a-z0-9_]+)(`?(?:(?: as)? [a-z0-9_]+)? (?:ON|USING)?)")
+var SubQueryPattern = regexp.MustCompile("(?i)(SELECT .+? FROM `?(?:[a-z0-9_]+\\.)?)([a-z0-9_]+)(`?)")
+var InsertPattern = regexp.MustCompile("^(?i)(INSERT(?: IGNORE)?(?: INTO)? `?(?:[a-z0-9_]+\\.)?)([a-z0-9_]+)(`?)")
+var UpdatePattern = regexp.MustCompile("^(?i)(UPDATE(?: IGNORE)? `?(?:[a-z0-9_]+\\.)?)([a-z0-9_]+)(`? SET)")
+var DeletePattern = regexp.MustCompile("^(?i)(DELETE(?: IGNORE)? FROM `?(?:[a-z0-9_]+\\.)?)([a-z0-9_]+)(`?)")
 
 func toSqlQuery(str string) (*Query, bool) {
 	str, err := normalize(str)
@@ -179,40 +179,40 @@ func toSqlQuery(str string) (*Query, bool) {
 	}
 
 	q := &Query{Raw: str}
-	if matches := selectPattern.FindStringSubmatch(str); len(matches) > 2 {
+	if matches := SelectPattern.FindStringSubmatch(str); len(matches) > 2 {
 		q.Kind = Select
 		q.Tables = make([]string, 0)
-		if subqueryPattern.MatchString(str) {
-			for _, m := range subqueryPattern.FindAllStringSubmatch(str, -1) {
+		if SubQueryPattern.MatchString(str) {
+			for _, m := range SubQueryPattern.FindAllStringSubmatch(str, -1) {
 				q.Tables = append(q.Tables, m[2])
 			}
 		}
-		if joinPattern.MatchString(str) {
-			for _, m := range joinPattern.FindAllStringSubmatch(str, -1) {
+		if JoinPattern.MatchString(str) {
+			for _, m := range JoinPattern.FindAllStringSubmatch(str, -1) {
 				q.Tables = append(q.Tables, m[2])
 			}
 		}
-	} else if matches := insertPattern.FindStringSubmatch(str); len(matches) > 2 {
+	} else if matches := InsertPattern.FindStringSubmatch(str); len(matches) > 2 {
 		q.Kind = Insert
-		q.Tables = []string{insertPattern.FindStringSubmatch(str)[2]}
-		if subqueryPattern.MatchString(str) {
-			for _, m := range subqueryPattern.FindAllStringSubmatch(str, -1) {
+		q.Tables = []string{InsertPattern.FindStringSubmatch(str)[2]}
+		if SubQueryPattern.MatchString(str) {
+			for _, m := range SubQueryPattern.FindAllStringSubmatch(str, -1) {
 				q.Tables = append(q.Tables, m[2])
 			}
 		}
-	} else if matches := updatePattern.FindStringSubmatch(str); len(matches) > 2 {
+	} else if matches := UpdatePattern.FindStringSubmatch(str); len(matches) > 2 {
 		q.Kind = Update
-		q.Tables = []string{updatePattern.FindStringSubmatch(str)[2]}
-		if subqueryPattern.MatchString(str) {
-			for _, m := range subqueryPattern.FindAllStringSubmatch(str, -1) {
+		q.Tables = []string{UpdatePattern.FindStringSubmatch(str)[2]}
+		if SubQueryPattern.MatchString(str) {
+			for _, m := range SubQueryPattern.FindAllStringSubmatch(str, -1) {
 				q.Tables = append(q.Tables, m[2])
 			}
 		}
-	} else if matches := deletePattern.FindStringSubmatch(str); len(matches) > 2 {
+	} else if matches := DeletePattern.FindStringSubmatch(str); len(matches) > 2 {
 		q.Kind = Delete
-		q.Tables = []string{deletePattern.FindStringSubmatch(str)[2]}
-		if subqueryPattern.MatchString(str) {
-			for _, m := range subqueryPattern.FindAllStringSubmatch(str, -1) {
+		q.Tables = []string{DeletePattern.FindStringSubmatch(str)[2]}
+		if SubQueryPattern.MatchString(str) {
+			for _, m := range SubQueryPattern.FindAllStringSubmatch(str, -1) {
 				q.Tables = append(q.Tables, m[2])
 			}
 		}

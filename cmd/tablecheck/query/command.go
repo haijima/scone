@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"path/filepath"
-	"regexp"
 	"slices"
 	"strconv"
 	"strings"
@@ -215,12 +214,6 @@ func makeHeader(opt *PrintOption) []string {
 	return header
 }
 
-var joinPattern = regexp.MustCompile("(?i)(JOIN `?(?:[a-z0-9_]+\\.)?)([a-z0-9_]+)(`?(?:(?: as)? [a-z0-9_]+)? (?:ON|USING)?)")
-var subqueryPattern = regexp.MustCompile("(?i)(SELECT .+? FROM `?(?:[a-z0-9_]+\\.)?)([a-z0-9_]+)(`?)")
-var insertPattern = regexp.MustCompile("^(?i)(INSERT(?: IGNORE)?(?: INTO)? `?(?:[a-z0-9_]+\\.)?)([a-z0-9_]+)(`?)")
-var updatePattern = regexp.MustCompile("^(?i)(UPDATE(?: IGNORE)? `?(?:[a-z0-9_]+\\.)?)([a-z0-9_]+)(`? SET)")
-var deletePattern = regexp.MustCompile("^(?i)(DELETE(?: IGNORE)? FROM `?(?:[a-z0-9_]+\\.)?)([a-z0-9_]+)(`?)")
-
 func row(q *query.Query, opt *PrintOption) []string {
 	file := fmt.Sprintf("%s:%d:%d", filepath.Base(q.Position().Filename), q.Position().Line, q.Position().Column)
 	sqlType := q.Kind.String()
@@ -237,11 +230,11 @@ func row(q *query.Query, opt *PrintOption) []string {
 
 	emphasize := color.New(color.Bold, color.Underline).SprintFunc()
 	raw := q.Raw
-	raw = subqueryPattern.ReplaceAllString(raw, "$1"+emphasize("$2")+"$3")
-	raw = joinPattern.ReplaceAllString(raw, "$1"+emphasize("$2")+"$3")
-	raw = insertPattern.ReplaceAllString(raw, "$1"+emphasize("$2")+"$3")
-	raw = updatePattern.ReplaceAllString(raw, "$1"+emphasize("$2")+"$3")
-	raw = deletePattern.ReplaceAllString(raw, "$1"+emphasize("$2")+"$3")
+	raw = query.SubQueryPattern.ReplaceAllString(raw, "$1"+emphasize("$2")+"$3")
+	raw = query.JoinPattern.ReplaceAllString(raw, "$1"+emphasize("$2")+"$3")
+	raw = query.InsertPattern.ReplaceAllString(raw, "$1"+emphasize("$2")+"$3")
+	raw = query.UpdatePattern.ReplaceAllString(raw, "$1"+emphasize("$2")+"$3")
+	raw = query.DeletePattern.ReplaceAllString(raw, "$1"+emphasize("$2")+"$3")
 
 	ellipsis := raw
 	if len(ellipsis) > 60 {

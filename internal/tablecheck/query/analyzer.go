@@ -58,19 +58,10 @@ func ExtractQuery(ssaProg *buildssa.SSA, opt *QueryOption) (*Result, error) {
 	}
 
 	slices.SortFunc(foundQueries, func(a, b *Query) int {
-		if a.Position().Offset == b.Position().Offset {
-			if a.Raw == b.Raw {
-				return 0
-			}
-			if a.Raw < b.Raw {
-				return -1
-			}
-			return 1
+		if a.Position().Offset != b.Position().Offset {
+			return a.Position().Offset - b.Position().Offset
 		}
-		if a.Position().Offset < b.Position().Offset {
-			return -1
-		}
-		return 1
+		return strings.Compare(a.Raw, b.Raw)
 	})
 	foundQueries = slices.CompactFunc(foundQueries, func(a, b *Query) bool {
 		return a.Raw == b.Raw && a.Position().Offset == b.Position().Offset

@@ -1,9 +1,12 @@
 package query
 
 import (
+	"fmt"
 	"go/ast"
 	"go/constant"
 	"go/token"
+	"log/slog"
+	"path/filepath"
 	"strings"
 
 	"golang.org/x/tools/go/analysis/passes/buildssa"
@@ -40,7 +43,7 @@ func getQueriesInComment(ssaProg *buildssa.SSA, files []*ast.File, opt *QueryOpt
 	return foundQueries
 }
 
-func analyzeFunc(pkg *ssa.Package, fn *ssa.Function, pos []token.Pos, opt *QueryOption) []*Query {
+func analyzeFuncBySsaConst(pkg *ssa.Package, fn *ssa.Function, pos []token.Pos, opt *QueryOption) []*Query {
 	foundQueries := make([]*Query, 0)
 	for _, block := range fn.Blocks {
 		for _, instr := range block.Instrs {
@@ -48,7 +51,7 @@ func analyzeFunc(pkg *ssa.Package, fn *ssa.Function, pos []token.Pos, opt *Query
 		}
 	}
 	for _, anon := range fn.AnonFuncs {
-		foundQueries = append(foundQueries, analyzeFunc(pkg, anon, append([]token.Pos{anon.Pos(), fn.Pos()}, pos...), opt)...)
+		foundQueries = append(foundQueries, analyzeFuncBySsaConst(pkg, anon, append([]token.Pos{anon.Pos(), fn.Pos()}, pos...), opt)...)
 	}
 	return foundQueries
 }
@@ -105,4 +108,96 @@ func constToQuery(pkg *ssa.Package, a *ssa.Const, fn *ssa.Function, pos []token.
 		}
 	}
 	return nil, false
+}
+
+type methodArg struct {
+	Package  string
+	Method   string
+	ArgIndex int
+}
+
+var targetMethods = []methodArg{
+	{Package: "database/sql", Method: "Query", ArgIndex: 1},
+	{Package: "database/sql", Method: "QueryRow", ArgIndex: 1},
+	{Package: "database/sql", Method: "Exec", ArgIndex: 1},
+	{Package: "github.com/jmoiron/sqlx", Method: "Exec", ArgIndex: 1},
+	{Package: "github.com/jmoiron/sqlx", Method: "Rebind", ArgIndex: 1},
+	{Package: "github.com/jmoiron/sqlx", Method: "BindNamed", ArgIndex: 1},
+	{Package: "github.com/jmoiron/sqlx", Method: "NamedQuery", ArgIndex: 1},
+	{Package: "github.com/jmoiron/sqlx", Method: "NamedExec", ArgIndex: 1},
+	{Package: "github.com/jmoiron/sqlx", Method: "Select", ArgIndex: 2},
+	{Package: "github.com/jmoiron/sqlx", Method: "Get", ArgIndex: 2},
+	{Package: "github.com/jmoiron/sqlx", Method: "Queryx", ArgIndex: 1},
+	{Package: "github.com/jmoiron/sqlx", Method: "QueryRowx", ArgIndex: 1},
+	{Package: "github.com/jmoiron/sqlx", Method: "MustExec", ArgIndex: 1},
+	{Package: "github.com/jmoiron/sqlx", Method: "Preparex", ArgIndex: 1},
+	{Package: "github.com/jmoiron/sqlx", Method: "PrepareNamed", ArgIndex: 1},
+	{Package: "github.com/jmoiron/sqlx", Method: "PreparexContext", ArgIndex: 2},
+	{Package: "github.com/jmoiron/sqlx", Method: "PrepareNamedContext", ArgIndex: 2},
+	{Package: "github.com/jmoiron/sqlx", Method: "MustExecContext", ArgIndex: 2},
+	{Package: "github.com/jmoiron/sqlx", Method: "QueryxContext", ArgIndex: 2},
+	{Package: "github.com/jmoiron/sqlx", Method: "SelectContext", ArgIndex: 3},
+	{Package: "github.com/jmoiron/sqlx", Method: "GetContext", ArgIndex: 3},
+	{Package: "github.com/jmoiron/sqlx", Method: "QueryRowxContext", ArgIndex: 2},
+	{Package: "github.com/jmoiron/sqlx", Method: "NamedExecContext", ArgIndex: 2},
+	{Package: "github.com/jmoiron/sqlx", Method: "NamedExecContext", ArgIndex: 2},
+}
+
+func analyzeFuncBySsaMethod(pkg *ssa.Package, fn *ssa.Function, pos []token.Pos, opt *QueryOption) []*Query {
+	foundQueries := make([]*Query, 0)
+	for _, block := range fn.Blocks {
+		for _, instr := range block.Instrs {
+			c, ok1 := instr.(*ssa.Call)
+			if !ok1 {
+				continue
+			}
+			m, ok2 := c.Call.Value.(*ssa.Function)
+			if !ok2 {
+				continue
+			}
+			for _, t := range targetMethods {
+				if m.Pkg != nil && m.Pkg.Pkg.Path() == t.Package && m.Name() == t.Method {
+					arg := c.Common().Args[t.ArgIndex]
+					if a, ok := arg.(*ssa.Const); ok {
+						if q, ok := constToQuery(pkg, a, fn, append([]token.Pos{c.Pos(), fn.Pos()}, pos...), opt); ok {
+							foundQueries = append(foundQueries, q)
+						}
+					} else if p, ok := arg.(*ssa.Phi); ok {
+						for _, edge := range p.Edges {
+							if e, ok := edge.(*ssa.Const); ok {
+								if q, ok := constToQuery(pkg, e, fn, append([]token.Pos{c.Pos(), fn.Pos()}, pos...), opt); ok {
+									foundQueries = append(foundQueries, q)
+								}
+							} else {
+								warnIfNotCommented(pkg, edge, append([]token.Pos{e.Pos(), p.Pos(), c.Pos(), fn.Pos()}, pos...), opt)
+							}
+						}
+					} else {
+						warnIfNotCommented(pkg, arg, append([]token.Pos{c.Pos(), fn.Pos()}, pos...), opt)
+					}
+					break
+				}
+			}
+		}
+	}
+
+	for _, anon := range fn.AnonFuncs {
+		foundQueries = append(foundQueries, analyzeFuncBySsaMethod(pkg, anon, append([]token.Pos{anon.Pos(), fn.Pos()}, pos...), opt)...)
+	}
+
+	return foundQueries
+}
+
+func warnIfNotCommented(pkg *ssa.Package, v ssa.Value, pos []token.Pos, opt *QueryOption) {
+	position := GetPosition(pkg, pos)
+	commented := false
+	for _, cp := range opt.queryCommentPositions {
+		if GetPosition(pkg, append([]token.Pos{cp})).Line == position.Line-1 {
+			commented = true
+		}
+	}
+	if !commented {
+		file := fmt.Sprintf("%s:%d:%d", filepath.Base(position.Filename), position.Line, position.Column)
+		slog.Warn("Cannot parse query", "SQL", v, "package", pkg.Pkg.Path(), "file", file)
+	}
 }

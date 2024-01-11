@@ -29,7 +29,16 @@ type Result struct {
 	Queries []*Query
 }
 
+type AnalyzeMode int
+
+const (
+	SsaMethod AnalyzeMode = iota
+	SsaConst
+	Ast
+)
+
 type QueryOption struct {
+	Mode                AnalyzeMode
 	ExcludeQueries      []string
 	ExcludePackages     []string
 	ExcludePackagePaths []string
@@ -56,8 +65,14 @@ func ExtractQuery(ssaProg *buildssa.SSA, files []*ast.File, opt *QueryOption) (*
 	foundQueries = append(foundQueries, getQueriesInComment(ssaProg, files, opt)...)
 
 	for _, member := range ssaProg.SrcFuncs {
-		foundQueries = append(foundQueries, analyzeFunc(ssaProg.Pkg, member, []token.Pos{}, opt)...)
-		//foundQueries = append(foundQueries, analyzeFuncByAst(member, opt)...)
+		switch opt.Mode {
+		case SsaMethod:
+			foundQueries = append(foundQueries, analyzeFuncBySsaMethod(ssaProg.Pkg, member, []token.Pos{}, opt)...)
+		case SsaConst:
+			foundQueries = append(foundQueries, analyzeFuncBySsaConst(ssaProg.Pkg, member, []token.Pos{}, opt)...)
+		case Ast:
+			foundQueries = append(foundQueries, analyzeFuncByAst(ssaProg.Pkg, member, []token.Pos{}, opt)...)
+		}
 	}
 
 	slices.SortFunc(foundQueries, func(a, b *Query) int {

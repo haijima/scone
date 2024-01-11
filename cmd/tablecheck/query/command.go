@@ -46,6 +46,7 @@ func NewCommand(v *viper.Viper, _ afero.Fs) *cobra.Command {
 	cmd.Flags().StringSlice("cols", []string{}, "The `columns` to show {"+strings.Join(headerColumns, "|")+"}")
 	cmd.Flags().Bool("no-header", false, "Hide header")
 	cmd.Flags().Bool("no-rownum", false, "Hide row number")
+	cmd.Flags().String("mode", "ssa-method", "The query analyze `mode` {ssa-method|ssa-const|ast}")
 
 	_ = cmd.MarkFlagDirname("dir")
 
@@ -78,8 +79,21 @@ func run(cmd *cobra.Command, v *viper.Viper) error {
 	noHeader := v.GetBool("no-header")
 	noRowNum := v.GetBool("no-rownum")
 	sortKeys := v.GetStringSlice("sort")
+	modeFlg := v.GetString("mode")
+
+	var mode query.AnalyzeMode
+	if modeFlg == "ssa-method" {
+		mode = query.SsaMethod
+	} else if modeFlg == "ssa-const" {
+		mode = query.SsaConst
+	} else if modeFlg == "ast" {
+		mode = query.Ast
+	} else {
+		return fmt.Errorf("unknown mode: %s", modeFlg)
+	}
 
 	opt := &query.QueryOption{
+		Mode:                mode,
 		ExcludeQueries:      excludeQueries,
 		ExcludePackages:     excludePackages,
 		ExcludePackagePaths: excludePackagePaths,

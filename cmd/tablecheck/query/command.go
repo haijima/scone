@@ -45,6 +45,7 @@ func NewCommand(v *viper.Viper, _ afero.Fs) *cobra.Command {
 	cmd.Flags().StringSlice("filter-tables", []string{}, "The `names` of tables to filter")
 	cmd.Flags().StringSlice("cols", []string{}, "The `columns` to show {"+strings.Join(headerColumns, "|")+"}")
 	cmd.Flags().Bool("hide-rownum", false, "Hide row number")
+	cmd.Flags().Bool("no-rownum", false, "Hide row number")
 
 	_ = cmd.MarkFlagDirname("dir")
 
@@ -75,6 +76,7 @@ func run(cmd *cobra.Command, v *viper.Viper) error {
 	filterTables := v.GetStringSlice("filter-tables")
 	cols := v.GetStringSlice("cols")
 	hideRowNum := v.GetBool("hide-rownum")
+	noRowNum := v.GetBool("no-rownum")
 	sortKeys := v.GetStringSlice("sort")
 
 	opt := &query.QueryOption{
@@ -136,7 +138,7 @@ func run(cmd *cobra.Command, v *viper.Viper) error {
 		return 0
 	})
 
-	printOpt := &PrintOption{Cols: defaultHeaderIndex, HideRowNum: hideRowNum}
+	printOpt := &PrintOption{Cols: defaultHeaderIndex, NoRowNum: noRowNum}
 	if len(cols) > 0 {
 		printOpt.Cols = make([]int, 0, len(cols))
 		for _, col := range cols {
@@ -168,8 +170,8 @@ func run(cmd *cobra.Command, v *viper.Viper) error {
 }
 
 type PrintOption struct {
-	Cols       []int
-	HideRowNum bool
+	Cols     []int
+	NoRowNum bool
 }
 
 func printTable(w io.Writer, queries []*query.Query, opt *PrintOption) {
@@ -208,7 +210,7 @@ func printWithTableWriter(w *tablewriter.Table, queries []*query.Query, opt *Pri
 	w.SetHeader(makeHeader(opt))
 	for i, q := range queries {
 		r := row(q, opt)
-		if !opt.HideRowNum {
+		if !opt.NoRowNum {
 			r = append([]string{strconv.Itoa(i + 1)}, r...)
 		}
 		w.Append(r)
@@ -226,7 +228,7 @@ func printCSV(w io.Writer, queries []*query.Query, isTSV bool, opt *PrintOption)
 	}
 	for i, q := range queries {
 		r := row(q, opt)
-		if !opt.HideRowNum {
+		if !opt.NoRowNum {
 			r = append([]string{strconv.Itoa(i + 1)}, r...)
 		}
 		if err := writer.Write(r); err != nil {
@@ -239,7 +241,7 @@ func printCSV(w io.Writer, queries []*query.Query, isTSV bool, opt *PrintOption)
 
 func makeHeader(opt *PrintOption) []string {
 	header := make([]string, 0)
-	if !opt.HideRowNum {
+	if !opt.NoRowNum {
 		header = append(header, "#")
 	}
 	for _, col := range opt.Cols {

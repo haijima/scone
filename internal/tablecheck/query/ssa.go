@@ -1,11 +1,44 @@
 package query
 
 import (
+	"go/ast"
 	"go/constant"
 	"go/token"
+	"strings"
 
+	"golang.org/x/tools/go/analysis/passes/buildssa"
 	"golang.org/x/tools/go/ssa"
 )
+
+func getQueriesInComment(ssaProg *buildssa.SSA, files []*ast.File, opt *QueryOption) []*Query {
+	foundQueries := make([]*Query, 0)
+
+	commentPrefix := "// tablecheck:sql"
+	for _, file := range files {
+		for _, cg := range file.Comments {
+			for _, comment := range cg.List {
+				if strings.HasPrefix(comment.Text, commentPrefix) {
+					if q, ok := toSqlQuery(strings.TrimPrefix(comment.Text, commentPrefix)); ok {
+						q.Func = &ssa.Function{}
+						for _, member := range ssaProg.SrcFuncs {
+							if member.Syntax().Pos() <= comment.Pos() && comment.End() <= member.Syntax().End() {
+								q.Func = member
+								break
+							}
+						}
+						q.Pos = append([]token.Pos{comment.Pos()})
+						q.Package = ssaProg.Pkg
+						if filter(q, opt) {
+							foundQueries = append(foundQueries, q)
+							opt.queryCommentPositions = append(opt.queryCommentPositions, comment.Pos())
+						}
+					}
+				}
+			}
+		}
+	}
+	return foundQueries
+}
 
 func analyzeFunc(pkg *ssa.Package, fn *ssa.Function, pos []token.Pos, opt *QueryOption) []*Query {
 	foundQueries := make([]*Query, 0)

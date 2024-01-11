@@ -23,7 +23,7 @@ func Analyze(dir, pattern string, opt *query.QueryOption) ([]*QueryResultWithSSA
 			return nil, err
 		}
 
-		queryResult, err := query.ExtractQuery(ssa, opt)
+		queryResult, err := query.ExtractQuery(ssa, pkg.Syntax, opt)
 		if err != nil {
 			return nil, err
 		}

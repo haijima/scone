@@ -17,7 +17,7 @@ var Analyzer = &analysis.Analyzer{
 	Doc:  "tablecheck is ...",
 	Run: func(pass *analysis.Pass) (interface{}, error) {
 		ssaProg := pass.ResultOf[buildssa.Analyzer].(*buildssa.SSA)
-		return ExtractQuery(ssaProg, &QueryOption{})
+		return ExtractQuery(ssaProg, pass.Files, &QueryOption{})
 	},
 	Requires: []*analysis.Analyzer{
 		buildssa.Analyzer,
@@ -44,10 +44,17 @@ type QueryOption struct {
 	FilterFunctions     []string
 	FilterQueryTypes    []string
 	FilterTables        []string
+
+	queryCommentPositions []token.Pos
 }
 
-func ExtractQuery(ssaProg *buildssa.SSA, opt *QueryOption) (*Result, error) {
+func ExtractQuery(ssaProg *buildssa.SSA, files []*ast.File, opt *QueryOption) (*Result, error) {
 	foundQueries := make([]*Query, 0)
+	opt.queryCommentPositions = make([]token.Pos, 0)
+
+	// Get queries from comments
+	foundQueries = append(foundQueries, getQueriesInComment(ssaProg, files, opt)...)
+
 	for _, member := range ssaProg.SrcFuncs {
 		foundQueries = append(foundQueries, analyzeFunc(ssaProg.Pkg, member, []token.Pos{}, opt)...)
 		//foundQueries = append(foundQueries, analyzeFuncByAst(member, opt)...)

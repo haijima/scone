@@ -92,7 +92,7 @@ func run(cmd *cobra.Command, v *viper.Viper) error {
 		return fmt.Errorf("unknown mode: %s", modeFlg)
 	}
 
-	opt := &query.QueryOption{
+	opt := &query.Option{
 		Mode:                mode,
 		ExcludeQueries:      excludeQueries,
 		ExcludePackages:     excludePackages,

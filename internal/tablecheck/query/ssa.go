@@ -13,7 +13,7 @@ import (
 	"golang.org/x/tools/go/ssa"
 )
 
-func getQueriesInComment(ssaProg *buildssa.SSA, files []*ast.File, opt *QueryOption) []*Query {
+func getQueriesInComment(ssaProg *buildssa.SSA, files []*ast.File, opt *Option) []*Query {
 	foundQueries := make([]*Query, 0)
 
 	commentPrefix := "// tablecheck:sql"
@@ -43,7 +43,7 @@ func getQueriesInComment(ssaProg *buildssa.SSA, files []*ast.File, opt *QueryOpt
 	return foundQueries
 }
 
-func analyzeFuncBySsaConst(pkg *ssa.Package, fn *ssa.Function, pos []token.Pos, opt *QueryOption) []*Query {
+func analyzeFuncBySsaConst(pkg *ssa.Package, fn *ssa.Function, pos []token.Pos, opt *Option) []*Query {
 	foundQueries := make([]*Query, 0)
 	for _, block := range fn.Blocks {
 		for _, instr := range block.Instrs {
@@ -56,7 +56,7 @@ func analyzeFuncBySsaConst(pkg *ssa.Package, fn *ssa.Function, pos []token.Pos, 
 	return foundQueries
 }
 
-func analyzeInstr(pkg *ssa.Package, instr ssa.Instruction, pos []token.Pos, opt *QueryOption) []*Query {
+func analyzeInstr(pkg *ssa.Package, instr ssa.Instruction, pos []token.Pos, opt *Option) []*Query {
 	foundQueries := make([]*Query, 0)
 	switch i := instr.(type) {
 	case *ssa.Call:
@@ -67,7 +67,7 @@ func analyzeInstr(pkg *ssa.Package, instr ssa.Instruction, pos []token.Pos, opt 
 	return foundQueries
 }
 
-func callToQueries(pkg *ssa.Package, i *ssa.Call, fn *ssa.Function, pos []token.Pos, opt *QueryOption) []*Query {
+func callToQueries(pkg *ssa.Package, i *ssa.Call, fn *ssa.Function, pos []token.Pos, opt *Option) []*Query {
 	res := make([]*Query, 0)
 	pos = append([]token.Pos{i.Pos()}, pos...)
 	for _, arg := range i.Common().Args {
@@ -83,7 +83,7 @@ func callToQueries(pkg *ssa.Package, i *ssa.Call, fn *ssa.Function, pos []token.
 	return res
 }
 
-func phiToQueries(pkg *ssa.Package, a *ssa.Phi, fn *ssa.Function, pos []token.Pos, opt *QueryOption) []*Query {
+func phiToQueries(pkg *ssa.Package, a *ssa.Phi, fn *ssa.Function, pos []token.Pos, opt *Option) []*Query {
 	res := make([]*Query, 0)
 	for _, edge := range a.Edges {
 		switch e := edge.(type) {
@@ -96,7 +96,7 @@ func phiToQueries(pkg *ssa.Package, a *ssa.Phi, fn *ssa.Function, pos []token.Po
 	return res
 }
 
-func constToQuery(pkg *ssa.Package, a *ssa.Const, fn *ssa.Function, pos []token.Pos, opt *QueryOption) (*Query, bool) {
+func constToQuery(pkg *ssa.Package, a *ssa.Const, fn *ssa.Function, pos []token.Pos, opt *Option) (*Query, bool) {
 	if a.Value != nil && a.Value.Kind() == constant.String {
 		if q, ok := toSqlQuery(a.Value.ExactString()); ok {
 			q.Func = fn
@@ -143,7 +143,7 @@ var targetMethods = []methodArg{
 	{Package: "github.com/jmoiron/sqlx", Method: "NamedExecContext", ArgIndex: 2},
 }
 
-func analyzeFuncBySsaMethod(pkg *ssa.Package, fn *ssa.Function, pos []token.Pos, opt *QueryOption) []*Query {
+func analyzeFuncBySsaMethod(pkg *ssa.Package, fn *ssa.Function, pos []token.Pos, opt *Option) []*Query {
 	foundQueries := make([]*Query, 0)
 	for _, block := range fn.Blocks {
 		for _, instr := range block.Instrs {
@@ -188,7 +188,7 @@ func analyzeFuncBySsaMethod(pkg *ssa.Package, fn *ssa.Function, pos []token.Pos,
 	return foundQueries
 }
 
-func warnIfNotCommented(pkg *ssa.Package, v ssa.Value, pos []token.Pos, opt *QueryOption) {
+func warnIfNotCommented(pkg *ssa.Package, v ssa.Value, pos []token.Pos, opt *Option) {
 	position := GetPosition(pkg, pos)
 	commented := false
 	for _, cp := range opt.queryCommentPositions {

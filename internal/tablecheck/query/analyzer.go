@@ -17,7 +17,7 @@ var Analyzer = &analysis.Analyzer{
 	Doc:  "tablecheck is ...",
 	Run: func(pass *analysis.Pass) (interface{}, error) {
 		ssaProg := pass.ResultOf[buildssa.Analyzer].(*buildssa.SSA)
-		return ExtractQuery(ssaProg, pass.Files, &QueryOption{})
+		return ExtractQuery(ssaProg, pass.Files, &Option{})
 	},
 	Requires: []*analysis.Analyzer{
 		buildssa.Analyzer,
@@ -37,7 +37,7 @@ const (
 	Ast
 )
 
-type QueryOption struct {
+type Option struct {
 	Mode                AnalyzeMode
 	ExcludeQueries      []string
 	ExcludePackages     []string
@@ -57,7 +57,7 @@ type QueryOption struct {
 	queryCommentPositions []token.Pos
 }
 
-func ExtractQuery(ssaProg *buildssa.SSA, files []*ast.File, opt *QueryOption) (*Result, error) {
+func ExtractQuery(ssaProg *buildssa.SSA, files []*ast.File, opt *Option) (*Result, error) {
 	foundQueries := make([]*Query, 0)
 	opt.queryCommentPositions = make([]token.Pos, 0)
 
@@ -87,7 +87,7 @@ func ExtractQuery(ssaProg *buildssa.SSA, files []*ast.File, opt *QueryOption) (*
 	return &Result{Queries: foundQueries}, nil
 }
 
-func filter(q *Query, opt *QueryOption) bool {
+func filter(q *Query, opt *Option) bool {
 	pkgName := q.Package.Pkg.Name()
 	pkgPath := q.Package.Pkg.Path()
 	file := q.Position().Filename

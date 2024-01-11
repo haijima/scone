@@ -7,7 +7,7 @@ import (
 	"golang.org/x/tools/go/ssa"
 )
 
-func analyzeFuncByAst(pkg *ssa.Package, fn *ssa.Function, pos []token.Pos, opt *QueryOption) []*Query {
+func analyzeFuncByAst(pkg *ssa.Package, fn *ssa.Function, pos []token.Pos, opt *Option) []*Query {
 	foundQueries := make([]*Query, 0)
 	ast.Inspect(fn.Syntax(), func(n ast.Node) bool {
 		if lit, ok := n.(*ast.BasicLit); ok && lit.Kind == token.STRING {

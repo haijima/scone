@@ -10,7 +10,7 @@ type QueryResultWithSSA struct {
 	SSA         *buildssa.SSA
 }
 
-func Analyze(dir, pattern string, opt *query.QueryOption) ([]*QueryResultWithSSA, error) {
+func Analyze(dir, pattern string, opt *query.Option) ([]*QueryResultWithSSA, error) {
 	pkgs, err := LoadPackages(dir, pattern)
 	if err != nil {
 		return nil, err

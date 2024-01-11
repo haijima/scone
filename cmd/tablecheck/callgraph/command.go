@@ -35,7 +35,7 @@ func run(cmd *cobra.Command, v *viper.Viper) error {
 	pattern := v.GetString("pattern")
 	excludeQueries := v.GetStringSlice("exclude-queries")
 
-	result, err := tablecheck.Analyze(dir, pattern, &query.QueryOption{ExcludeQueries: excludeQueries})
+	result, err := tablecheck.Analyze(dir, pattern, &query.Option{ExcludeQueries: excludeQueries})
 	if err != nil {
 		return err
 	}

@@ -125,16 +125,28 @@ func toSqlQuery(str string) (*Query, bool) {
 }
 
 func normalize(str string) (string, error) {
-	if len(str) >= 2 && str[0] == '"' && str[len(str)-1] == '"' {
-		unquote, err := strconv.Unquote(str)
-		if err != nil {
-			return str, err
-		}
-		str = unquote
+	str, err := unquote(str)
+	if err != nil {
+		return str, err
 	}
 	str = strings.ReplaceAll(str, "\n", " ")
 	str = strings.Join(strings.Fields(str), " ") // remove duplicate spaces
 	str = strings.Trim(str, " ")
 	str = strings.ToLower(str)
+	return str, nil
+}
+
+func unquote(str string) (string, error) {
+	if len(str) >= 2 {
+		if str[0] == '"' && str[len(str)-1] == '"' {
+			return strconv.Unquote(str)
+		}
+		if str[0] == '\'' && str[len(str)-1] == '\'' {
+			return strconv.Unquote(str)
+		}
+		if str[0] == '`' && str[len(str)-1] == '`' {
+			return strconv.Unquote(str)
+		}
+	}
 	return str, nil
 }

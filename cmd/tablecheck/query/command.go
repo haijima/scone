@@ -44,7 +44,7 @@ func NewCommand(v *viper.Viper, _ afero.Fs) *cobra.Command {
 	cmd.Flags().StringSlice("filter-query-types", []string{}, "The `types` of queries to filter {select|insert|update|delete}")
 	cmd.Flags().StringSlice("filter-tables", []string{}, "The `names` of tables to filter")
 	cmd.Flags().StringSlice("cols", []string{}, "The `columns` to show {"+strings.Join(headerColumns, "|")+"}")
-	cmd.Flags().Bool("hide-rownum", false, "Hide row number")
+	cmd.Flags().Bool("no-header", false, "Hide header")
 	cmd.Flags().Bool("no-rownum", false, "Hide row number")
 
 	_ = cmd.MarkFlagDirname("dir")
@@ -75,7 +75,7 @@ func run(cmd *cobra.Command, v *viper.Viper) error {
 	filterQueryTypes := v.GetStringSlice("filter-query-types")
 	filterTables := v.GetStringSlice("filter-tables")
 	cols := v.GetStringSlice("cols")
-	hideRowNum := v.GetBool("hide-rownum")
+	noHeader := v.GetBool("no-header")
 	noRowNum := v.GetBool("no-rownum")
 	sortKeys := v.GetStringSlice("sort")
 
@@ -138,7 +138,7 @@ func run(cmd *cobra.Command, v *viper.Viper) error {
 		return 0
 	})
 
-	printOpt := &PrintOption{Cols: defaultHeaderIndex, NoRowNum: noRowNum}
+	printOpt := &PrintOption{Cols: defaultHeaderIndex, NoHeader: noHeader, NoRowNum: noRowNum}
 	if len(cols) > 0 {
 		printOpt.Cols = make([]int, 0, len(cols))
 		for _, col := range cols {
@@ -171,6 +171,7 @@ func run(cmd *cobra.Command, v *viper.Viper) error {
 
 type PrintOption struct {
 	Cols     []int
+	NoHeader bool
 	NoRowNum bool
 }
 
@@ -207,7 +208,9 @@ func printSimple(w io.Writer, queries []*query.Query, opt *PrintOption) {
 }
 
 func printWithTableWriter(w *tablewriter.Table, queries []*query.Query, opt *PrintOption) {
-	w.SetHeader(makeHeader(opt))
+	if !opt.NoHeader {
+		w.SetHeader(makeHeader(opt))
+	}
 	for i, q := range queries {
 		r := row(q, opt)
 		if !opt.NoRowNum {
@@ -223,8 +226,10 @@ func printCSV(w io.Writer, queries []*query.Query, isTSV bool, opt *PrintOption)
 	if isTSV {
 		writer.Comma = '\t'
 	}
-	if err := writer.Write(makeHeader(opt)); err != nil {
-		return err
+	if !opt.NoHeader {
+		if err := writer.Write(makeHeader(opt)); err != nil {
+			return err
+		}
 	}
 	for i, q := range queries {
 		r := row(q, opt)
@@ -298,7 +303,6 @@ func row(q *query.Query, opt *PrintOption) []string {
 		ellipsis,
 		raw,
 	}
-
 	res := make([]string, 0, len(opt.Cols))
 	for _, col := range opt.Cols {
 		res = append(res, fullRow[col])

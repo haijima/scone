@@ -18,20 +18,24 @@ type Query struct {
 }
 
 func (q *Query) Position() token.Position {
-	p := token.NoPos
-	for _, pos := range q.Pos {
-		if pos.IsValid() {
-			p = pos
-			break
-		}
-	}
-	return q.Package.Prog.Fset.Position(p)
+	return GetPosition(q.Package, q.Pos)
 }
 
 func (q *Query) Sha() string {
 	h := sha1.New()
 	h.Write([]byte(q.Raw))
 	return fmt.Sprintf("%x", h.Sum(nil))[:8]
+}
+
+func GetPosition(pkg *ssa.Package, pos []token.Pos) token.Position {
+	res := token.NoPos
+	for _, p := range pos {
+		if p.IsValid() {
+			res = p
+			break
+		}
+	}
+	return pkg.Prog.Fset.Position(res)
 }
 
 type QueryKind int

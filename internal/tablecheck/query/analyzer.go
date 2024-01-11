@@ -213,9 +213,12 @@ func toSqlQuery(str string) (*Query, bool) {
 }
 
 func normalize(str string) (string, error) {
-	str, err := strconv.Unquote(str)
-	if err != nil {
-		return str, err
+	if len(str) >= 2 && str[0] == '"' && str[len(str)-1] == '"' {
+		unquote, err := strconv.Unquote(str)
+		if err != nil {
+			return str, err
+		}
+		str = unquote
 	}
 	str = strings.ReplaceAll(str, "\n", " ")
 	str = strings.Join(strings.Fields(str), " ") // remove duplicate spaces

@@ -2,17 +2,13 @@ package query
 
 import (
 	"go/ast"
-	"go/constant"
 	"go/token"
 	"reflect"
-	"regexp"
 	"slices"
-	"strconv"
 	"strings"
 
 	"golang.org/x/tools/go/analysis"
 	"golang.org/x/tools/go/analysis/passes/buildssa"
-	"golang.org/x/tools/go/ssa"
 )
 
 // Analyzer is ...
@@ -67,164 +63,6 @@ func ExtractQuery(ssaProg *buildssa.SSA, opt *QueryOption) (*Result, error) {
 		return a.Raw == b.Raw && a.Position().Offset == b.Position().Offset
 	})
 	return &Result{Queries: foundQueries}, nil
-}
-
-func analyzeFunc(pkg *ssa.Package, fn *ssa.Function, pos []token.Pos, opt *QueryOption) []*Query {
-	foundQueries := make([]*Query, 0)
-	for _, block := range fn.Blocks {
-		for _, instr := range block.Instrs {
-			foundQueries = append(foundQueries, analyzeInstr(pkg, instr, append([]token.Pos{fn.Pos()}, pos...), opt)...)
-		}
-	}
-	for _, anon := range fn.AnonFuncs {
-		foundQueries = append(foundQueries, analyzeFunc(pkg, anon, append([]token.Pos{anon.Pos(), fn.Pos()}, pos...), opt)...)
-	}
-	return foundQueries
-}
-
-func analyzeInstr(pkg *ssa.Package, instr ssa.Instruction, pos []token.Pos, opt *QueryOption) []*Query {
-	foundQueries := make([]*Query, 0)
-	switch i := instr.(type) {
-	case *ssa.Call:
-		foundQueries = append(foundQueries, callToQueries(pkg, i, instr.Parent(), pos, opt)...)
-	case *ssa.Phi:
-		foundQueries = append(foundQueries, phiToQueries(pkg, i, instr.Parent(), pos, opt)...)
-	}
-	return foundQueries
-}
-
-func callToQueries(pkg *ssa.Package, i *ssa.Call, fn *ssa.Function, pos []token.Pos, opt *QueryOption) []*Query {
-	res := make([]*Query, 0)
-	pos = append([]token.Pos{i.Pos()}, pos...)
-	for _, arg := range i.Common().Args {
-		switch a := arg.(type) {
-		case *ssa.Phi:
-			res = append(res, phiToQueries(pkg, a, fn, pos, opt)...)
-		case *ssa.Const:
-			if q, ok := constToQuery(pkg, a, fn, pos, opt); ok {
-				res = append(res, q)
-			}
-		}
-	}
-	return res
-}
-
-func phiToQueries(pkg *ssa.Package, a *ssa.Phi, fn *ssa.Function, pos []token.Pos, opt *QueryOption) []*Query {
-	res := make([]*Query, 0)
-	for _, edge := range a.Edges {
-		switch e := edge.(type) {
-		case *ssa.Const:
-			if q, ok := constToQuery(pkg, e, fn, append([]token.Pos{a.Pos()}, pos...), opt); ok {
-				res = append(res, q)
-			}
-		}
-	}
-	return res
-}
-
-func constToQuery(pkg *ssa.Package, a *ssa.Const, fn *ssa.Function, pos []token.Pos, opt *QueryOption) (*Query, bool) {
-	if a.Value != nil && a.Value.Kind() == constant.String {
-		if q, ok := toSqlQuery(a.Value.ExactString()); ok {
-			q.Func = fn
-			q.Pos = append([]token.Pos{a.Pos()}, pos...)
-			q.Package = pkg
-			if filter(q, opt) {
-				return q, true
-			}
-		}
-	}
-	return nil, false
-}
-
-func analyzeFuncByAst(pkg *ssa.Package, fn *ssa.Function, pos []token.Pos, opt *QueryOption) []*Query {
-	foundQueries := make([]*Query, 0)
-	ast.Inspect(fn.Syntax(), func(n ast.Node) bool {
-		if lit, ok := n.(*ast.BasicLit); ok && lit.Kind == token.STRING {
-			if q, ok := toSqlQuery(lit.Value); ok {
-				q.Func = fn
-				q.Pos = append([]token.Pos{lit.Pos()}, pos...)
-				q.Package = pkg
-				if filter(q, opt) {
-					foundQueries = append(foundQueries, q)
-				}
-			}
-		}
-		return true
-	})
-	return foundQueries
-}
-
-var SelectPattern = regexp.MustCompile("^(?i)(SELECT .+? FROM `?(?:[a-z0-9_]+\\.)?)([a-z0-9_]+)(`?)")
-var JoinPattern = regexp.MustCompile("(?i)(JOIN `?(?:[a-z0-9_]+\\.)?)([a-z0-9_]+)(`?(?:(?: as)? [a-z0-9_]+)? (?:ON|USING)?)")
-var SubQueryPattern = regexp.MustCompile("(?i)(SELECT .+? FROM `?(?:[a-z0-9_]+\\.)?)([a-z0-9_]+)(`?)")
-var InsertPattern = regexp.MustCompile("^(?i)(INSERT(?: IGNORE)?(?: INTO)? `?(?:[a-z0-9_]+\\.)?)([a-z0-9_]+)(`?)")
-var UpdatePattern = regexp.MustCompile("^(?i)(UPDATE(?: IGNORE)? `?(?:[a-z0-9_]+\\.)?)([a-z0-9_]+)(`? SET)")
-var DeletePattern = regexp.MustCompile("^(?i)(DELETE(?: IGNORE)? FROM `?(?:[a-z0-9_]+\\.)?)([a-z0-9_]+)(`?)")
-
-func toSqlQuery(str string) (*Query, bool) {
-	str, err := normalize(str)
-	if err != nil {
-		return nil, false
-	}
-
-	q := &Query{Raw: str}
-	if matches := SelectPattern.FindStringSubmatch(str); len(matches) > 2 {
-		q.Kind = Select
-		q.Tables = make([]string, 0)
-		if SubQueryPattern.MatchString(str) {
-			for _, m := range SubQueryPattern.FindAllStringSubmatch(str, -1) {
-				q.Tables = append(q.Tables, m[2])
-			}
-		}
-		if JoinPattern.MatchString(str) {
-			for _, m := range JoinPattern.FindAllStringSubmatch(str, -1) {
-				q.Tables = append(q.Tables, m[2])
-			}
-		}
-	} else if matches := InsertPattern.FindStringSubmatch(str); len(matches) > 2 {
-		q.Kind = Insert
-		q.Tables = []string{InsertPattern.FindStringSubmatch(str)[2]}
-		if SubQueryPattern.MatchString(str) {
-			for _, m := range SubQueryPattern.FindAllStringSubmatch(str, -1) {
-				q.Tables = append(q.Tables, m[2])
-			}
-		}
-	} else if matches := UpdatePattern.FindStringSubmatch(str); len(matches) > 2 {
-		q.Kind = Update
-		q.Tables = []string{UpdatePattern.FindStringSubmatch(str)[2]}
-		if SubQueryPattern.MatchString(str) {
-			for _, m := range SubQueryPattern.FindAllStringSubmatch(str, -1) {
-				q.Tables = append(q.Tables, m[2])
-			}
-		}
-	} else if matches := DeletePattern.FindStringSubmatch(str); len(matches) > 2 {
-		q.Kind = Delete
-		q.Tables = []string{DeletePattern.FindStringSubmatch(str)[2]}
-		if SubQueryPattern.MatchString(str) {
-			for _, m := range SubQueryPattern.FindAllStringSubmatch(str, -1) {
-				q.Tables = append(q.Tables, m[2])
-			}
-		}
-	} else {
-		//slog.Warn(fmt.Sprintf("unknown query: %s", str))
-		return nil, false
-	}
-	return q, true
-}
-
-func normalize(str string) (string, error) {
-	if len(str) >= 2 && str[0] == '"' && str[len(str)-1] == '"' {
-		unquote, err := strconv.Unquote(str)
-		if err != nil {
-			return str, err
-		}
-		str = unquote
-	}
-	str = strings.ReplaceAll(str, "\n", " ")
-	str = strings.Join(strings.Fields(str), " ") // remove duplicate spaces
-	str = strings.Trim(str, " ")
-	str = strings.ToLower(str)
-	return str, nil
 }
 
 func filter(q *Query, opt *QueryOption) bool {

@@ -30,6 +30,9 @@ func getQueriesInComment(ssaProg *buildssa.SSA, files []*ast.File, opt *Option) 
 							}
 						}
 						q.Pos = append([]token.Pos{comment.Pos()})
+						if q.Func != nil {
+							q.Pos = append(q.Pos, q.Func.Pos())
+						}
 						q.Package = ssaProg.Pkg
 						if filter(q, opt) {
 							foundQueries = append(foundQueries, q)
@@ -117,69 +120,83 @@ type methodArg struct {
 }
 
 var targetMethods = []methodArg{
-	{Package: "database/sql", Method: "ExecContext", ArgIndex: 2},
-	{Package: "database/sql", Method: "Exec", ArgIndex: 1},
-	{Package: "database/sql", Method: "QueryContext", ArgIndex: 2},
-	{Package: "database/sql", Method: "Query", ArgIndex: 1},
-	{Package: "database/sql", Method: "QueryRowContext", ArgIndex: 2},
-	{Package: "database/sql", Method: "QueryRow", ArgIndex: 1},
-	{Package: "github.com/jmoiron/sqlx", Method: "Exec", ArgIndex: 1},
-	{Package: "github.com/jmoiron/sqlx", Method: "Rebind", ArgIndex: 1},
-	{Package: "github.com/jmoiron/sqlx", Method: "BindNamed", ArgIndex: 1},
-	{Package: "github.com/jmoiron/sqlx", Method: "NamedQuery", ArgIndex: 1},
-	{Package: "github.com/jmoiron/sqlx", Method: "NamedExec", ArgIndex: 1},
-	{Package: "github.com/jmoiron/sqlx", Method: "Select", ArgIndex: 2},
-	{Package: "github.com/jmoiron/sqlx", Method: "Get", ArgIndex: 2},
-	{Package: "github.com/jmoiron/sqlx", Method: "Queryx", ArgIndex: 1},
-	{Package: "github.com/jmoiron/sqlx", Method: "QueryRowx", ArgIndex: 1},
-	{Package: "github.com/jmoiron/sqlx", Method: "MustExec", ArgIndex: 1},
-	{Package: "github.com/jmoiron/sqlx", Method: "Preparex", ArgIndex: 1},
-	{Package: "github.com/jmoiron/sqlx", Method: "PrepareNamed", ArgIndex: 1},
-	{Package: "github.com/jmoiron/sqlx", Method: "PreparexContext", ArgIndex: 2},
-	{Package: "github.com/jmoiron/sqlx", Method: "PrepareNamedContext", ArgIndex: 2},
-	{Package: "github.com/jmoiron/sqlx", Method: "MustExecContext", ArgIndex: 2},
-	{Package: "github.com/jmoiron/sqlx", Method: "QueryxContext", ArgIndex: 2},
-	{Package: "github.com/jmoiron/sqlx", Method: "SelectContext", ArgIndex: 3},
-	{Package: "github.com/jmoiron/sqlx", Method: "GetContext", ArgIndex: 3},
-	{Package: "github.com/jmoiron/sqlx", Method: "QueryRowxContext", ArgIndex: 2},
-	{Package: "github.com/jmoiron/sqlx", Method: "NamedExecContext", ArgIndex: 2},
-	{Package: "github.com/jmoiron/sqlx", Method: "Exec", ArgIndex: 1},
+	{Package: "database/sql", Method: "ExecContext", ArgIndex: 1},
+	{Package: "database/sql", Method: "Exec", ArgIndex: 0},
+	{Package: "database/sql", Method: "QueryContext", ArgIndex: 1},
+	{Package: "database/sql", Method: "Query", ArgIndex: 0},
+	{Package: "database/sql", Method: "QueryRowContext", ArgIndex: 1},
+	{Package: "database/sql", Method: "QueryRow", ArgIndex: 0},
+	{Package: "github.com/jmoiron/sqlx", Method: "Exec", ArgIndex: 0},
+	{Package: "github.com/jmoiron/sqlx", Method: "Rebind", ArgIndex: 0},
+	{Package: "github.com/jmoiron/sqlx", Method: "BindNamed", ArgIndex: 0},
+	{Package: "github.com/jmoiron/sqlx", Method: "NamedQuery", ArgIndex: 0},
+	{Package: "github.com/jmoiron/sqlx", Method: "NamedExec", ArgIndex: 0},
+	{Package: "github.com/jmoiron/sqlx", Method: "Select", ArgIndex: 1},
+	{Package: "github.com/jmoiron/sqlx", Method: "Get", ArgIndex: 1},
+	{Package: "github.com/jmoiron/sqlx", Method: "Queryx", ArgIndex: 0},
+	{Package: "github.com/jmoiron/sqlx", Method: "QueryRowx", ArgIndex: 0},
+	{Package: "github.com/jmoiron/sqlx", Method: "MustExec", ArgIndex: 0},
+	{Package: "github.com/jmoiron/sqlx", Method: "Preparex", ArgIndex: 0},
+	{Package: "github.com/jmoiron/sqlx", Method: "PrepareNamed", ArgIndex: 0},
+	{Package: "github.com/jmoiron/sqlx", Method: "PreparexContext", ArgIndex: 1},
+	{Package: "github.com/jmoiron/sqlx", Method: "PrepareNamedContext", ArgIndex: 1},
+	{Package: "github.com/jmoiron/sqlx", Method: "MustExecContext", ArgIndex: 1},
+	{Package: "github.com/jmoiron/sqlx", Method: "QueryxContext", ArgIndex: 1},
+	{Package: "github.com/jmoiron/sqlx", Method: "SelectContext", ArgIndex: 2},
+	{Package: "github.com/jmoiron/sqlx", Method: "GetContext", ArgIndex: 2},
+	{Package: "github.com/jmoiron/sqlx", Method: "QueryRowxContext", ArgIndex: 1},
+	{Package: "github.com/jmoiron/sqlx", Method: "NamedExecContext", ArgIndex: 1},
+	{Package: "github.com/jmoiron/sqlx", Method: "Exec", ArgIndex: 0},
 	{Package: "github.com/jmoiron/sqlx", Method: "In", ArgIndex: 0},
+
+	{Package: "github.com/isucon/isucon12-qualify/webapp/go", Method: "GetContext", ArgIndex: 2},
+	{Package: "github.com/isucon/isucon12-qualify/webapp/go", Method: "SelectContext", ArgIndex: 2},
+	{Package: "github.com/isucon/isucon12-qualify/webapp/go", Method: "ExecContext", ArgIndex: 1},
 }
 
 func analyzeFuncBySsaMethod(pkg *ssa.Package, fn *ssa.Function, pos []token.Pos, opt *Option) []*Query {
 	foundQueries := make([]*Query, 0)
 	for _, block := range fn.Blocks {
 		for _, instr := range block.Instrs {
-			c, ok1 := instr.(*ssa.Call)
-			if !ok1 {
+			c, ok := instr.(*ssa.Call)
+			if !ok {
 				continue
 			}
-			m, ok2 := c.Call.Value.(*ssa.Function)
-			if !ok2 {
-				continue
+			common := c.Common()
+
+			var mp, mn string
+			if common.IsInvoke() && common.Method.Pkg() != nil {
+				mp = common.Method.Pkg().Path()
+				mn = common.Method.Name()
+			} else if m, ok := common.Value.(*ssa.Function); ok {
+				if m.Pkg != nil {
+					mp = m.Pkg.Pkg.Path()
+				} else if m.Signature.Recv() != nil && m.Signature.Recv().Pkg() != nil {
+					mp = m.Signature.Recv().Pkg().Path()
+				}
+				mn = m.Name()
+			} else {
+				continue // Can't get package name of the function
 			}
+
 			for _, t := range targetMethods {
-				if m.Pkg != nil && m.Pkg.Pkg.Path() == t.Package && m.Name() == t.Method {
-					arg := c.Common().Args[t.ArgIndex]
-					if a, ok := arg.(*ssa.Const); ok {
-						if q, ok := constToQuery(pkg, a, fn, append([]token.Pos{c.Pos(), fn.Pos()}, pos...), opt); ok {
-							foundQueries = append(foundQueries, q)
-						}
-					} else if p, ok := arg.(*ssa.Phi); ok {
-						for _, edge := range p.Edges {
-							if e, ok := edge.(*ssa.Const); ok {
-								if q, ok := constToQuery(pkg, e, fn, append([]token.Pos{c.Pos(), fn.Pos()}, pos...), opt); ok {
-									foundQueries = append(foundQueries, q)
-								}
-							} else {
-								warnIfNotCommented(pkg, edge, append([]token.Pos{e.Pos(), p.Pos(), c.Pos(), fn.Pos()}, pos...), opt)
+				if mp == t.Package && mn == t.Method {
+					idx := t.ArgIndex
+					if !common.IsInvoke() {
+						idx++ // Set first argument as receiver
+					}
+					arg := common.Args[idx]
+
+					if phi, ok := arg.(*ssa.Phi); ok {
+						for _, edge := range phi.Edges {
+							if q, ok := constLikeStringValueToQuery(pkg, edge, fn, append([]token.Pos{arg.Pos(), c.Pos(), fn.Pos()}, pos...), opt); ok {
+								foundQueries = append(foundQueries, q)
 							}
 						}
-					} else {
-						warnIfNotCommented(pkg, arg, append([]token.Pos{c.Pos(), fn.Pos()}, pos...), opt)
+					} else if q, ok := constLikeStringValueToQuery(pkg, arg, fn, append([]token.Pos{c.Pos(), fn.Pos()}, pos...), opt); ok {
+						foundQueries = append(foundQueries, q)
 					}
-					break
+					break // Found target method
 				}
 			}
 		}
@@ -190,6 +207,49 @@ func analyzeFuncBySsaMethod(pkg *ssa.Package, fn *ssa.Function, pos []token.Pos,
 	}
 
 	return foundQueries
+}
+
+func constLikeStringValueToQuery(pkg *ssa.Package, v ssa.Value, fn *ssa.Function, pos []token.Pos, opt *Option) (*Query, bool) {
+	if a, ok := constLikeStringValue(v); ok {
+		if q, ok := toSqlQuery(a); ok {
+			q.Func = fn
+			q.Pos = append([]token.Pos{v.Pos()}, pos...)
+			q.Package = pkg
+			if filter(q, opt) {
+				return q, true
+			} else {
+				warnIfNotCommented(pkg, v, append([]token.Pos{v.Pos()}, pos...), opt)
+			}
+		} else {
+			warnIfNotCommented(pkg, v, append([]token.Pos{v.Pos()}, pos...), opt)
+		}
+	} else {
+		warnIfNotCommented(pkg, v, append([]token.Pos{v.Pos()}, pos...), opt)
+	}
+	return nil, false
+}
+
+func constLikeStringValue(v ssa.Value) (string, bool) {
+	switch t := v.(type) {
+	case *ssa.Const:
+		if t.Value != nil && t.Value.Kind() == constant.String {
+			return t.Value.ExactString(), true
+		}
+	case *ssa.BinOp:
+		if t.Op == token.ADD {
+			if x, ok := constLikeStringValue(t.X); ok {
+				if y, ok := constLikeStringValue(t.Y); ok {
+					if xx, err := unquote(x); err == nil {
+						if yy, err := unquote(y); err == nil {
+							return xx + " " + yy, true
+						}
+					}
+				}
+			}
+		}
+		// TODO:Support fmt.Sprintf() and strings.Join()
+	}
+	return "", false
 }
 
 func IsCommented(pkg *ssa.Package, pos []token.Pos, opt *Option) bool {

@@ -14,13 +14,14 @@ func NewRootCmd(v *viper.Viper, fs afero.Fs) *cobra.Command {
 	cmd.Use = "tablecheck"
 	cmd.Short = "tablecheck is a static analysis tool for SQL"
 	cmd.Version = cobrax.VersionFunc()
-	cmd.SetGlobalNormalizationFunc(cobrax.SnakeToKebab)
 	cmd.PersistentPreRunE = func(cmd *cobra.Command, args []string) error {
 		return cobrax.RootPersistentPreRunE(cmd, v, fs, args)
 	}
 
 	cmd.AddCommand(callgraph.NewCommand(v, fs))
 	cmd.AddCommand(query.NewCommand(v, fs))
+
+	cmd.SetGlobalNormalizationFunc(cobrax.SnakeToKebab)
 
 	return cmd
 }

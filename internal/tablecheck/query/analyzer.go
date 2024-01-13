@@ -55,14 +55,34 @@ type Option struct {
 	FilterTables        []string
 
 	queryCommentPositions []token.Pos
+	isIgnoredFunc         func(pos token.Pos) bool
 }
 
+// ExtractQuery extracts queries from the given package.
 func ExtractQuery(ssaProg *buildssa.SSA, files []*ast.File, opt *Option) (*Result, error) {
 	foundQueries := make([]*Query, 0)
 	opt.queryCommentPositions = make([]token.Pos, 0)
+	opt.isIgnoredFunc = func(pos token.Pos) bool { return false }
 
 	// Get queries from comments
 	foundQueries = append(foundQueries, getQueriesInComment(ssaProg, files, opt)...)
+
+	ignoreCommentPrefix := "// tablecheck:ignore"
+	for _, file := range files {
+		for _, cg := range file.Comments {
+			for _, comment := range cg.List {
+				if strings.HasPrefix(comment.Text, ignoreCommentPrefix) {
+					f := ssaProg.Pkg.Prog.Fset.File(comment.Pos())
+					start := f.LineStart(f.Line(comment.Pos()) + 1)
+					end := f.LineStart(f.Line(comment.Pos()) + 2)
+					old := opt.isIgnoredFunc
+					opt.isIgnoredFunc = func(pos token.Pos) bool {
+						return old(pos) || (start <= pos && pos < end)
+					}
+				}
+			}
+		}
+	}
 
 	for _, member := range ssaProg.SrcFuncs {
 		switch opt.Mode {
@@ -96,7 +116,15 @@ func filter(q *Query, opt *Option) bool {
 	table := q.Tables[0]
 	hash := q.Sha()
 
-	return filterAndExclude(pkgName, opt.FilterPackages, opt.ExcludePackages) &&
+	commented := false
+	for _, p := range q.Pos {
+		if p.IsValid() {
+			commented = commented || opt.isIgnoredFunc(p)
+		}
+	}
+
+	return !commented &&
+		filterAndExclude(pkgName, opt.FilterPackages, opt.ExcludePackages) &&
 		filterAndExclude(pkgPath, opt.FilterPackagePaths, opt.ExcludePackagePaths) &&
 		filterAndExclude(file, opt.FilterFiles, opt.ExcludeFiles) &&
 		filterAndExclude(funcName, opt.FilterFunctions, opt.ExcludeFunctions) &&

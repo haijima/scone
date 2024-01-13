@@ -200,6 +200,12 @@ func warnIfNotCommented(pkg *ssa.Package, v ssa.Value, pos []token.Pos, opt *Opt
 			commented = true
 		}
 	}
+
+	for _, p := range pos {
+		if p.IsValid() {
+			commented = commented || opt.isIgnoredFunc(p)
+		}
+	}
 	if !commented {
 		file := fmt.Sprintf("%s:%d:%d", filepath.Base(position.Filename), position.Line, position.Column)
 		slog.Warn("Cannot parse query", "SQL", v, "package", pkg.Pkg.Path(), "file", file)

@@ -67,17 +67,18 @@ func ExtractQuery(ssaProg *buildssa.SSA, files []*ast.File, opt *Option) (*Resul
 	// Get queries from comments
 	foundQueries = append(foundQueries, getQueriesInComment(ssaProg, files, opt)...)
 
-	ignoreCommentPrefix := "// tablecheck:ignore"
+	//ignoreCommentPrefix := "// tablecheck:ignore"
 	for _, file := range files {
-		for _, cg := range file.Comments {
-			for _, comment := range cg.List {
-				if strings.HasPrefix(comment.Text, ignoreCommentPrefix) {
-					f := ssaProg.Pkg.Prog.Fset.File(comment.Pos())
-					start := f.LineStart(f.Line(comment.Pos()) + 1)
-					end := f.LineStart(f.Line(comment.Pos()) + 2)
-					old := opt.isIgnoredFunc
-					opt.isIgnoredFunc = func(pos token.Pos) bool {
-						return old(pos) || (start <= pos && pos < end)
+		cm := ast.NewCommentMap(ssaProg.Pkg.Prog.Fset, file, file.Comments)
+		for n, cgs := range cm {
+			for _, cg := range cgs {
+				for _, c := range strings.Split(cg.Text(), "\n") {
+					if strings.HasPrefix(c, "tablecheck:ignore") {
+						old := opt.isIgnoredFunc
+						opt.isIgnoredFunc = func(pos token.Pos) bool {
+							return old(pos) || (n.Pos() <= pos && pos < n.End())
+						}
+						break
 					}
 				}
 			}

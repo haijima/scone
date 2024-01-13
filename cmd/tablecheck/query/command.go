@@ -60,7 +60,6 @@ func run(cmd *cobra.Command, v *viper.Viper) error {
 	dir := v.GetString("dir")
 	pattern := v.GetString("pattern")
 	format := v.GetString("format")
-	//sortKeys := v.GetStringSlice("sort")
 	excludeQueries := v.GetStringSlice("exclude-queries")
 	excludePackages := v.GetStringSlice("exclude-packages")
 	excludePackagePaths := v.GetStringSlice("exclude-package-paths")

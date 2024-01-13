@@ -133,6 +133,7 @@ func normalize(str string) (string, error) {
 	str = strings.Join(strings.Fields(str), " ") // remove duplicate spaces
 	str = strings.Trim(str, " ")
 	str = strings.ToLower(str)
+	//str = convertSQLKeywordsToUpper(str)
 	return str, nil
 }
 
@@ -149,4 +150,30 @@ func unquote(str string) (string, error) {
 		}
 	}
 	return str, nil
+}
+
+// reserved keywords in SQL
+var keywords = []string{
+	"SELECT", "FROM", "WHERE", "INSERT", "UPDATE", "DELETE", "JOIN",
+	"COUNT", "GROUP", "BY", "HAVING", "ORDER", "LIMIT", "OFFSET",
+	"INNER", "LEFT", "RIGHT", "FULL", "OUTER", "CROSS", "NATURAL",
+	"UNION", "ALL", "AND", "OR", "NOT", "AS", "IN", "ON", "IS",
+	"NULL", "LIKE", "EXISTS", "CASE", "WHEN", "THEN", "ELSE",
+	"END", "CREATE", "ALTER", "DROP", "TABLE", "INDEX", "VIEW",
+	"TRIGGER", "USE", "DATABASE", "PRIMARY", "KEY", "FOREIGN",
+	"REFERENCES", "DISTINCT", "SET", "VALUES", "INTO", "PROCEDURE",
+	"FUNCTION", "DECLARE", "CURSOR", "FETCH", "GRANT", "REVOKE",
+	"BEGIN", "TRANSACTION", "COMMIT", "ROLLBACK", "SAVEPOINT",
+	"LOCK", "UNLOCK", "MERGE", "EXCEPT", "INTERSECT", "MINUS",
+	"DESC", "ASC", "BETWEEN", "TRUNCATE", "CAST", "CONVERT",
+}
+var reservedKeywordsRegexp = regexp.MustCompile(`(?i)\b(` + strings.Join(keywords, "|") + `)\b`)
+var backQuoteRegexp = regexp.MustCompile("`(.+)`")
+
+func convertSQLKeywordsToUpper(sql string) string {
+	// convert reserved keywords to upper case
+	sql = reservedKeywordsRegexp.ReplaceAllStringFunc(sql, strings.ToUpper)
+	// convert table names to lower case
+	sql = backQuoteRegexp.ReplaceAllStringFunc(sql, strings.ToLower)
+	return sql
 }

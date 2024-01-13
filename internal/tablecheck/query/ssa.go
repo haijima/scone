@@ -192,7 +192,7 @@ func analyzeFuncBySsaMethod(pkg *ssa.Package, fn *ssa.Function, pos []token.Pos,
 	return foundQueries
 }
 
-func warnIfNotCommented(pkg *ssa.Package, v ssa.Value, pos []token.Pos, opt *Option) {
+func IsCommented(pkg *ssa.Package, pos []token.Pos, opt *Option) bool {
 	position := GetPosition(pkg, pos)
 	commented := false
 	for _, cp := range opt.queryCommentPositions {
@@ -206,7 +206,12 @@ func warnIfNotCommented(pkg *ssa.Package, v ssa.Value, pos []token.Pos, opt *Opt
 			commented = commented || opt.isIgnoredFunc(p)
 		}
 	}
-	if !commented {
+	return commented
+}
+
+func warnIfNotCommented(pkg *ssa.Package, v ssa.Value, pos []token.Pos, opt *Option) {
+	position := GetPosition(pkg, pos)
+	if !IsCommented(pkg, pos, opt) {
 		file := fmt.Sprintf("%s:%d:%d", filepath.Base(position.Filename), position.Line, position.Column)
 		slog.Warn("Cannot parse query", "SQL", v, "package", pkg.Pkg.Path(), "file", file)
 	}

@@ -117,9 +117,12 @@ type methodArg struct {
 }
 
 var targetMethods = []methodArg{
-	{Package: "database/sql", Method: "Query", ArgIndex: 1},
-	{Package: "database/sql", Method: "QueryRow", ArgIndex: 1},
+	{Package: "database/sql", Method: "ExecContext", ArgIndex: 2},
 	{Package: "database/sql", Method: "Exec", ArgIndex: 1},
+	{Package: "database/sql", Method: "QueryContext", ArgIndex: 2},
+	{Package: "database/sql", Method: "Query", ArgIndex: 1},
+	{Package: "database/sql", Method: "QueryRowContext", ArgIndex: 2},
+	{Package: "database/sql", Method: "QueryRow", ArgIndex: 1},
 	{Package: "github.com/jmoiron/sqlx", Method: "Exec", ArgIndex: 1},
 	{Package: "github.com/jmoiron/sqlx", Method: "Rebind", ArgIndex: 1},
 	{Package: "github.com/jmoiron/sqlx", Method: "BindNamed", ArgIndex: 1},
@@ -140,7 +143,8 @@ var targetMethods = []methodArg{
 	{Package: "github.com/jmoiron/sqlx", Method: "GetContext", ArgIndex: 3},
 	{Package: "github.com/jmoiron/sqlx", Method: "QueryRowxContext", ArgIndex: 2},
 	{Package: "github.com/jmoiron/sqlx", Method: "NamedExecContext", ArgIndex: 2},
-	{Package: "github.com/jmoiron/sqlx", Method: "NamedExecContext", ArgIndex: 2},
+	{Package: "github.com/jmoiron/sqlx", Method: "Exec", ArgIndex: 1},
+	{Package: "github.com/jmoiron/sqlx", Method: "In", ArgIndex: 0},
 }
 
 func analyzeFuncBySsaMethod(pkg *ssa.Package, fn *ssa.Function, pos []token.Pos, opt *Option) []*Query {

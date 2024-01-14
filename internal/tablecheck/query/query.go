@@ -70,7 +70,8 @@ var SelectPattern = regexp.MustCompile("^(?i)(SELECT .+? FROM `?(?:[a-z0-9_]+\\.
 var JoinPattern = regexp.MustCompile("(?i)(JOIN `?(?:[a-z0-9_]+\\.)?)([a-z0-9_]+)(`?(?:(?: as)? [a-z0-9_]+)? (?:ON|USING)?)")
 var SubQueryPattern = regexp.MustCompile("(?i)(SELECT .+? FROM `?(?:[a-z0-9_]+\\.)?)([a-z0-9_]+)(`?)")
 var InsertPattern = regexp.MustCompile("^(?i)(INSERT(?: IGNORE)?(?: INTO)? `?(?:[a-z0-9_]+\\.)?)([a-z0-9_]+)(`?)")
-var UpdatePattern = regexp.MustCompile("^(?i)(UPDATE(?: IGNORE)? `?(?:[a-z0-9_]+\\.)?)([a-z0-9_]+)(`? SET)")
+var UpdatePattern = regexp.MustCompile("^(?i)(UPDATE(?: IGNORE)? `?(?:[a-z0-9_]+\\.)?)([a-z0-9_]+)(`?.* SET)")
+var ReplacePattern = regexp.MustCompile("^(?i)(REPLACE(?: INTO)? `?(?:[a-z0-9_]+\\.)?)([a-z0-9_]+)(`?)")
 var DeletePattern = regexp.MustCompile("^(?i)(DELETE(?: IGNORE)? FROM `?(?:[a-z0-9_]+\\.)?)([a-z0-9_]+)(`?)")
 
 func toSqlQuery(str string) (*Query, bool) {
@@ -104,6 +105,14 @@ func toSqlQuery(str string) (*Query, bool) {
 	} else if matches := UpdatePattern.FindStringSubmatch(str); len(matches) > 2 {
 		q.Kind = Update
 		q.Tables = []string{UpdatePattern.FindStringSubmatch(str)[2]}
+		if SubQueryPattern.MatchString(str) {
+			for _, m := range SubQueryPattern.FindAllStringSubmatch(str, -1) {
+				q.Tables = append(q.Tables, m[2])
+			}
+		}
+	} else if matches := ReplacePattern.FindStringSubmatch(str); len(matches) > 2 {
+		q.Kind = Update
+		q.Tables = []string{ReplacePattern.FindStringSubmatch(str)[2]}
 		if SubQueryPattern.MatchString(str) {
 			for _, m := range SubQueryPattern.FindAllStringSubmatch(str, -1) {
 				q.Tables = append(q.Tables, m[2])

@@ -288,6 +288,7 @@ func row(q *query.Query, opt *PrintOption) []string {
 	raw = query.JoinPattern.ReplaceAllString(raw, "$1"+emphasize("$2")+"$3")
 	raw = query.InsertPattern.ReplaceAllString(raw, "$1"+emphasize("$2")+"$3")
 	raw = query.UpdatePattern.ReplaceAllString(raw, "$1"+emphasize("$2")+"$3")
+	raw = query.ReplacePattern.ReplaceAllString(raw, "$1"+emphasize("$2")+"$3")
 	raw = query.DeletePattern.ReplaceAllString(raw, "$1"+emphasize("$2")+"$3")
 
 	ellipsis := raw

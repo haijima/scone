@@ -7,6 +7,7 @@ import (
 	"go/token"
 	"log/slog"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	"golang.org/x/tools/go/analysis/passes/buildssa"
@@ -229,6 +230,8 @@ func constLikeStringValueToQuery(pkg *ssa.Package, v ssa.Value, fn *ssa.Function
 	return nil, false
 }
 
+var fmtVerbRegexp = regexp.MustCompile(`(^|[^%]|(?:%%)+)(%(?:-?\d+|\+|#)?)(\w)`)
+
 func constLikeStringValue(v ssa.Value) (string, bool) {
 	switch t := v.(type) {
 	case *ssa.Const:
@@ -247,7 +250,68 @@ func constLikeStringValue(v ssa.Value) (string, bool) {
 				}
 			}
 		}
-		// TODO:Support fmt.Sprintf() and strings.Join()
+	// TODO:Support fmt.Sprintf() and strings.Join()
+	case *ssa.Call:
+		common := t.Common()
+		if cvFn, ok := common.Value.(*ssa.Function); ok {
+			if cvFn.Pkg != nil && cvFn.Pkg.Pkg.Path() == "fmt" && cvFn.Name() == "Sprintf" {
+				f, ok := constLikeStringValue(t.Call.Args[0])
+				if !ok {
+					break
+				}
+				f, err := unquote(f)
+				if err != nil {
+					break
+				}
+
+				i := 0
+				f = fmtVerbRegexp.ReplaceAllStringFunc(f, func(s string) string {
+					i = i + 1
+
+					m := fmtVerbRegexp.FindAllStringSubmatch(s, 1)
+					if m == nil || len(m) < 1 || len(m[0]) < 4 {
+						return s
+					}
+					switch m[0][3] {
+					case "b":
+						return m[0][1] + "01"
+					case "c":
+						return m[0][1] + "a"
+					case "t":
+						return m[0][1] + "true"
+					case "T":
+						return m[0][1] + "string"
+					case "e":
+						return m[0][1] + "1.234000e+08"
+					case "E":
+						return m[0][1] + "1.234000E+08"
+					case "p":
+						return m[0][1] + "0xc0000ba000"
+					case "x":
+						return m[0][1] + "1f"
+					case "d":
+						return m[0][1] + "1"
+					case "f":
+						return m[0][1] + "1.0"
+					//case "s":
+					//	if i+1 >= len(t.Call.Args) {
+					//		return s
+					//	}
+					//	a := t.Call.Args[i+1]
+					//	if c, ok := constLikeStringValue(a); ok {
+					//		return m[0][1] + c
+					//	} else {
+					//		return s
+					//	}
+					default:
+						return s
+					}
+				})
+				if !fmtVerbRegexp.MatchString(f) {
+					return f, true
+				}
+			}
+		}
 	}
 	return "", false
 }

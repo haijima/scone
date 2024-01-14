@@ -1,6 +1,7 @@
 package query
 
 import (
+	"context"
 	"fmt"
 	"go/ast"
 	"go/constant"
@@ -211,6 +212,8 @@ func analyzeFuncBySsaMethod(pkg *ssa.Package, fn *ssa.Function, pos []token.Pos,
 }
 
 func constLikeStringValueToQuery(pkg *ssa.Package, v ssa.Value, fn *ssa.Function, pos []token.Pos, opt *Option) (*Query, bool) {
+	position := GetPosition(pkg, append([]token.Pos{v.Pos()}, pos...))
+	file := fmt.Sprintf("%s:%d:%d", filepath.Base(position.Filename), position.Line, position.Column)
 	if a, ok := constLikeStringValue(v); ok {
 		if q, ok := toSqlQuery(a); ok {
 			q.Func = fn
@@ -219,13 +222,37 @@ func constLikeStringValueToQuery(pkg *ssa.Package, v ssa.Value, fn *ssa.Function
 			if filter(q, opt) {
 				return q, true
 			} else {
-				warnIfNotCommented(pkg, v, append([]token.Pos{v.Pos()}, pos...), opt)
+				slog.Debug("filtered", "SQL", v, "package", pkg.Pkg.Path(), "file", file)
 			}
 		} else {
-			warnIfNotCommented(pkg, v, append([]token.Pos{v.Pos()}, pos...), opt)
+			level := slog.LevelWarn
+			if IsCommented(pkg, append([]token.Pos{v.Pos()}, pos...), opt) {
+				level = slog.LevelDebug
+			}
+			if norm, err := normalize(
+				a); err == nil {
+				slog.Log(context.Background(), level, "Cannot parse query", "SQL", norm, "package", pkg.Pkg.Path(), "file", file)
+			} else {
+				slog.Log(context.Background(), level, "Cannot parse query", "SQL", a, "package", pkg.Pkg.Path(), "file", file)
+			}
 		}
 	} else {
-		warnIfNotCommented(pkg, v, append([]token.Pos{v.Pos()}, pos...), opt)
+		if extract, ok := v.(*ssa.Extract); ok {
+			if c, ok := extract.Tuple.(*ssa.Call); ok {
+				if fn, ok := c.Common().Value.(*ssa.Function); ok {
+					if fn.Pkg != nil && fn.Pkg.Pkg.Path() == "github.com/jmoiron/sqlx" && fn.Name() == "In" {
+						// No need to warn if v is the result of sqlx.In()
+						return nil, false
+					}
+				}
+			}
+		}
+		level := slog.LevelWarn
+		if IsCommented(pkg, append([]token.Pos{v.Pos()}, pos...), opt) {
+			level = slog.LevelDebug
+		}
+		slog.Log(context.Background(), level,
+			"Can't parse value as string constant", "value", fmt.Sprintf("%T %v", v, v), "package", pkg.Pkg.Path(), "file", file)
 	}
 	return nil, false
 }
@@ -331,12 +358,4 @@ func IsCommented(pkg *ssa.Package, pos []token.Pos, opt *Option) bool {
 		}
 	}
 	return commented
-}
-
-func warnIfNotCommented(pkg *ssa.Package, v ssa.Value, pos []token.Pos, opt *Option) {
-	position := GetPosition(pkg, pos)
-	if !IsCommented(pkg, pos, opt) {
-		file := fmt.Sprintf("%s:%d:%d", filepath.Base(position.Filename), position.Line, position.Column)
-		slog.Warn("Cannot parse query", "SQL", v, "package", pkg.Pkg.Path(), "file", file)
-	}
 }

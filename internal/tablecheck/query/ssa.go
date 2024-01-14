@@ -252,7 +252,7 @@ func constLikeStringValueToQuery(pkg *ssa.Package, v ssa.Value, fn *ssa.Function
 			level = slog.LevelDebug
 		}
 		slog.Log(context.Background(), level,
-			"Can't parse value as string constant", "value", fmt.Sprintf("%T %v", v, v), "package", pkg.Pkg.Path(), "file", file)
+			"Can't parse value as string constant", "type", fmt.Sprintf("%T", v), "value", fmt.Sprintf("%v", v), "package", pkg.Pkg.Path(), "file", file)
 	}
 	return nil, false
 }

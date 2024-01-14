@@ -75,8 +75,10 @@ func ExtractQuery(ssaProg *buildssa.SSA, files []*ast.File, opt *Option) (*Resul
 				for _, c := range strings.Split(cg.Text(), "\n") {
 					if strings.HasPrefix(c, "tablecheck:ignore") {
 						old := opt.isIgnoredFunc
+						start := n.Pos()
+						end := n.End()
 						opt.isIgnoredFunc = func(pos token.Pos) bool {
-							return old(pos) || (n.Pos() <= pos && pos < n.End())
+							return old(pos) || (start <= pos && pos < end)
 						}
 						break
 					}

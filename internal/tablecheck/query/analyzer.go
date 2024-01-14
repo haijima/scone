@@ -53,6 +53,7 @@ type Option struct {
 	FilterFunctions     []string
 	FilterQueryTypes    []string
 	FilterTables        []string
+	AdditionalFuncs     []string
 
 	queryCommentPositions []token.Pos
 	isIgnoredFunc         func(pos token.Pos) bool

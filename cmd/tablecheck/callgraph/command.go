@@ -39,6 +39,7 @@ func NewCommand(v *viper.Viper, _ afero.Fs) *cobra.Command {
 	cmd.Flags().StringSlice("filter-query-types", []string{}, "The `types` of queries to filter {select|insert|update|delete}")
 	cmd.Flags().StringSlice("filter-tables", []string{}, "The `names` of tables to filter")
 	cmd.Flags().String("mode", "ssa-method", "The query analyze `mode` {ssa-method|ssa-const|ast}")
+	cmd.Flags().StringSlice("analyze-funcs", []string{}, "The names of functions to analyze additionally. format: `<package>#<function>#<argument index>`")
 	_ = cmd.MarkFlagDirname("dir")
 
 	return cmd
@@ -62,6 +63,7 @@ func run(cmd *cobra.Command, v *viper.Viper) error {
 	filterQueryTypes := v.GetStringSlice("filter-query-types")
 	filterTables := v.GetStringSlice("filter-tables")
 	modeFlg := v.GetString("mode")
+	additionalFuncs := v.GetStringSlice("analyze-funcs")
 
 	var mode query.AnalyzeMode
 	if modeFlg == "ssa-method" {
@@ -90,6 +92,7 @@ func run(cmd *cobra.Command, v *viper.Viper) error {
 		FilterFunctions:     filterFunctions,
 		FilterQueryTypes:    filterQueryTypes,
 		FilterTables:        filterTables,
+		AdditionalFuncs:     additionalFuncs,
 	}
 	result, err := tablecheck.Analyze(dir, pattern, opt)
 	if err != nil {

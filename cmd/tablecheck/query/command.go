@@ -47,6 +47,7 @@ func NewCommand(v *viper.Viper, _ afero.Fs) *cobra.Command {
 	cmd.Flags().Bool("no-header", false, "Hide header")
 	cmd.Flags().Bool("no-rownum", false, "Hide row number")
 	cmd.Flags().String("mode", "ssa-method", "The query analyze `mode` {ssa-method|ssa-const|ast}")
+	cmd.Flags().StringSlice("analyze-funcs", []string{}, "The names of functions to analyze additionally. format: `<package>#<function>#<argument index>`")
 
 	_ = cmd.MarkFlagDirname("dir")
 
@@ -79,6 +80,7 @@ func run(cmd *cobra.Command, v *viper.Viper) error {
 	noRowNum := v.GetBool("no-rownum")
 	sortKeys := v.GetStringSlice("sort")
 	modeFlg := v.GetString("mode")
+	additionalFuncs := v.GetStringSlice("analyze-funcs")
 
 	var mode query.AnalyzeMode
 	if modeFlg == "ssa-method" {
@@ -107,6 +109,7 @@ func run(cmd *cobra.Command, v *viper.Viper) error {
 		FilterFunctions:     filterFunctions,
 		FilterQueryTypes:    filterQueryTypes,
 		FilterTables:        filterTables,
+		AdditionalFuncs:     additionalFuncs,
 	}
 	result, err := tablecheck.Analyze(dir, pattern, opt)
 	if err != nil {

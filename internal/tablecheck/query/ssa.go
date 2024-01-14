@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 
 	"golang.org/x/tools/go/analysis/passes/buildssa"
@@ -150,13 +151,27 @@ var targetMethods = []methodArg{
 	{Package: "github.com/jmoiron/sqlx", Method: "NamedExecContext", ArgIndex: 1},
 	{Package: "github.com/jmoiron/sqlx", Method: "Exec", ArgIndex: 0},
 	{Package: "github.com/jmoiron/sqlx", Method: "In", ArgIndex: -1},
-
-	{Package: "github.com/isucon/isucon12-qualify/webapp/go", Method: "GetContext", ArgIndex: 2},
-	{Package: "github.com/isucon/isucon12-qualify/webapp/go", Method: "SelectContext", ArgIndex: 2},
-	{Package: "github.com/isucon/isucon12-qualify/webapp/go", Method: "ExecContext", ArgIndex: 1},
 }
 
 func analyzeFuncBySsaMethod(pkg *ssa.Package, fn *ssa.Function, pos []token.Pos, opt *Option) []*Query {
+	tms := make([]methodArg, len(targetMethods))
+	copy(tms, targetMethods)
+	if opt.AdditionalFuncs != nil || len(opt.AdditionalFuncs) > 0 {
+		for _, f := range opt.AdditionalFuncs {
+			s := strings.Split(f, "#")
+			if len(s) != 3 {
+				slog.Warn(fmt.Sprintf("Invalid format of additional function: %s", f))
+				continue
+			}
+			idx, err := strconv.Atoi(s[2])
+			if err != nil {
+				slog.Warn(fmt.Sprintf("Index of additional function should be integer: %s", f))
+				continue
+			}
+			tms = append(tms, methodArg{Package: s[0], Method: s[1], ArgIndex: idx})
+		}
+	}
+
 	foundQueries := make([]*Query, 0)
 	for _, block := range fn.Blocks {
 		for _, instr := range block.Instrs {
@@ -181,7 +196,7 @@ func analyzeFuncBySsaMethod(pkg *ssa.Package, fn *ssa.Function, pos []token.Pos,
 				continue // Can't get package name of the function
 			}
 
-			for _, t := range targetMethods {
+			for _, t := range tms {
 				if mp == t.Package && mn == t.Method {
 					idx := t.ArgIndex
 					if !common.IsInvoke() {

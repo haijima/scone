@@ -147,7 +147,7 @@ var targetMethods = []methodArg{
 	{Package: "github.com/jmoiron/sqlx", Method: "QueryRowxContext", ArgIndex: 1},
 	{Package: "github.com/jmoiron/sqlx", Method: "NamedExecContext", ArgIndex: 1},
 	{Package: "github.com/jmoiron/sqlx", Method: "Exec", ArgIndex: 0},
-	{Package: "github.com/jmoiron/sqlx", Method: "In", ArgIndex: 0},
+	{Package: "github.com/jmoiron/sqlx", Method: "In", ArgIndex: -1},
 
 	{Package: "github.com/isucon/isucon12-qualify/webapp/go", Method: "GetContext", ArgIndex: 2},
 	{Package: "github.com/isucon/isucon12-qualify/webapp/go", Method: "SelectContext", ArgIndex: 2},

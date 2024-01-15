@@ -54,7 +54,7 @@ func NewCommand(v *viper.Viper, _ afero.Fs) *cobra.Command {
 	return cmd
 }
 
-var headerColumns = []string{"package", "package-path", "file", "function", "type", "table", "tables", "sha1", "query", "raw-query"}
+var headerColumns = []string{"package", "package-path", "file", "function", "type", "table", "related-tables", "sha1", "query", "raw-query"}
 var defaultHeaderIndex = []int{0, 1, 2, 3, 4, 5, 6, 7, 8}
 
 func run(cmd *cobra.Command, v *viper.Viper) error {
@@ -308,6 +308,16 @@ func row(q *query.Query, opt *PrintOption) []string {
 		}
 	}
 
+	tableSet := make([]string, 0, len(q.Tables))
+	seen := make(map[string]bool)
+	for _, t := range q.Tables {
+		if !seen[t] {
+			tableSet = append(tableSet, t)
+			seen[t] = true
+		}
+	}
+	tables := strings.Join(tableSet[1:], ", ")
+
 	fullRow := []string{
 		q.Package.Pkg.Name(),
 		q.Package.Pkg.Path(),
@@ -315,7 +325,7 @@ func row(q *query.Query, opt *PrintOption) []string {
 		q.Func.Name(),
 		sqlType,
 		q.Tables[0],
-		strconv.Itoa(len(q.Tables)),
+		tables,
 		q.Sha(),
 		ellipsis,
 		raw,

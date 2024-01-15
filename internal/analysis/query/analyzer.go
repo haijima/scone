@@ -117,7 +117,7 @@ func filter(q *Query, opt *Option) bool {
 	file := q.Position().Filename
 	funcName := q.Func.Name()
 	queryType := q.Kind.String()
-	table := q.Tables[0]
+	tables := q.Tables
 	hash := q.Sha()
 
 	commented := false
@@ -133,7 +133,7 @@ func filter(q *Query, opt *Option) bool {
 		filterAndExclude(file, opt.FilterFiles, opt.ExcludeFiles) &&
 		filterAndExclude(funcName, opt.FilterFunctions, opt.ExcludeFunctions) &&
 		filterAndExclude(queryType, opt.FilterQueryTypes, opt.ExcludeQueryTypes) &&
-		filterAndExclude(table, opt.FilterTables, opt.ExcludeTables) &&
+		filterAndExcludeFunc(tables, opt.FilterTables, opt.ExcludeTables, slices.Contains[[]string]) &&
 		filterAndExcludeFunc(hash, opt.FilterQueries, opt.ExcludeQueries, strings.HasPrefix)
 }
 
@@ -141,7 +141,7 @@ func filterAndExclude(target string, filters []string, excludes []string) bool {
 	return filterAndExcludeFunc(target, filters, excludes, func(target, input string) bool { return target == input })
 }
 
-func filterAndExcludeFunc(target string, filters []string, excludes []string, fn func(target, input string) bool) bool {
+func filterAndExcludeFunc[T any](target T, filters []string, excludes []string, fn func(target T, input string) bool) bool {
 	match := true
 	if filters != nil && len(filters) > 0 {
 		match = false

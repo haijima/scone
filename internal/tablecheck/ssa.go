@@ -11,7 +11,7 @@ import (
 
 // See: buildssa.Analyzer
 func BuildSSA(pkg *packages.Package) (*buildssa.SSA, error) {
-	prog := ssa.NewProgram(pkg.Fset, ssa.GlobalDebug)
+	prog := ssa.NewProgram(pkg.Fset, ssa.BuilderMode(0))
 
 	// Create SSA packages for direct imports.
 	for _, p := range pkg.Types.Imports() {

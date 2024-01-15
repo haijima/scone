@@ -206,12 +206,16 @@ func analyzeFuncBySsaMethod(pkg *ssa.Package, fn *ssa.Function, pos []token.Pos,
 
 					if phi, ok := arg.(*ssa.Phi); ok {
 						for _, edge := range phi.Edges {
-							if q, ok := constLikeStringValueToQuery(pkg, edge, fn, append([]token.Pos{arg.Pos(), c.Pos(), fn.Pos()}, pos...), opt); ok {
-								foundQueries = append(foundQueries, q)
+							if qs, ok := constLikeStringValueToQueries(pkg, edge, fn, append([]token.Pos{arg.Pos(), c.Pos(), fn.Pos()}, pos...), opt); ok {
+								for _, q := range qs {
+									foundQueries = append(foundQueries, q)
+								}
 							}
 						}
-					} else if q, ok := constLikeStringValueToQuery(pkg, arg, fn, append([]token.Pos{c.Pos(), fn.Pos()}, pos...), opt); ok {
-						foundQueries = append(foundQueries, q)
+					} else if qs, ok := constLikeStringValueToQueries(pkg, arg, fn, append([]token.Pos{c.Pos(), fn.Pos()}, pos...), opt); ok {
+						for _, q := range qs {
+							foundQueries = append(foundQueries, q)
+						}
 					}
 					break // Found target method
 				}
@@ -226,30 +230,35 @@ func analyzeFuncBySsaMethod(pkg *ssa.Package, fn *ssa.Function, pos []token.Pos,
 	return foundQueries
 }
 
-func constLikeStringValueToQuery(pkg *ssa.Package, v ssa.Value, fn *ssa.Function, pos []token.Pos, opt *Option) (*Query, bool) {
+func constLikeStringValueToQueries(pkg *ssa.Package, v ssa.Value, fn *ssa.Function, pos []token.Pos, opt *Option) ([]*Query, bool) {
 	position := GetPosition(pkg, append([]token.Pos{v.Pos()}, pos...))
 	file := fmt.Sprintf("%s:%d:%d", filepath.Base(position.Filename), position.Line, position.Column)
-	if a, ok := constLikeStringValue(v); ok {
-		if q, ok := toSqlQuery(a); ok {
-			q.Func = fn
-			q.Pos = append([]token.Pos{v.Pos()}, pos...)
-			q.Package = pkg
-			if filter(q, opt) {
-				return q, true
+	if as, ok := constLikeStringValues(v); ok {
+		res := make([]*Query, 0)
+		for _, a := range as {
+			if q, ok := toSqlQuery(a); ok {
+				q.Func = fn
+				q.Pos = append([]token.Pos{v.Pos()}, pos...)
+				q.Package = pkg
+				if filter(q, opt) {
+					res = append(res, q)
+				} else {
+					slog.Debug("filtered", "SQL", v, "package", pkg.Pkg.Path(), "file", file)
+				}
 			} else {
-				slog.Debug("filtered", "SQL", v, "package", pkg.Pkg.Path(), "file", file)
+				level := slog.LevelWarn
+				if IsCommented(pkg, append([]token.Pos{v.Pos()}, pos...), opt) {
+					level = slog.LevelDebug
+				}
+				if norm, err := normalize(a); err == nil {
+					slog.Log(context.Background(), level, "Cannot parse query", "SQL", norm, "package", pkg.Pkg.Path(), "file", file)
+				} else {
+					slog.Log(context.Background(), level, "Cannot parse query", "SQL", a, "package", pkg.Pkg.Path(), "file", file)
+				}
 			}
-		} else {
-			level := slog.LevelWarn
-			if IsCommented(pkg, append([]token.Pos{v.Pos()}, pos...), opt) {
-				level = slog.LevelDebug
-			}
-			if norm, err := normalize(
-				a); err == nil {
-				slog.Log(context.Background(), level, "Cannot parse query", "SQL", norm, "package", pkg.Pkg.Path(), "file", file)
-			} else {
-				slog.Log(context.Background(), level, "Cannot parse query", "SQL", a, "package", pkg.Pkg.Path(), "file", file)
-			}
+		}
+		if len(res) > 0 {
+			return res, true
 		}
 	} else {
 		if extract, ok := v.(*ssa.Extract); ok {
@@ -257,7 +266,7 @@ func constLikeStringValueToQuery(pkg *ssa.Package, v ssa.Value, fn *ssa.Function
 				if fn, ok := c.Common().Value.(*ssa.Function); ok {
 					if fn.Pkg != nil && fn.Pkg.Pkg.Path() == "github.com/jmoiron/sqlx" && fn.Name() == "In" {
 						// No need to warn if v is the result of sqlx.In()
-						return nil, false
+						return []*Query{}, false
 					}
 				}
 			}
@@ -269,38 +278,64 @@ func constLikeStringValueToQuery(pkg *ssa.Package, v ssa.Value, fn *ssa.Function
 		slog.Log(context.Background(), level,
 			"Can't parse value as string constant", "type", fmt.Sprintf("%T", v), "value", fmt.Sprintf("%v", v), "package", pkg.Pkg.Path(), "file", file)
 	}
-	return nil, false
+	return []*Query{}, false
 }
 
 var fmtVerbRegexp = regexp.MustCompile(`(^|[^%]|(?:%%)+)(%(?:-?\d+|\+|#)?)(\w)`)
 
-func constLikeStringValue(v ssa.Value) (string, bool) {
+func constLikeStringValues(v ssa.Value) ([]string, bool) {
 	switch t := v.(type) {
 	case *ssa.Const:
 		if t.Value != nil && t.Value.Kind() == constant.String {
-			return t.Value.ExactString(), true
+			return []string{t.Value.ExactString()}, true
 		}
 	case *ssa.BinOp:
 		if t.Op == token.ADD {
-			if x, ok := constLikeStringValue(t.X); ok {
-				if y, ok := constLikeStringValue(t.Y); ok {
-					if xx, err := unquote(x); err == nil {
-						if yy, err := unquote(y); err == nil {
-							return xx + " " + yy, true
+			if x, ok := constLikeStringValues(t.X); ok {
+				if y, ok := constLikeStringValues(t.Y); ok {
+					res := make([]string, 0, len(x)*len(y))
+					for _, xx := range x {
+						for _, yy := range y {
+							xx, err := unquote(xx)
+							if err != nil {
+								continue
+							}
+							yy, err := unquote(yy)
+							if err != nil {
+								continue
+							}
+							res = append(res, xx+yy)
 						}
+					}
+					if len(res) > 0 {
+						return res, true
 					}
 				}
 			}
+		}
+	case *ssa.Phi:
+		res := make([]string, 0, len(t.Edges))
+		for _, edge := range t.Edges {
+			if c, ok := constLikeStringValues(edge); ok {
+				res = append(res, c...)
+			}
+		}
+		if len(res) > 0 {
+			return res, true
 		}
 	// TODO:Support fmt.Sprintf() and strings.Join()
 	case *ssa.Call:
 		common := t.Common()
 		if cvFn, ok := common.Value.(*ssa.Function); ok {
 			if cvFn.Pkg != nil && cvFn.Pkg.Pkg.Path() == "fmt" && cvFn.Name() == "Sprintf" {
-				f, ok := constLikeStringValue(t.Call.Args[0])
+				fs, ok := constLikeStringValues(t.Call.Args[0])
 				if !ok {
 					break
 				}
+				if len(fs) != 1 {
+					break
+				}
+				f := fs[0]
 				f, err := unquote(f)
 				if err != nil {
 					break
@@ -350,12 +385,12 @@ func constLikeStringValue(v ssa.Value) (string, bool) {
 					}
 				})
 				if !fmtVerbRegexp.MatchString(f) {
-					return f, true
+					return []string{f}, true
 				}
 			}
 		}
 	}
-	return "", false
+	return []string{}, false
 }
 
 func IsCommented(pkg *ssa.Package, pos []token.Pos, opt *Option) bool {

@@ -144,7 +144,6 @@ func printGraphviz(w io.Writer, cgs []*callgraph.CallGraph) error {
 					fmt.Fprintf(w, "\t\"%s%s\"[label=\"%s\"]\n", cg.Package.Path(), edge.Caller, edge.Caller)
 					fmt.Fprintf(w, "\t\"%s%s\"[label=\"%s\"]\n", cg.Package.Path(), edge.Callee, edge.Callee)
 					gve.Style = "dashed"
-					gve.Weight = 1000
 					fmt.Fprintln(w, gve)
 				}
 			}

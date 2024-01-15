@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/haijima/scone/internal/tablecheck"
-	"github.com/haijima/scone/internal/tablecheck/callgraph"
-	"github.com/haijima/scone/internal/tablecheck/query"
+	"github.com/haijima/scone/internal/analysis"
+	"github.com/haijima/scone/internal/analysis/callgraph"
+	"github.com/haijima/scone/internal/analysis/query"
 	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -94,7 +94,7 @@ func run(cmd *cobra.Command, v *viper.Viper) error {
 		FilterTables:        filterTables,
 		AdditionalFuncs:     additionalFuncs,
 	}
-	result, err := tablecheck.Analyze(dir, pattern, opt)
+	result, err := analysis.Analyze(dir, pattern, opt)
 	if err != nil {
 		return err
 	}

@@ -11,8 +11,8 @@ import (
 	"unicode"
 
 	"github.com/fatih/color"
-	"github.com/haijima/scone/internal/tablecheck"
-	"github.com/haijima/scone/internal/tablecheck/query"
+	"github.com/haijima/scone/internal/analysis"
+	"github.com/haijima/scone/internal/analysis/query"
 	"github.com/olekukonko/tablewriter"
 	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
@@ -111,7 +111,7 @@ func run(cmd *cobra.Command, v *viper.Viper) error {
 		FilterTables:        filterTables,
 		AdditionalFuncs:     additionalFuncs,
 	}
-	result, err := tablecheck.Analyze(dir, pattern, opt)
+	result, err := analysis.Analyze(dir, pattern, opt)
 	if err != nil {
 		return err
 	}

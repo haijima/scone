@@ -19,7 +19,7 @@ import (
 func getQueriesInComment(ssaProg *buildssa.SSA, files []*ast.File, opt *Option) []*Query {
 	foundQueries := make([]*Query, 0)
 
-	commentPrefix := "// tablecheck:sql"
+	commentPrefix := "// scone:sql"
 	for _, file := range files {
 		for _, cg := range file.Comments {
 			for _, comment := range cg.List {

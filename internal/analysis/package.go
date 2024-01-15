@@ -1,4 +1,4 @@
-package tablecheck
+package analysis
 
 import (
 	"errors"

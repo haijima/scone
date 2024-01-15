@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	"github.com/gostaticanalysis/testutil"
-	"github.com/haijima/scone/internal/tablecheck/callgraph"
+	"github.com/haijima/scone/internal/analysis/callgraph"
 	"golang.org/x/tools/go/analysis/analysistest"
 )
 

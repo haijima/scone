@@ -3,7 +3,7 @@ package callgraph
 import (
 	"go/types"
 
-	"github.com/haijima/scone/internal/tablecheck/query"
+	"github.com/haijima/scone/internal/analysis/query"
 	"golang.org/x/tools/go/ssa"
 )
 

@@ -14,7 +14,7 @@ import (
 // Analyzer is ...
 var Analyzer = &analysis.Analyzer{
 	Name: "extractquery",
-	Doc:  "tablecheck is ...",
+	Doc:  "scone is ...",
 	Run: func(pass *analysis.Pass) (interface{}, error) {
 		ssaProg := pass.ResultOf[buildssa.Analyzer].(*buildssa.SSA)
 		return ExtractQuery(ssaProg, pass.Files, &Option{})
@@ -68,13 +68,13 @@ func ExtractQuery(ssaProg *buildssa.SSA, files []*ast.File, opt *Option) (*Resul
 	// Get queries from comments
 	foundQueries = append(foundQueries, getQueriesInComment(ssaProg, files, opt)...)
 
-	//ignoreCommentPrefix := "// tablecheck:ignore"
+	//ignoreCommentPrefix := "// scone:ignore"
 	for _, file := range files {
 		cm := ast.NewCommentMap(ssaProg.Pkg.Prog.Fset, file, file.Comments)
 		for n, cgs := range cm {
 			for _, cg := range cgs {
 				for _, c := range strings.Split(cg.Text(), "\n") {
-					if strings.HasPrefix(c, "tablecheck:ignore") {
+					if strings.HasPrefix(c, "scone:ignore") {
 						old := opt.isIgnoredFunc
 						start := n.Pos()
 						end := n.End()

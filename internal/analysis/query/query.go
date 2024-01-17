@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"go/token"
 	"regexp"
-	"strconv"
 	"strings"
 
+	"github.com/haijima/scone/internal/analysis/analysisutil"
 	"golang.org/x/tools/go/ssa"
 )
 
@@ -21,24 +21,13 @@ type Query struct {
 }
 
 func (q *Query) Position() token.Position {
-	return GetPosition(q.Package, q.Pos)
+	return analysisutil.GetPosition(q.Package, q.Pos)
 }
 
 func (q *Query) Sha() string {
 	h := sha1.New()
 	h.Write([]byte(q.Raw))
 	return fmt.Sprintf("%x", h.Sum(nil))[:8]
-}
-
-func GetPosition(pkg *ssa.Package, pos []token.Pos) token.Position {
-	res := token.NoPos
-	for _, p := range pos {
-		if p.IsValid() {
-			res = p
-			break
-		}
-	}
-	return pkg.Prog.Fset.Position(res)
 }
 
 type QueryKind int
@@ -134,7 +123,7 @@ func toSqlQuery(str string) (*Query, bool) {
 }
 
 func normalize(str string) (string, error) {
-	str, err := unquote(str)
+	str, err := analysisutil.Unquote(str)
 	if err != nil {
 		return str, err
 	}
@@ -143,21 +132,6 @@ func normalize(str string) (string, error) {
 	str = strings.Trim(str, " ")
 	str = strings.ToLower(str)
 	//str = convertSQLKeywordsToUpper(str)
-	return str, nil
-}
-
-func unquote(str string) (string, error) {
-	if len(str) >= 2 {
-		if str[0] == '"' && str[len(str)-1] == '"' {
-			return strconv.Unquote(str)
-		}
-		if str[0] == '\'' && str[len(str)-1] == '\'' {
-			return strconv.Unquote(str)
-		}
-		if str[0] == '`' && str[len(str)-1] == '`' {
-			return strconv.Unquote(str)
-		}
-	}
 	return str, nil
 }
 

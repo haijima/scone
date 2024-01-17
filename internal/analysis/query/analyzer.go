@@ -29,36 +29,6 @@ type Result struct {
 	Queries []*Query
 }
 
-type AnalyzeMode int
-
-const (
-	SsaMethod AnalyzeMode = iota
-	SsaConst
-	Ast
-)
-
-type Option struct {
-	Mode                AnalyzeMode
-	ExcludeQueries      []string
-	ExcludePackages     []string
-	ExcludePackagePaths []string
-	ExcludeFiles        []string
-	ExcludeFunctions    []string
-	ExcludeQueryTypes   []string
-	ExcludeTables       []string
-	FilterQueries       []string
-	FilterPackages      []string
-	FilterPackagePaths  []string
-	FilterFiles         []string
-	FilterFunctions     []string
-	FilterQueryTypes    []string
-	FilterTables        []string
-	AdditionalFuncs     []string
-
-	queryCommentPositions []token.Pos
-	isIgnoredFunc         func(pos token.Pos) bool
-}
-
 // ExtractQuery extracts queries from the given package.
 func ExtractQuery(ssaProg *buildssa.SSA, files []*ast.File, opt *Option) (*Result, error) {
 	foundQueries := make([]*Query, 0)

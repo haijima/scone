@@ -8,10 +8,10 @@ import (
 	"go/token"
 	"log/slog"
 	"path/filepath"
-	"regexp"
 	"strconv"
 	"strings"
 
+	"github.com/haijima/scone/internal/analysis/analysisutil"
 	"golang.org/x/tools/go/analysis/passes/buildssa"
 	"golang.org/x/tools/go/ssa"
 )
@@ -231,9 +231,9 @@ func analyzeFuncBySsaMethod(pkg *ssa.Package, fn *ssa.Function, pos []token.Pos,
 }
 
 func constLikeStringValueToQueries(pkg *ssa.Package, v ssa.Value, fn *ssa.Function, pos []token.Pos, opt *Option) ([]*Query, bool) {
-	position := GetPosition(pkg, append([]token.Pos{v.Pos()}, pos...))
+	position := analysisutil.GetPosition(pkg, append([]token.Pos{v.Pos()}, pos...))
 	file := fmt.Sprintf("%s:%d:%d", filepath.Base(position.Filename), position.Line, position.Column)
-	if as, ok := constLikeStringValues(v); ok {
+	if as, ok := analysisutil.ConstLikeStringValues(v); ok {
 		res := make([]*Query, 0)
 		for _, a := range as {
 			if q, ok := toSqlQuery(a); ok {
@@ -281,123 +281,11 @@ func constLikeStringValueToQueries(pkg *ssa.Package, v ssa.Value, fn *ssa.Functi
 	return []*Query{}, false
 }
 
-var fmtVerbRegexp = regexp.MustCompile(`(^|[^%]|(?:%%)+)(%(?:-?\d+|\+|#)?)(\w)`)
-
-func constLikeStringValues(v ssa.Value) ([]string, bool) {
-	switch t := v.(type) {
-	case *ssa.Const:
-		if t.Value != nil && t.Value.Kind() == constant.String {
-			return []string{t.Value.ExactString()}, true
-		}
-	case *ssa.BinOp:
-		if t.Op == token.ADD {
-			if x, ok := constLikeStringValues(t.X); ok {
-				if y, ok := constLikeStringValues(t.Y); ok {
-					res := make([]string, 0, len(x)*len(y))
-					for _, xx := range x {
-						for _, yy := range y {
-							xx, err := unquote(xx)
-							if err != nil {
-								continue
-							}
-							yy, err := unquote(yy)
-							if err != nil {
-								continue
-							}
-							res = append(res, xx+yy)
-						}
-					}
-					if len(res) > 0 {
-						return res, true
-					}
-				}
-			}
-		}
-	case *ssa.Phi:
-		res := make([]string, 0, len(t.Edges))
-		for _, edge := range t.Edges {
-			if c, ok := constLikeStringValues(edge); ok {
-				res = append(res, c...)
-			}
-		}
-		if len(res) > 0 {
-			return res, true
-		}
-	// TODO:Support fmt.Sprintf() and strings.Join()
-	case *ssa.Call:
-		common := t.Common()
-		if cvFn, ok := common.Value.(*ssa.Function); ok {
-			if cvFn.Pkg != nil && cvFn.Pkg.Pkg.Path() == "fmt" && cvFn.Name() == "Sprintf" {
-				fs, ok := constLikeStringValues(t.Call.Args[0])
-				if !ok {
-					break
-				}
-				if len(fs) != 1 {
-					break
-				}
-				f := fs[0]
-				f, err := unquote(f)
-				if err != nil {
-					break
-				}
-
-				i := 0
-				f = fmtVerbRegexp.ReplaceAllStringFunc(f, func(s string) string {
-					i = i + 1
-
-					m := fmtVerbRegexp.FindAllStringSubmatch(s, 1)
-					if m == nil || len(m) < 1 || len(m[0]) < 4 {
-						return s
-					}
-					switch m[0][3] {
-					case "b":
-						return m[0][1] + "01"
-					case "c":
-						return m[0][1] + "a"
-					case "t":
-						return m[0][1] + "true"
-					case "T":
-						return m[0][1] + "string"
-					case "e":
-						return m[0][1] + "1.234000e+08"
-					case "E":
-						return m[0][1] + "1.234000E+08"
-					case "p":
-						return m[0][1] + "0xc0000ba000"
-					case "x":
-						return m[0][1] + "1f"
-					case "d":
-						return m[0][1] + "1"
-					case "f":
-						return m[0][1] + "1.0"
-					//case "s":
-					//	if i+1 >= len(t.Call.Args) {
-					//		return s
-					//	}
-					//	a := t.Call.Args[i+1]
-					//	if c, ok := constLikeStringValue(a); ok {
-					//		return m[0][1] + c
-					//	} else {
-					//		return s
-					//	}
-					default:
-						return s
-					}
-				})
-				if !fmtVerbRegexp.MatchString(f) {
-					return []string{f}, true
-				}
-			}
-		}
-	}
-	return []string{}, false
-}
-
 func IsCommented(pkg *ssa.Package, pos []token.Pos, opt *Option) bool {
-	position := GetPosition(pkg, pos)
+	position := analysisutil.GetPosition(pkg, pos)
 	commented := false
 	for _, cp := range opt.queryCommentPositions {
-		if GetPosition(pkg, append([]token.Pos{cp})).Line == position.Line-1 {
+		if analysisutil.GetPosition(pkg, append([]token.Pos{cp})).Line == position.Line-1 {
 			commented = true
 		}
 	}

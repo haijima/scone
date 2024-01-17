@@ -128,35 +128,18 @@ func filter(q *Query, opt *Option) bool {
 	}
 
 	return !commented &&
-		filterAndExclude(pkgName, opt.FilterPackages, opt.ExcludePackages) &&
-		filterAndExclude(pkgPath, opt.FilterPackagePaths, opt.ExcludePackagePaths) &&
-		filterAndExclude(file, opt.FilterFiles, opt.ExcludeFiles) &&
-		filterAndExclude(funcName, opt.FilterFunctions, opt.ExcludeFunctions) &&
-		filterAndExclude(queryType, opt.FilterQueryTypes, opt.ExcludeQueryTypes) &&
-		filterAndExcludeFunc(tables, opt.FilterTables, opt.ExcludeTables, slices.Contains[[]string]) &&
-		filterAndExcludeFunc(hash, opt.FilterQueries, opt.ExcludeQueries, strings.HasPrefix)
-}
-
-func filterAndExclude(target string, filters []string, excludes []string) bool {
-	return filterAndExcludeFunc(target, filters, excludes, func(target, input string) bool { return target == input })
-}
-
-func filterAndExcludeFunc[T any](target T, filters []string, excludes []string, fn func(target T, input string) bool) bool {
-	match := true
-	if filters != nil && len(filters) > 0 {
-		match = false
-		for _, f := range filters {
-			if fn(target, f) {
-				match = true
-			}
-		}
-	}
-	if excludes != nil && len(excludes) > 0 {
-		for _, e := range excludes {
-			if fn(target, e) {
-				match = false
-			}
-		}
-	}
-	return match
+		(slices.Contains(opt.FilterPackages, pkgName) || len(opt.FilterPackages) == 0) &&
+		(!slices.Contains(opt.ExcludePackages, pkgName) || len(opt.ExcludePackages) == 0) &&
+		(slices.Contains(opt.FilterPackagePaths, pkgPath) || len(opt.FilterPackagePaths) == 0) &&
+		(!slices.Contains(opt.ExcludePackagePaths, pkgPath) || len(opt.ExcludePackagePaths) == 0) &&
+		(slices.Contains(opt.FilterFiles, file) || len(opt.FilterFiles) == 0) &&
+		(!slices.Contains(opt.ExcludeFiles, file) || len(opt.ExcludeFiles) == 0) &&
+		(slices.Contains(opt.FilterFunctions, funcName) || len(opt.FilterFunctions) == 0) &&
+		(!slices.Contains(opt.ExcludeFunctions, funcName) || len(opt.ExcludeFunctions) == 0) &&
+		(slices.Contains(opt.FilterQueryTypes, queryType) || len(opt.FilterQueryTypes) == 0) &&
+		(!slices.Contains(opt.ExcludeQueryTypes, queryType) || len(opt.ExcludeQueryTypes) == 0) &&
+		(slices.ContainsFunc(opt.FilterTables, func(s string) bool { return slices.Contains(tables, s) }) || len(opt.FilterTables) == 0) &&
+		(!slices.ContainsFunc(opt.ExcludeTables, func(s string) bool { return slices.Contains(tables, s) }) || len(opt.ExcludeTables) == 0) &&
+		(slices.ContainsFunc(opt.FilterQueries, func(s string) bool { return strings.HasPrefix(hash, s) }) || len(opt.FilterQueries) == 0) &&
+		(!slices.ContainsFunc(opt.ExcludeQueries, func(s string) bool { return strings.HasPrefix(hash, s) }) || len(opt.ExcludeQueries) == 0)
 }

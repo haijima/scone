@@ -25,29 +25,11 @@ func NewCommand(v *viper.Viper, _ afero.Fs) *cobra.Command {
 	cmd.Short = "List SQL queries"
 	cmd.RunE = func(cmd *cobra.Command, args []string) error { return run(cmd, v) }
 
-	cmd.Flags().StringP("dir", "d", ".", "The directory to analyze")
-	cmd.Flags().StringP("pattern", "p", "./...", "The pattern to analyze")
 	cmd.Flags().String("format", "table", "The output format {table|md|csv|tsv|simple}")
 	cmd.Flags().StringSlice("sort", []string{"file"}, "The sort `keys` {file|function|type|table|sha1}")
-	cmd.Flags().StringSlice("exclude-queries", []string{}, "The `SHA1s` of queries to exclude")
-	cmd.Flags().StringSlice("exclude-packages", []string{}, "The `names` of packages to exclude")
-	cmd.Flags().StringSlice("exclude-package-paths", []string{}, "The `paths` of packages to exclude")
-	cmd.Flags().StringSlice("exclude-files", []string{}, "The `names` of files to exclude")
-	cmd.Flags().StringSlice("exclude-functions", []string{}, "The `names` of functions to exclude")
-	cmd.Flags().StringSlice("exclude-query-types", []string{}, "The `types` of queries to exclude {select|insert|update|delete}")
-	cmd.Flags().StringSlice("exclude-tables", []string{}, "The `names` of tables to exclude")
-	cmd.Flags().StringSlice("filter-queries", []string{}, "The `SHA1s` of queries to filter")
-	cmd.Flags().StringSlice("filter-packages", []string{}, "The `names` of packages to filter")
-	cmd.Flags().StringSlice("filter-package-paths", []string{}, "The `paths` of packages to filter")
-	cmd.Flags().StringSlice("filter-files", []string{}, "The `names` of files to filter")
-	cmd.Flags().StringSlice("filter-functions", []string{}, "The `names` of functions to filter")
-	cmd.Flags().StringSlice("filter-query-types", []string{}, "The `types` of queries to filter {select|insert|update|delete}")
-	cmd.Flags().StringSlice("filter-tables", []string{}, "The `names` of tables to filter")
 	cmd.Flags().StringSlice("cols", []string{}, "The `columns` to show {"+strings.Join(headerColumns, "|")+"}")
 	cmd.Flags().Bool("no-header", false, "Hide header")
 	cmd.Flags().Bool("no-rownum", false, "Hide row number")
-	cmd.Flags().String("mode", "ssa-method", "The query analyze `mode` {ssa-method|ssa-const|ast}")
-	cmd.Flags().StringSlice("analyze-funcs", []string{}, "The names of functions to analyze additionally. format: `<package>#<function>#<argument index>`")
 
 	_ = cmd.MarkFlagDirname("dir")
 

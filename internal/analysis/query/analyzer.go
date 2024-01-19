@@ -80,36 +80,3 @@ func ExtractQuery(ssaProg *buildssa.SSA, files []*ast.File, opt *Option) (*Resul
 	})
 	return &Result{Queries: foundQueries}, nil
 }
-
-func filter(q *Query, opt *Option) bool {
-	pkgName := q.Package.Pkg.Name()
-	pkgPath := q.Package.Pkg.Path()
-	file := q.Position().Filename
-	funcName := q.Func.Name()
-	queryType := q.Kind.String()
-	tables := q.Tables
-	hash := q.Sha()
-
-	commented := false
-	for _, p := range q.Pos {
-		if p.IsValid() {
-			commented = commented || opt.isIgnoredFunc(p)
-		}
-	}
-
-	return !commented &&
-		(slices.Contains(opt.FilterPackages, pkgName) || len(opt.FilterPackages) == 0) &&
-		(!slices.Contains(opt.ExcludePackages, pkgName) || len(opt.ExcludePackages) == 0) &&
-		(slices.Contains(opt.FilterPackagePaths, pkgPath) || len(opt.FilterPackagePaths) == 0) &&
-		(!slices.Contains(opt.ExcludePackagePaths, pkgPath) || len(opt.ExcludePackagePaths) == 0) &&
-		(slices.Contains(opt.FilterFiles, file) || len(opt.FilterFiles) == 0) &&
-		(!slices.Contains(opt.ExcludeFiles, file) || len(opt.ExcludeFiles) == 0) &&
-		(slices.Contains(opt.FilterFunctions, funcName) || len(opt.FilterFunctions) == 0) &&
-		(!slices.Contains(opt.ExcludeFunctions, funcName) || len(opt.ExcludeFunctions) == 0) &&
-		(slices.Contains(opt.FilterQueryTypes, queryType) || len(opt.FilterQueryTypes) == 0) &&
-		(!slices.Contains(opt.ExcludeQueryTypes, queryType) || len(opt.ExcludeQueryTypes) == 0) &&
-		(slices.ContainsFunc(opt.FilterTables, func(s string) bool { return slices.Contains(tables, s) }) || len(opt.FilterTables) == 0) &&
-		(!slices.ContainsFunc(opt.ExcludeTables, func(s string) bool { return slices.Contains(tables, s) }) || len(opt.ExcludeTables) == 0) &&
-		(slices.ContainsFunc(opt.FilterQueries, func(s string) bool { return strings.HasPrefix(hash, s) }) || len(opt.FilterQueries) == 0) &&
-		(!slices.ContainsFunc(opt.ExcludeQueries, func(s string) bool { return strings.HasPrefix(hash, s) }) || len(opt.ExcludeQueries) == 0)
-}

@@ -37,7 +37,7 @@ func getQueriesInComment(ssaProg *buildssa.SSA, files []*ast.File, opt *Option) 
 							q.Pos = append(q.Pos, q.Func.Pos())
 						}
 						q.Package = ssaProg.Pkg
-						if filter(q, opt) {
+						if opt.Filter(q) {
 							foundQueries = append(foundQueries, q)
 							opt.queryCommentPositions = append(opt.queryCommentPositions, comment.Pos())
 						}
@@ -108,7 +108,7 @@ func constToQuery(pkg *ssa.Package, a *ssa.Const, fn *ssa.Function, pos []token.
 			q.Func = fn
 			q.Pos = append([]token.Pos{a.Pos()}, pos...)
 			q.Package = pkg
-			if filter(q, opt) {
+			if opt.Filter(q) {
 				return q, true
 			}
 		}
@@ -240,7 +240,7 @@ func constLikeStringValueToQueries(pkg *ssa.Package, v ssa.Value, fn *ssa.Functi
 				q.Func = fn
 				q.Pos = append([]token.Pos{v.Pos()}, pos...)
 				q.Package = pkg
-				if filter(q, opt) {
+				if opt.Filter(q) {
 					res = append(res, q)
 				} else {
 					slog.Debug("filtered", "SQL", v, "package", pkg.Pkg.Path(), "file", file)

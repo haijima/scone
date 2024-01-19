@@ -15,7 +15,7 @@ func analyzeFuncByAst(pkg *ssa.Package, fn *ssa.Function, pos []token.Pos, opt *
 				q.Func = fn
 				q.Pos = append([]token.Pos{lit.Pos()}, pos...)
 				q.Package = pkg
-				if filter(q, opt) {
+				if opt.Filter(q) {
 					foundQueries = append(foundQueries, q)
 				}
 			}

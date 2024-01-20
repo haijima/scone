@@ -286,15 +286,7 @@ func row(q *query.Query, opt *PrintOption) []string {
 		sqlType = color.RedString(sqlType)
 	}
 
-	emphasize := color.New(color.Bold, color.Underline).SprintFunc()
 	raw := q.Raw
-	raw = query.SubQueryPattern.ReplaceAllString(raw, "$1"+emphasize("$2")+"$3")
-	raw = query.JoinPattern.ReplaceAllString(raw, "$1"+emphasize("$2")+"$3")
-	raw = query.InsertPattern.ReplaceAllString(raw, "$1"+emphasize("$2")+"$3")
-	raw = query.UpdatePattern.ReplaceAllString(raw, "$1"+emphasize("$2")+"$3")
-	raw = query.ReplacePattern.ReplaceAllString(raw, "$1"+emphasize("$2")+"$3")
-	raw = query.DeletePattern.ReplaceAllString(raw, "$1"+emphasize("$2")+"$3")
-
 	ellipsis := raw
 	if len(ellipsis) > 60 {
 		lastSpaceIx := -1

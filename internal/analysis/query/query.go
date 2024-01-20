@@ -82,18 +82,11 @@ func toSqlQuery(str string) (*Query, bool) {
 	return q, true
 }
 
-var trailingCommentRegexp = regexp.MustCompile(`(?i)--.*\n`)
-
 func normalize(str string) (string, error) {
 	str, err := analysisutil.Unquote(str)
 	if err != nil {
 		return str, err
 	}
-	str = trailingCommentRegexp.ReplaceAllString(str, " ") // remove comments and join lines
-	str = strings.Join(strings.Fields(str), " ")           // remove duplicate spaces
-	str = strings.Trim(str, " ")
-	str = strings.ToLower(str)
-	//str = convertSQLKeywordsToUpper(str)
 	str = regexp.MustCompile(`(?i):[a-z_]+`).ReplaceAllString(str, "?") // replace named parameters with parameter of prepared statement
 	return str, nil
 }

@@ -4,20 +4,26 @@ import (
 	"crypto/sha1"
 	"fmt"
 	"go/token"
+	"log/slog"
 	"regexp"
 	"strings"
 
 	"github.com/haijima/scone/internal/analysis/analysisutil"
+	"github.com/pingcap/tidb/pkg/parser"
+	"github.com/pingcap/tidb/pkg/parser/ast"
 	"golang.org/x/tools/go/ssa"
+
+	_ "github.com/pingcap/tidb/pkg/parser/test_driver"
 )
 
 type Query struct {
-	Kind    QueryKind
-	Func    *ssa.Function
-	Pos     []token.Pos
-	Package *ssa.Package
-	Raw     string
-	Tables  []string
+	Kind      QueryKind
+	Func      *ssa.Function
+	Pos       []token.Pos
+	Package   *ssa.Package
+	Raw       string
+	MainTable string
+	Tables    []string
 }
 
 func (q *Query) Position() token.Position {
@@ -69,70 +75,90 @@ func toSqlQuery(str string) (*Query, bool) {
 		return nil, false
 	}
 
-	q := &Query{Raw: str}
-	if matches := SelectPattern.FindStringSubmatch(str); len(matches) > 2 {
-		q.Kind = Select
-		q.Tables = make([]string, 0)
-		if SubQueryPattern.MatchString(str) {
-			for _, m := range SubQueryPattern.FindAllStringSubmatch(str, -1) {
-				q.Tables = append(q.Tables, m[2])
-			}
-		}
-		if JoinPattern.MatchString(str) {
-			for _, m := range JoinPattern.FindAllStringSubmatch(str, -1) {
-				q.Tables = append(q.Tables, m[2])
-			}
-		}
-	} else if matches := InsertPattern.FindStringSubmatch(str); len(matches) > 2 {
-		q.Kind = Insert
-		q.Tables = []string{InsertPattern.FindStringSubmatch(str)[2]}
-		if SubQueryPattern.MatchString(str) {
-			for _, m := range SubQueryPattern.FindAllStringSubmatch(str, -1) {
-				q.Tables = append(q.Tables, m[2])
-			}
-		}
-	} else if matches := UpdatePattern.FindStringSubmatch(str); len(matches) > 2 {
-		q.Kind = Update
-		q.Tables = []string{UpdatePattern.FindStringSubmatch(str)[2]}
-		if SubQueryPattern.MatchString(str) {
-			for _, m := range SubQueryPattern.FindAllStringSubmatch(str, -1) {
-				q.Tables = append(q.Tables, m[2])
-			}
-		}
-	} else if matches := ReplacePattern.FindStringSubmatch(str); len(matches) > 2 {
-		q.Kind = Update
-		q.Tables = []string{ReplacePattern.FindStringSubmatch(str)[2]}
-		if SubQueryPattern.MatchString(str) {
-			for _, m := range SubQueryPattern.FindAllStringSubmatch(str, -1) {
-				q.Tables = append(q.Tables, m[2])
-			}
-		}
-	} else if matches := DeletePattern.FindStringSubmatch(str); len(matches) > 2 {
-		q.Kind = Delete
-		q.Tables = []string{DeletePattern.FindStringSubmatch(str)[2]}
-		if SubQueryPattern.MatchString(str) {
-			for _, m := range SubQueryPattern.FindAllStringSubmatch(str, -1) {
-				q.Tables = append(q.Tables, m[2])
-			}
-		}
-	} else {
-		//slog.Warn(fmt.Sprintf("unknown query: %s", str))
+	q, err := parse(str)
+	if err != nil {
 		return nil, false
 	}
 	return q, true
 }
+
+var trailingCommentRegexp = regexp.MustCompile(`(?i)--.*\n`)
 
 func normalize(str string) (string, error) {
 	str, err := analysisutil.Unquote(str)
 	if err != nil {
 		return str, err
 	}
-	str = strings.ReplaceAll(str, "\n", " ")
-	str = strings.Join(strings.Fields(str), " ") // remove duplicate spaces
+	str = trailingCommentRegexp.ReplaceAllString(str, " ") // remove comments and join lines
+	str = strings.Join(strings.Fields(str), " ")           // remove duplicate spaces
 	str = strings.Trim(str, " ")
 	str = strings.ToLower(str)
 	//str = convertSQLKeywordsToUpper(str)
+	str = regexp.MustCompile(`(?i):[a-z_]+`).ReplaceAllString(str, "?") // replace named parameters with parameter of prepared statement
 	return str, nil
+}
+
+type tableX struct {
+	tableNames []string
+}
+
+func (v *tableX) Enter(in ast.Node) (ast.Node, bool) {
+	if name, ok := in.(*ast.TableName); ok {
+		v.tableNames = append(v.tableNames, name.Name.O)
+	}
+	return in, false
+}
+
+func (v *tableX) Leave(in ast.Node) (ast.Node, bool) {
+	return in, true
+}
+
+func parse(sql string) (*Query, error) {
+	p := parser.New()
+
+	stmtNodes, warns, err := p.ParseSQL(sql)
+	if err != nil {
+		return nil, err
+	}
+	for _, w := range warns {
+		slog.Warn(w.Error())
+	}
+	if len(stmtNodes) > 1 {
+		slog.Warn("multiple statements in one query")
+	}
+
+	stmt := stmtNodes[0]
+	q := &Query{Raw: stmt.Text()}
+
+	v := &tableX{}
+	stmt.Accept(v)
+	tables := v.tableNames
+	if len(tables) > 0 {
+		q.MainTable = tables[0]
+	}
+	tableSet := make([]string, 0)
+	seen := make(map[string]bool)
+	for _, t := range tables {
+		if !seen[t] {
+			tableSet = append(tableSet, t)
+			seen[t] = true
+		}
+	}
+	q.Tables = tableSet // q.Tables[0] == q.MainTable
+
+	switch stmt.(type) {
+	case *ast.SelectStmt:
+		q.Kind = Select
+	case *ast.InsertStmt:
+		q.Kind = Insert
+	case *ast.UpdateStmt:
+		q.Kind = Update
+	case *ast.DeleteStmt:
+		q.Kind = Delete
+	default:
+		q.Kind = Unknown
+	}
+	return q, nil
 }
 
 // reserved keywords in SQL

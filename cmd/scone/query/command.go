@@ -121,8 +121,8 @@ func run(cmd *cobra.Command, v *viper.Viper) error {
 				return strings.Compare(a.Func.Name(), b.Func.Name())
 			} else if sortKey == "type" && a.Kind != b.Kind {
 				return int(a.Kind) - int(b.Kind)
-			} else if sortKey == "table" && a.Tables[0] != b.Tables[0] {
-				return strings.Compare(a.Tables[0], b.Tables[0])
+			} else if sortKey == "table" && a.MainTable != b.MainTable {
+				return strings.Compare(a.MainTable, b.MainTable)
 			} else if sortKey == "sha1" && a.Sha() != b.Sha() {
 				return strings.Compare(a.Sha(), b.Sha())
 			} else if sortKey == "file" {
@@ -301,15 +301,10 @@ func row(q *query.Query, opt *PrintOption) []string {
 		}
 	}
 
-	tableSet := make([]string, 0, len(q.Tables))
-	seen := make(map[string]bool)
-	for _, t := range q.Tables {
-		if !seen[t] {
-			tableSet = append(tableSet, t)
-			seen[t] = true
-		}
+	var tables string
+	if len(q.Tables) > 0 {
+		tables = strings.Join(q.Tables[1:], ", ")
 	}
-	tables := strings.Join(tableSet[1:], ", ")
 
 	fullRow := []string{
 		q.Package.Pkg.Name(),
@@ -317,7 +312,7 @@ func row(q *query.Query, opt *PrintOption) []string {
 		file,
 		q.Func.Name(),
 		sqlType,
-		q.Tables[0],
+		q.MainTable,
 		tables,
 		q.Sha(),
 		ellipsis,

@@ -189,7 +189,7 @@ type PrintOption struct {
 func printTable(w io.Writer, queries []*query.Query, opt *PrintOption) {
 	table := tablewriter.NewWriter(w)
 	table.SetColWidth(tablewriter.MAX_ROW_WIDTH * 4)
-	table.SetAutoWrapText(opt.Cols != nil || slices.Contains(opt.Cols, 9))
+	table.SetAutoWrapText(opt.Cols != nil && slices.Contains(opt.Cols, 9))
 	printWithTableWriter(table, queries, opt)
 }
 

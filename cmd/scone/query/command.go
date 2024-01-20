@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"strconv"
 	"strings"
@@ -17,6 +18,7 @@ import (
 	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+	"golang.org/x/exp/maps"
 )
 
 func NewCommand(v *viper.Viper, _ afero.Fs) *cobra.Command {
@@ -30,6 +32,7 @@ func NewCommand(v *viper.Viper, _ afero.Fs) *cobra.Command {
 	cmd.Flags().StringSlice("cols", []string{}, "The `columns` to show {"+strings.Join(headerColumns, "|")+"}")
 	cmd.Flags().Bool("no-header", false, "Hide header")
 	cmd.Flags().Bool("no-rownum", false, "Hide row number")
+	cmd.Flags().Bool("full-package-path", false, "Show full package path")
 
 	_ = cmd.MarkFlagDirname("dir")
 
@@ -63,6 +66,7 @@ func run(cmd *cobra.Command, v *viper.Viper) error {
 	sortKeys := v.GetStringSlice("sort")
 	modeFlg := v.GetString("mode")
 	additionalFuncs := v.GetStringSlice("analyze-funcs")
+	showFullPackagePath := v.GetBool("full-package-path")
 
 	var mode query.AnalyzeMode
 	if modeFlg == "ssa-method" {
@@ -136,7 +140,7 @@ func run(cmd *cobra.Command, v *viper.Viper) error {
 		return 0
 	})
 
-	printOpt := &PrintOption{Cols: defaultHeaderIndex, NoHeader: noHeader, NoRowNum: noRowNum}
+	printOpt := &PrintOption{Cols: defaultHeaderIndex, NoHeader: noHeader, NoRowNum: noRowNum, ShowFullPackagePath: showFullPackagePath}
 	if len(cols) > 0 {
 		printOpt.Cols = make([]int, 0, len(cols))
 		for _, col := range cols {
@@ -151,6 +155,13 @@ func run(cmd *cobra.Command, v *viper.Viper) error {
 			}
 		}
 	}
+	pkgs := make(map[string]bool)
+	for _, q := range queries {
+		pkgs[q.Package.Pkg.Path()] = true
+	}
+	pkgBasePath := findCommonPrefix(maps.Keys(pkgs))
+	printOpt.pkgBasePath = pkgBasePath
+
 	if format == "table" {
 		printTable(cmd.OutOrStdout(), queries, printOpt)
 	} else if format == "md" {
@@ -168,9 +179,11 @@ func run(cmd *cobra.Command, v *viper.Viper) error {
 }
 
 type PrintOption struct {
-	Cols     []int
-	NoHeader bool
-	NoRowNum bool
+	Cols                []int
+	NoHeader            bool
+	NoRowNum            bool
+	ShowFullPackagePath bool
+	pkgBasePath         string
 }
 
 func printTable(w io.Writer, queries []*query.Query, opt *PrintOption) {
@@ -254,6 +267,12 @@ func makeHeader(opt *PrintOption) []string {
 }
 
 func row(q *query.Query, opt *PrintOption) []string {
+	pkgPath := q.Package.Pkg.Path()
+	if !opt.ShowFullPackagePath && opt.pkgBasePath != "" && strings.HasPrefix(pkgPath, opt.pkgBasePath) {
+		pkgPath = strings.TrimPrefix(pkgPath, opt.pkgBasePath)
+		pkgPath = shortenPackagePath(opt.pkgBasePath) + pkgPath
+	}
+
 	file := fmt.Sprintf("%s:%d:%d", filepath.Base(q.Position().Filename), q.Position().Line, q.Position().Column)
 	sqlType := q.Kind.String()
 	switch q.Kind {
@@ -302,7 +321,7 @@ func row(q *query.Query, opt *PrintOption) []string {
 
 	fullRow := []string{
 		q.Package.Pkg.Name(),
-		q.Package.Pkg.Path(),
+		pkgPath,
 		file,
 		q.Func.Name(),
 		sqlType,
@@ -317,4 +336,24 @@ func row(q *query.Query, opt *PrintOption) []string {
 		res = append(res, fullRow[col])
 	}
 	return res
+}
+
+func findCommonPrefix(strs []string) string {
+	if len(strs) == 0 {
+		return ""
+	}
+	prefix := strs[0]
+	for _, str := range strs {
+		for len(str) < len(prefix) || str[:len(prefix)] != prefix {
+			prefix = prefix[:len(prefix)-1]
+		}
+	}
+	return prefix
+}
+
+func shortenPackagePath(path string) string {
+	re := regexp.MustCompile(`([^/]+)/`)
+	return re.ReplaceAllStringFunc(path, func(m string) string {
+		return string(m[0]) + "/"
+	})
 }

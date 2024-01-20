@@ -115,7 +115,47 @@ func run(cmd *cobra.Command, v *viper.Viper) error {
 	if !slices.Contains(sortKeys, "file") {
 		sortKeys = append(sortKeys, "file")
 	}
-	slices.SortFunc(queries, func(a, b *query.Query) int {
+	slices.SortFunc(queries, sortQuery(sortKeys))
+
+	printOpt := &PrintOption{Cols: defaultHeaderIndex, NoHeader: noHeader, NoRowNum: noRowNum, ShowFullPackagePath: showFullPackagePath}
+	if len(cols) > 0 {
+		printOpt.Cols = make([]int, 0, len(cols))
+		for _, col := range cols {
+			if !slices.Contains(headerColumns, col) {
+				return fmt.Errorf("unknown columns: %s", col)
+			}
+			for i, header := range headerColumns {
+				if col == header {
+					printOpt.Cols = append(printOpt.Cols, i)
+					break
+				}
+			}
+		}
+	}
+	pkgs := make(map[string]bool)
+	for _, q := range queries {
+		pkgs[q.Package.Pkg.Path()] = true
+	}
+	printOpt.pkgBasePath = findCommonPrefix(maps.Keys(pkgs))
+
+	if format == "table" {
+		printTable(cmd.OutOrStdout(), queries, printOpt)
+	} else if format == "md" {
+		printMarkdown(cmd.OutOrStdout(), queries, printOpt)
+	} else if format == "simple" {
+		printSimple(cmd.OutOrStdout(), queries, printOpt)
+	} else if format == "csv" {
+		return printCSV(cmd.OutOrStdout(), queries, false, printOpt)
+	} else if format == "tsv" {
+		return printCSV(cmd.OutOrStdout(), queries, true, printOpt)
+	} else {
+		return fmt.Errorf("unknown format: %s", format)
+	}
+	return nil
+}
+
+func sortQuery(sortKeys []string) func(a *query.Query, b *query.Query) int {
+	return func(a, b *query.Query) int {
 		for _, sortKey := range sortKeys {
 			if sortKey == "function" && a.Func.Name() != b.Func.Name() {
 				return strings.Compare(a.Func.Name(), b.Func.Name())
@@ -138,44 +178,7 @@ func run(cmd *cobra.Command, v *viper.Viper) error {
 			}
 		}
 		return 0
-	})
-
-	printOpt := &PrintOption{Cols: defaultHeaderIndex, NoHeader: noHeader, NoRowNum: noRowNum, ShowFullPackagePath: showFullPackagePath}
-	if len(cols) > 0 {
-		printOpt.Cols = make([]int, 0, len(cols))
-		for _, col := range cols {
-			if !slices.Contains(headerColumns, col) {
-				return fmt.Errorf("unknown columns: %s", col)
-			}
-			for i, header := range headerColumns {
-				if col == header {
-					printOpt.Cols = append(printOpt.Cols, i)
-					break
-				}
-			}
-		}
 	}
-	pkgs := make(map[string]bool)
-	for _, q := range queries {
-		pkgs[q.Package.Pkg.Path()] = true
-	}
-	pkgBasePath := findCommonPrefix(maps.Keys(pkgs))
-	printOpt.pkgBasePath = pkgBasePath
-
-	if format == "table" {
-		printTable(cmd.OutOrStdout(), queries, printOpt)
-	} else if format == "md" {
-		printMarkdown(cmd.OutOrStdout(), queries, printOpt)
-	} else if format == "simple" {
-		printSimple(cmd.OutOrStdout(), queries, printOpt)
-	} else if format == "csv" {
-		return printCSV(cmd.OutOrStdout(), queries, false, printOpt)
-	} else if format == "tsv" {
-		return printCSV(cmd.OutOrStdout(), queries, true, printOpt)
-	} else {
-		return fmt.Errorf("unknown format: %s", format)
-	}
-	return nil
 }
 
 type PrintOption struct {

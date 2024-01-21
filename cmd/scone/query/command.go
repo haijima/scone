@@ -283,10 +283,10 @@ func row(q *query.Query, opt *PrintOption) []string {
 		sqlType = color.BlueString(sqlType)
 	case query.Insert:
 		sqlType = color.GreenString(sqlType)
-	case query.Update:
-		sqlType = color.YellowString(sqlType)
 	case query.Delete:
 		sqlType = color.RedString(sqlType)
+	case query.Replace, query.Update:
+		sqlType = color.YellowString(sqlType)
 	}
 
 	raw := q.Raw

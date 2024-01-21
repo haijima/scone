@@ -43,6 +43,7 @@ const (
 	Select
 	Insert
 	Delete
+	Replace
 	Update
 )
 
@@ -54,6 +55,8 @@ func (k QueryKind) String() string {
 		return "INSERT"
 	case Delete:
 		return "DELETE"
+	case Replace:
+		return "REPLACE"
 	case Update:
 		return "UPDATE"
 	default:
@@ -139,11 +142,15 @@ func parse(sql string) (*Query, error) {
 	}
 	q.Tables = tableSet // q.Tables[0] == q.MainTable
 
-	switch stmt.(type) {
+	switch s := stmt.(type) {
 	case *ast.SelectStmt:
 		q.Kind = Select
 	case *ast.InsertStmt:
-		q.Kind = Insert
+		if s.IsReplace {
+			q.Kind = Replace
+		} else {
+			q.Kind = Insert
+		}
 	case *ast.UpdateStmt:
 		q.Kind = Update
 	case *ast.DeleteStmt:

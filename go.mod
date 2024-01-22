@@ -6,6 +6,7 @@ require (
 	github.com/fatih/color v1.15.0
 	github.com/gostaticanalysis/testutil v0.4.0
 	github.com/haijima/cobrax v0.1.5
+	github.com/lmittmann/tint v1.0.4
 	github.com/mattn/go-colorable v0.1.13
 	github.com/olekukonko/tablewriter v0.0.5
 	github.com/pingcap/tidb/pkg/parser v0.0.0-20231124053542-069631e2ecfe

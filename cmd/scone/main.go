@@ -3,9 +3,11 @@ package main
 import (
 	"log/slog"
 	"os"
+	"time"
 
 	"github.com/fatih/color"
 	"github.com/haijima/cobrax"
+	"github.com/lmittmann/tint"
 	"github.com/mattn/go-colorable"
 	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
@@ -20,7 +22,7 @@ func init() {
 		// Colorization settings
 		color.NoColor = color.NoColor || v.GetBool("no-color")
 		// Set Logger
-		l := slog.New(slog.NewTextHandler(rootCmd.ErrOrStderr(), &slog.HandlerOptions{Level: cobrax.VerbosityLevel(v)}))
+		l := slog.New(tint.NewHandler(rootCmd.ErrOrStderr(), &tint.Options{Level: cobrax.VerbosityLevel(v), NoColor: color.NoColor, TimeFormat: time.Kitchen}))
 		slog.SetDefault(l)
 		cobrax.SetLogger(l)
 	})

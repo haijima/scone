@@ -14,13 +14,14 @@ import (
 )
 
 type Query struct {
-	Kind      QueryKind
-	Func      *ssa.Function
-	Pos       []token.Pos
-	Package   *ssa.Package
-	Raw       string
-	MainTable string
-	Tables    []string
+	Kind            QueryKind
+	Func            *ssa.Function
+	Pos             []token.Pos
+	Package         *ssa.Package
+	Raw             string
+	MainTable       string
+	Tables          []string
+	FilterColumnMap map[string][]string
 }
 
 func (q *Query) Position() token.Position {
@@ -82,12 +83,20 @@ func toSqlQuery(str string) (*Query, bool) {
 	return q, true
 }
 
+var namedParameterRegexp = regexp.MustCompile(`(?i):[a-z_]+`)
+var trailingCommentRegexp = regexp.MustCompile(`(?i)--.*\r?\n`)
+
 func normalize(str string) (string, error) {
 	str, err := analysisutil.Unquote(str)
 	if err != nil {
 		return str, err
 	}
-	str = regexp.MustCompile(`(?i):[a-z_]+`).ReplaceAllString(str, "?") // replace named parameters with parameter of prepared statement
+	str = namedParameterRegexp.ReplaceAllString(str, "?")  // replace named parameters with parameter of prepared statement
+	str = trailingCommentRegexp.ReplaceAllString(str, " ") // remove comments and join lines
+	str = strings.Replace(str, "\t", " ", -1)              // remove tabs
+	str = strings.Join(strings.Fields(str), " ")           // remove duplicate spaces
+	str = strings.TrimSpace(str)                           // remove leading and trailing spaces
+
 	return str, nil
 }
 

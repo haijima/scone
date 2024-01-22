@@ -145,6 +145,8 @@ func parse(sql string) (*Query, error) {
 	switch s := stmt.(type) {
 	case *ast.SelectStmt:
 		q.Kind = Select
+	case *ast.SetOprStmt:
+		q.Kind = Select
 	case *ast.InsertStmt:
 		if s.IsReplace {
 			q.Kind = Replace

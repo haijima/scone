@@ -3,6 +3,7 @@ package query
 import (
 	"log/slog"
 
+	"github.com/haijima/scone/internal/util"
 	"github.com/lmittmann/tint"
 	"github.com/pingcap/tidb/pkg/parser"
 	"github.com/pingcap/tidb/pkg/parser/ast"
@@ -40,10 +41,6 @@ func (v *colX) Enter(in ast.Node) (ast.Node, bool) {
 			return in, false
 		} else if bin.Op == opcode.LogicAnd {
 			return in, false
-		} else if bin.Op == opcode.LogicOr {
-			return in, true
-		} else {
-			return in, true
 		}
 	}
 	return in, true
@@ -121,7 +118,7 @@ func parse(sql string) (*Query, error) {
 	switch s := stmt.(type) {
 	case *ast.SelectStmt:
 		q.Kind = Select
-		q.FilterColumnMap = parseSelectStmt(s)
+		q.FilterColumnMap = parseStmt(s.From, s.Where)
 	case *ast.SetOprStmt:
 		q.Kind = Select
 		q.FilterColumnMap = parseSetOprStmt(s)
@@ -131,12 +128,16 @@ func parse(sql string) (*Query, error) {
 		} else {
 			q.Kind = Insert
 		}
+		q.FilterColumnMap = parseInsertStmt(s)
 	case *ast.UpdateStmt:
 		q.Kind = Update
+		q.FilterColumnMap = parseStmt(s.TableRefs, s.Where)
 	case *ast.DeleteStmt:
 		q.Kind = Delete
+		q.FilterColumnMap = parseStmt(s.TableRefs, s.Where)
 	default:
 		q.Kind = Unknown
+		q.FilterColumnMap = make(map[string][]string)
 	}
 	return q, nil
 }
@@ -145,28 +146,43 @@ func parseSetOprStmt(stmt *ast.SetOprStmt) map[string][]string {
 	res := make(map[string][]string)
 	for _, s := range stmt.SelectList.Selects {
 		if stmt, ok := s.(*ast.SelectStmt); ok {
-			m := parseSelectStmt(stmt)
+			m := parseStmt(stmt.From, stmt.Where)
 			for k, v := range m {
-				res[k] = Intersect(res[k], v)
+				res[k] = util.Intersect(res[k], v)
 			}
 		} else if stmt, ok := s.(*ast.SetOprStmt); ok {
 			m := parseSetOprStmt(stmt)
 			for k, v := range m {
-				res[k] = Intersect(res[k], v)
+				res[k] = util.Intersect(res[k], v)
 			}
 		}
 	}
 	return res
 }
 
-func parseSelectStmt(stmt *ast.SelectStmt) map[string][]string {
-	jf := &JoinFlatter{tableNames: make([]*ast.TableSource, 0), selectStmts: make([]*ast.TableSource, 0), setOprStmts: make([]*ast.TableSource, 0)}
-	if stmt.From != nil {
-		stmt.From.Accept(jf)
-	} else {
-		slog.Warn("no from clause in (sub)query", "SQL", stmt.Text())
+func parseInsertStmt(stmt *ast.InsertStmt) map[string][]string {
+	if stmt.Select != nil {
+		switch s := stmt.Select.(type) {
+		case *ast.SelectStmt:
+			return parseStmt(s.From, s.Where)
+		case *ast.SetOprStmt:
+			return parseSetOprStmt(s)
+		case *ast.SubqueryExpr:
+			return parseStmt(s.Query.(*ast.SelectStmt).From, s.Query.(*ast.SelectStmt).Where)
+		}
+	}
+	return make(map[string][]string)
+}
+
+func parseStmt(tableRefs *ast.TableRefsClause, condition ast.Node) map[string][]string {
+	if tableRefs == nil || tableRefs.TableRefs == nil {
+		return make(map[string][]string)
 	}
 
+	jf := &JoinFlatter{tableNames: make([]*ast.TableSource, 0), selectStmts: make([]*ast.TableSource, 0), setOprStmts: make([]*ast.TableSource, 0)}
+	tableRefs.Accept(jf)
+
+	// Collect table names and aliases
 	tableAliases := make(map[string]string) // key: alias, value: original table name
 	for _, t := range jf.tableNames {
 		name := t.Source.(*ast.TableName).Name.L
@@ -177,35 +193,36 @@ func parseSelectStmt(stmt *ast.SelectStmt) map[string][]string {
 		tableAliases[asName] = name
 	}
 
+	// Collect column names
 	ra := make(map[string][]string)
 	for a := range tableAliases {
 		ra[a] = make([]string, 0)
 	}
-	if stmt.Where != nil {
+	if condition != nil {
 		vc := &colX{}
-		stmt.Where.Accept(vc)
+		condition.Accept(vc)
 		for _, col := range vc.colNames {
 			tableAlias := col.Table.L
 			if tableAlias == "" {
 				if len(jf.tableNames) == 1 && len(jf.selectStmts) == 0 && len(jf.setOprStmts) == 0 {
 					tableAlias = jf.tableNames[0].Source.(*ast.TableName).Name.L
 				} else {
-					slog.Warn("ambiguous column name in (sub)query", "column", col.Name.L, "SQL", stmt.Text())
+					slog.Warn("ambiguous column name in (sub)query", "column", col.Name.L, "condition", condition.Text())
 					for a := range tableAliases {
 						ra[a] = append(ra[a], col.Name.L)
 					}
 					continue
 				}
 			}
-
 			ra[tableAlias] = append(ra[tableAlias], col.Name.L)
 		}
 	}
 
+	// Intersect column names
 	res := make(map[string][]string)
 	for tableAlias, colNames := range ra {
 		if tableName, ok := tableAliases[tableAlias]; ok {
-			res[tableName] = Intersect(res[tableName], colNames)
+			res[tableName] = util.Intersect(res[tableName], colNames)
 		}
 	}
 	for _, tableName := range jf.tableNames {
@@ -215,32 +232,12 @@ func parseSelectStmt(stmt *ast.SelectStmt) map[string][]string {
 		}
 	}
 
+	// Intersect column names with result of sub-queries
 	for _, s := range jf.selectStmts {
-		m := parseSelectStmt(s.Source.(*ast.SelectStmt))
+		m := parseStmt(s.Source.(*ast.SelectStmt).From, s.Source.(*ast.SelectStmt).Where)
 		for k, v := range m {
-			res[k] = Intersect(res[k], v)
+			res[k] = util.Intersect(res[k], v)
 		}
 	}
 	return res
-}
-
-func Intersect(a, b []string) []string {
-	if a == nil {
-		return b
-	}
-	if b == nil {
-		return a
-	}
-
-	seen := make(map[string]bool)
-	for _, v := range a {
-		seen[v] = true
-	}
-	r := make([]string, 0)
-	for _, v := range b {
-		if seen[v] {
-			r = append(r, v)
-		}
-	}
-	return r
 }

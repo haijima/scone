@@ -82,10 +82,10 @@ func printResult(w io.Writer, queries []*query.Query, tables []string, cgs []*ca
 	}
 	connTables, collocationMap := clusterize(tables, queries, cgs)
 
-	printSummary(w, queries, tables, connTables, filterColumns, maxKindMap)
+	printSummary(w, tables, queries, connTables, filterColumns, maxKindMap)
 	if !opt.SummarizeOnly {
 		for _, t := range tables {
-			printTableResult(w, t, queries, maxKindMap, kindsMap, collocationMap, connTables, filterColumns)
+			printTableResult(w, t, queries, connTables, collocationMap[t], filterColumns[t], maxKindMap[t], kindsMap[t])
 		}
 	}
 	return nil
@@ -173,7 +173,7 @@ func clusterize(tables []string, queries []*query.Query, cgs []*callgraph.CallGr
 	return connTables, collocationMap
 }
 
-func printSummary(w io.Writer, queries []*query.Query, tables []string, connTables [][]string, filterColumns map[string][]string, maxKindMap map[string]query.QueryKind) {
+func printSummary(w io.Writer, tables []string, queries []*query.Query, connTables [][]string, filterColumns map[string][]string, maxKindMap map[string]query.QueryKind) {
 	fmt.Fprintf(w, "%s\n", color.CyanString("Summary"))
 	fmt.Fprintf(w, "  %s : %d\n", color.MagentaString("queries       "), len(queries))
 	fmt.Fprintf(w, "  %s : %d\n", color.MagentaString("tables        "), len(tables))
@@ -212,9 +212,9 @@ func printSummary(w io.Writer, queries []*query.Query, tables []string, connTabl
 	fmt.Fprintln(w)
 }
 
-func printTableResult(w io.Writer, table string, queries []*query.Query, maxKindMap map[string]query.QueryKind, kindsMap map[string]map[query.QueryKind]bool, collocationMap map[string][]string, connTables [][]string, filterColumns map[string][]string) {
+func printTableResult(w io.Writer, table string, queries []*query.Query, connTables [][]string, collocationTables []string, filterColumns []string, maxKind query.QueryKind, kinds map[query.QueryKind]bool) {
 	var colorFunc func(format string, a ...interface{}) string
-	switch maxKindMap[table] {
+	switch maxKind {
 	case query.Select:
 		colorFunc = color.New(color.FgBlack, color.BgBlue).SprintfFunc()
 	case query.Insert:
@@ -229,10 +229,10 @@ func printTableResult(w io.Writer, table string, queries []*query.Query, maxKind
 	fmt.Fprintln(w, colorFunc(" %s ", table))
 
 	fmt.Fprintf(w, "  %s\t:", color.MagentaString("query types"))
-	ks := maps.Keys(kindsMap[table])
+	ks := maps.Keys(kinds)
 	slices.Sort(ks)
 	for _, k := range ks {
-		if kindsMap[table][k] {
+		if kinds[k] {
 			switch k {
 			case query.Select:
 				fmt.Fprintf(w, " %s", color.BlueString(k.String()))
@@ -250,7 +250,7 @@ func printTableResult(w io.Writer, table string, queries []*query.Query, maxKind
 	fmt.Fprintln(w)
 
 	fmt.Fprintf(w, "  %s\t: ", color.MagentaString("cacheability"))
-	switch maxKindMap[table] {
+	switch maxKind {
 	case query.Select:
 		fmt.Fprintln(w, color.BlueString("Hard coded"))
 	case query.Insert:
@@ -261,7 +261,7 @@ func printTableResult(w io.Writer, table string, queries []*query.Query, maxKind
 		fmt.Fprintln(w, color.HiBlackString("Unknown"))
 	}
 
-	fmt.Fprintf(w, "  %s\t: %q\n", color.MagentaString("collocation"), collocationMap[table])
+	fmt.Fprintf(w, "  %s\t: %q\n", color.MagentaString("collocation"), collocationTables)
 
 	for _, ts := range connTables {
 		if slices.Contains(ts, table) {
@@ -269,8 +269,8 @@ func printTableResult(w io.Writer, table string, queries []*query.Query, maxKind
 		}
 	}
 
-	if len(filterColumns[table]) > 0 {
-		fmt.Fprintf(w, "  %s\t: %q\n", color.MagentaString("partition key"), filterColumns[table])
+	if len(filterColumns) > 0 {
+		fmt.Fprintf(w, "  %s\t: %q\n", color.MagentaString("partition key"), filterColumns)
 		fmt.Fprintf(w, "  \t\t  %s\n", color.HiBlackString("It is likely that this table will always be filtered by these column(s)"))
 	}
 

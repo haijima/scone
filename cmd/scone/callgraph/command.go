@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/haijima/scone/cmd/scone/option"
 	"github.com/haijima/scone/internal/analysis"
 	"github.com/haijima/scone/internal/analysis/callgraph"
 	"github.com/haijima/scone/internal/analysis/query"
@@ -22,6 +23,7 @@ func NewCommand(v *viper.Viper, _ afero.Fs) *cobra.Command {
 	}
 
 	cmd.Flags().String("format", "dot", "The output format {dot|mermaid|text}")
+	option.SetQueryOptionFlags(cmd)
 
 	return cmd
 }
@@ -29,52 +31,11 @@ func NewCommand(v *viper.Viper, _ afero.Fs) *cobra.Command {
 func run(cmd *cobra.Command, v *viper.Viper) error {
 	dir := v.GetString("dir")
 	pattern := v.GetString("pattern")
-	excludeQueries := v.GetStringSlice("exclude-queries")
-	excludePackages := v.GetStringSlice("exclude-packages")
-	excludePackagePaths := v.GetStringSlice("exclude-package-paths")
-	excludeFiles := v.GetStringSlice("exclude-files")
-	excludeFunctions := v.GetStringSlice("exclude-functions")
-	excludeQueryTypes := v.GetStringSlice("exclude-query-types")
-	excludeTables := v.GetStringSlice("exclude-tables")
-	filterQueries := v.GetStringSlice("filter-queries")
-	filterPackages := v.GetStringSlice("filter-packages")
-	filterPackagePaths := v.GetStringSlice("filter-package-paths")
-	filterFiles := v.GetStringSlice("filter-files")
-	filterFunctions := v.GetStringSlice("filter-functions")
-	filterQueryTypes := v.GetStringSlice("filter-query-types")
-	filterTables := v.GetStringSlice("filter-tables")
-	modeFlg := v.GetString("mode")
-	additionalFuncs := v.GetStringSlice("analyze-funcs")
-
-	var mode query.AnalyzeMode
-	if modeFlg == "ssa-method" {
-		mode = query.SsaMethod
-	} else if modeFlg == "ssa-const" {
-		mode = query.SsaConst
-	} else if modeFlg == "ast" {
-		mode = query.Ast
-	} else {
-		return fmt.Errorf("unknown mode: %s", modeFlg)
+	opt, err := option.QueryOptionFromViper(v)
+	if err != nil {
+		return err
 	}
 
-	opt := &query.Option{
-		Mode:                mode,
-		ExcludeQueries:      excludeQueries,
-		ExcludePackages:     excludePackages,
-		ExcludePackagePaths: excludePackagePaths,
-		ExcludeFiles:        excludeFiles,
-		ExcludeFunctions:    excludeFunctions,
-		ExcludeQueryTypes:   excludeQueryTypes,
-		ExcludeTables:       excludeTables,
-		FilterQueries:       filterQueries,
-		FilterPackages:      filterPackages,
-		FilterPackagePaths:  filterPackagePaths,
-		FilterFiles:         filterFiles,
-		FilterFunctions:     filterFunctions,
-		FilterQueryTypes:    filterQueryTypes,
-		FilterTables:        filterTables,
-		AdditionalFuncs:     additionalFuncs,
-	}
 	result, err := analysis.Analyze(dir, pattern, opt)
 	if err != nil {
 		return err

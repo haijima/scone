@@ -12,6 +12,7 @@ import (
 	"unicode"
 
 	"github.com/fatih/color"
+	"github.com/haijima/scone/cmd/scone/option"
 	"github.com/haijima/scone/internal/analysis"
 	"github.com/haijima/scone/internal/analysis/query"
 	"github.com/olekukonko/tablewriter"
@@ -33,6 +34,7 @@ func NewCommand(v *viper.Viper, _ afero.Fs) *cobra.Command {
 	cmd.Flags().Bool("no-header", false, "Hide header")
 	cmd.Flags().Bool("no-rownum", false, "Hide row number")
 	cmd.Flags().Bool("full-package-path", false, "Show full package path")
+	option.SetQueryOptionFlags(cmd)
 
 	_ = cmd.MarkFlagDirname("dir")
 
@@ -46,57 +48,16 @@ func run(cmd *cobra.Command, v *viper.Viper) error {
 	dir := v.GetString("dir")
 	pattern := v.GetString("pattern")
 	format := v.GetString("format")
-	excludeQueries := v.GetStringSlice("exclude-queries")
-	excludePackages := v.GetStringSlice("exclude-packages")
-	excludePackagePaths := v.GetStringSlice("exclude-package-paths")
-	excludeFiles := v.GetStringSlice("exclude-files")
-	excludeFunctions := v.GetStringSlice("exclude-functions")
-	excludeQueryTypes := v.GetStringSlice("exclude-query-types")
-	excludeTables := v.GetStringSlice("exclude-tables")
-	filterQueries := v.GetStringSlice("filter-queries")
-	filterPackages := v.GetStringSlice("filter-packages")
-	filterPackagePaths := v.GetStringSlice("filter-package-paths")
-	filterFiles := v.GetStringSlice("filter-files")
-	filterFunctions := v.GetStringSlice("filter-functions")
-	filterQueryTypes := v.GetStringSlice("filter-query-types")
-	filterTables := v.GetStringSlice("filter-tables")
 	cols := v.GetStringSlice("cols")
 	noHeader := v.GetBool("no-header")
 	noRowNum := v.GetBool("no-rownum")
 	sortKeys := v.GetStringSlice("sort")
-	modeFlg := v.GetString("mode")
-	additionalFuncs := v.GetStringSlice("analyze-funcs")
 	showFullPackagePath := v.GetBool("full-package-path")
-
-	var mode query.AnalyzeMode
-	if modeFlg == "ssa-method" {
-		mode = query.SsaMethod
-	} else if modeFlg == "ssa-const" {
-		mode = query.SsaConst
-	} else if modeFlg == "ast" {
-		mode = query.Ast
-	} else {
-		return fmt.Errorf("unknown mode: %s", modeFlg)
+	opt, err := option.QueryOptionFromViper(v)
+	if err != nil {
+		return err
 	}
 
-	opt := &query.Option{
-		Mode:                mode,
-		ExcludeQueries:      excludeQueries,
-		ExcludePackages:     excludePackages,
-		ExcludePackagePaths: excludePackagePaths,
-		ExcludeFiles:        excludeFiles,
-		ExcludeFunctions:    excludeFunctions,
-		ExcludeQueryTypes:   excludeQueryTypes,
-		ExcludeTables:       excludeTables,
-		FilterQueries:       filterQueries,
-		FilterPackages:      filterPackages,
-		FilterPackagePaths:  filterPackagePaths,
-		FilterFiles:         filterFiles,
-		FilterFunctions:     filterFunctions,
-		FilterQueryTypes:    filterQueryTypes,
-		FilterTables:        filterTables,
-		AdditionalFuncs:     additionalFuncs,
-	}
 	result, err := analysis.Analyze(dir, pattern, opt)
 	if err != nil {
 		return err

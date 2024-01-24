@@ -102,3 +102,18 @@ type SqlValue struct {
 	Kind   query.QueryKind
 	RawSQL string
 }
+
+func Walk(cg *CallGraph, in *Node, fn func(edge *Edge) bool) {
+	queue := []string{in.Name}
+	for len(queue) > 0 {
+		callee := queue[0]
+		queue = queue[1:]
+		if n, exists := cg.Nodes[callee]; exists {
+			for _, e := range n.Out {
+				if skip := fn(e); !skip {
+					queue = append(queue, e.Callee)
+				}
+			}
+		}
+	}
+}

@@ -1,6 +1,8 @@
 package analysis
 
 import (
+	"slices"
+
 	"github.com/haijima/scone/internal/analysis/query"
 	"golang.org/x/tools/go/analysis/passes/buildssa"
 )
@@ -32,4 +34,21 @@ func Analyze(dir, pattern string, opt *query.Option) ([]*QueryResultWithSSA, err
 	}
 
 	return results, nil
+}
+
+func GetQueriesAndTablesFromResult(result []*QueryResultWithSSA) ([]*query.Query, []string) {
+	tables := make([]string, 0)
+	queries := make([]*query.Query, 0)
+	for _, res := range result {
+		for _, q := range res.QueryResult.Queries {
+			queries = append(queries, q)
+			for _, t := range q.Tables {
+				tables = append(tables, t)
+			}
+		}
+	}
+	slices.Sort(tables)
+	tables = slices.Compact(tables)
+
+	return queries, tables
 }

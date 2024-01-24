@@ -35,8 +35,6 @@ func NewCommand(v *viper.Viper, _ afero.Fs) *cobra.Command {
 	cmd.Flags().Bool("full-package-path", false, "Show full package path")
 	option.SetQueryOptionFlags(cmd)
 
-	_ = cmd.MarkFlagDirname("dir")
-
 	return cmd
 }
 

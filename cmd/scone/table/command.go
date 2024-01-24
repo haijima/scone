@@ -30,8 +30,6 @@ func NewCommand(v *viper.Viper, _ afero.Fs) *cobra.Command {
 	cmd.Flags().Bool("summary", false, "Print summary only")
 	option.SetQueryOptionFlags(cmd)
 
-	_ = cmd.MarkFlagDirname("dir")
-
 	return cmd
 }
 

@@ -7,6 +7,7 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/fatih/color"
 	"github.com/haijima/scone/internal/analysis/analysisutil"
 	"golang.org/x/tools/go/ssa"
 
@@ -59,6 +60,27 @@ func (k QueryKind) String() string {
 		return "UPDATE"
 	default:
 		return "UNKNOWN"
+	}
+}
+
+func (k QueryKind) ColoredString() string {
+	return k.Color(k.String())
+}
+
+func (k QueryKind) Color(str string) string {
+	switch k {
+	case Select:
+		return color.BlueString(str)
+	case Insert:
+		return color.GreenString(str)
+	case Delete:
+		return color.RedString(str)
+	case Replace:
+		return color.YellowString(str)
+	case Update:
+		return color.YellowString(str)
+	default:
+		return color.HiBlackString(str)
 	}
 }
 

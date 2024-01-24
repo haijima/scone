@@ -9,7 +9,6 @@ import (
 	"strings"
 	"unicode"
 
-	"github.com/fatih/color"
 	"github.com/haijima/scone/cmd/scone/option"
 	"github.com/haijima/scone/internal/analysis"
 	"github.com/haijima/scone/internal/analysis/query"
@@ -180,17 +179,8 @@ func row(q *query.Query, opt *PrintOption) []string {
 	}
 
 	file := fmt.Sprintf("%s:%d:%d", filepath.Base(q.Position().Filename), q.Position().Line, q.Position().Column)
-	sqlType := q.Kind.String()
-	switch q.Kind {
-	case query.Select:
-		sqlType = color.BlueString(sqlType)
-	case query.Insert:
-		sqlType = color.GreenString(sqlType)
-	case query.Delete:
-		sqlType = color.RedString(sqlType)
-	case query.Replace, query.Update:
-		sqlType = color.YellowString(sqlType)
-	}
+
+	sqlType := q.Kind.ColoredString()
 
 	raw := q.Raw
 	ellipsis := raw

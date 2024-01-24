@@ -60,9 +60,7 @@ func run(cmd *cobra.Command, v *viper.Viper) error {
 	return printResult(cmd.OutOrStdout(), queries, tables, cgs, PrintOption{SummarizeOnly: summarizeOnly})
 }
 
-type PrintOption struct {
-	SummarizeOnly bool
-}
+type PrintOption struct{ SummarizeOnly bool }
 
 func printResult(w io.Writer, queries []*query.Query, tables []string, cgs []*callgraph.CallGraph, opt PrintOption) error {
 	filterColumns := make(map[string][]string)
@@ -213,20 +211,18 @@ func printSummary(w io.Writer, tables []string, queries []*query.Query, connTabl
 }
 
 func printTableResult(w io.Writer, table string, queries []*query.Query, connTables [][]string, collocationTables []string, filterColumns []string, maxKind query.QueryKind, kinds map[query.QueryKind]bool) {
-	var colorFunc func(format string, a ...interface{}) string
 	switch maxKind {
 	case query.Select:
-		colorFunc = color.New(color.FgBlack, color.BgBlue).SprintfFunc()
+		fmt.Fprintln(w, color.New(color.FgBlack, color.BgBlue).Sprintf(" %s ", table))
 	case query.Insert:
-		colorFunc = color.New(color.FgBlack, color.BgGreen).SprintfFunc()
+		fmt.Fprintln(w, color.New(color.FgBlack, color.BgGreen).Sprintf(" %s ", table))
 	case query.Delete:
-		colorFunc = color.New(color.FgBlack, color.BgRed).SprintfFunc()
+		fmt.Fprintln(w, color.New(color.FgBlack, color.BgRed).Sprintf(" %s ", table))
 	case query.Replace, query.Update:
-		colorFunc = color.New(color.FgBlack, color.BgYellow).SprintfFunc()
+		fmt.Fprintln(w, color.New(color.FgBlack, color.BgYellow).Sprintf(" %s ", table))
 	default:
-		colorFunc = color.New(color.FgBlack, color.BgWhite).SprintfFunc()
+		fmt.Fprintln(w, color.New(color.FgBlack, color.BgWhite).Sprintf(" %s ", table))
 	}
-	fmt.Fprintln(w, colorFunc(" %s ", table))
 
 	fmt.Fprintf(w, "  %s\t:", color.MagentaString("query types"))
 	ks := maps.Keys(kinds)
@@ -234,16 +230,10 @@ func printTableResult(w io.Writer, table string, queries []*query.Query, connTab
 	for _, k := range ks {
 		if kinds[k] {
 			switch k {
-			case query.Select:
-				fmt.Fprintf(w, " %s", color.BlueString(k.String()))
-			case query.Insert:
-				fmt.Fprintf(w, " %s", color.GreenString(k.String()))
-			case query.Delete:
-				fmt.Fprintf(w, " %s", color.RedString(k.String()))
-			case query.Replace, query.Update:
-				fmt.Fprintf(w, " %s", color.YellowString(k.String()))
-			default:
+			case query.Unknown:
 				fmt.Fprintf(w, " %s", k.String())
+			default:
+				fmt.Fprintf(w, " %s", k.ColoredString())
 			}
 		}
 	}
@@ -252,13 +242,13 @@ func printTableResult(w io.Writer, table string, queries []*query.Query, connTab
 	fmt.Fprintf(w, "  %s\t: ", color.MagentaString("cacheability"))
 	switch maxKind {
 	case query.Select:
-		fmt.Fprintln(w, color.BlueString("Hard coded"))
+		fmt.Fprintln(w, maxKind.Color("Hard coded"))
 	case query.Insert:
-		fmt.Fprintln(w, color.GreenString("Read-through"))
+		fmt.Fprintln(w, maxKind.Color("Read-through"))
 	case query.Delete, query.Replace, query.Update:
 		fmt.Fprintln(w, "Write-through")
 	case query.Unknown:
-		fmt.Fprintln(w, color.HiBlackString("Unknown"))
+		fmt.Fprintln(w, maxKind.Color("Unknown"))
 	}
 
 	fmt.Fprintf(w, "  %s\t: %q\n", color.MagentaString("collocation"), collocationTables)
@@ -288,16 +278,10 @@ func printTableResult(w io.Writer, table string, queries []*query.Query, connTab
 		file := fmt.Sprintf("%s:%d:%d", filepath.Base(q.Position().Filename), q.Position().Line, q.Position().Column)
 		k := ""
 		switch q.Kind {
-		case query.Select:
-			k = color.BlueString(q.Kind.String()[:1])
-		case query.Insert:
-			k = color.GreenString(q.Kind.String()[:1])
-		case query.Delete:
-			k = color.RedString(q.Kind.String()[:1])
-		case query.Replace, query.Update:
-			k = color.YellowString(q.Kind.String()[:1])
-		default:
+		case query.Unknown:
 			k = q.Kind.String()[:1]
+		default:
+			k = q.Kind.Color(q.Kind.String()[:1])
 		}
 		p.AddRow([]string{"   ", strconv.Itoa(i + 1), file, q.Func.Name(), k, q.Raw})
 	}

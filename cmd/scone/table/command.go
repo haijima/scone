@@ -12,6 +12,7 @@ import (
 	"github.com/haijima/scone/internal/analysis"
 	"github.com/haijima/scone/internal/analysis/callgraph"
 	"github.com/haijima/scone/internal/analysis/query"
+	internalio "github.com/haijima/scone/internal/io"
 	"github.com/haijima/scone/internal/util"
 	"github.com/olekukonko/tablewriter"
 	"github.com/spf13/afero"
@@ -283,18 +284,8 @@ func printTableResult(w io.Writer, table string, queries []*query.Query, maxKind
 	}
 	fmt.Fprintf(w, "  %s\t: %d\n", color.MagentaString("queries"), len(qs))
 
-	tw := tablewriter.NewWriter(w)
-	tw.SetColWidth(tablewriter.MAX_ROW_WIDTH * 5)
-	tw.SetHeaderAlignment(tablewriter.ALIGN_LEFT)
-	tw.SetColumnAlignment([]int{tablewriter.ALIGN_LEFT, tablewriter.ALIGN_RIGHT, tablewriter.ALIGN_LEFT, tablewriter.ALIGN_LEFT, tablewriter.ALIGN_LEFT, tablewriter.ALIGN_LEFT})
-	tw.SetCenterSeparator("")
-	tw.SetColumnSeparator("")
-	tw.SetRowSeparator("")
-	tw.SetHeaderLine(false)
-	tw.SetBorder(false)
-	tw.SetTablePadding(" ")
-
-	tw.SetHeader([]string{"", "#", "file", "function", "t", "query"})
+	p := internalio.NewSimplePrinter(w, tablewriter.MAX_ROW_WIDTH*5, true)
+	p.SetHeader([]string{"", "#", "file", "function", "t", "query"})
 	for i, q := range qs {
 		file := fmt.Sprintf("%s:%d:%d", filepath.Base(q.Position().Filename), q.Position().Line, q.Position().Column)
 		k := ""
@@ -310,8 +301,8 @@ func printTableResult(w io.Writer, table string, queries []*query.Query, maxKind
 		default:
 			k = q.Kind.String()[:1]
 		}
-		tw.Append([]string{"   ", strconv.Itoa(i + 1), file, q.Func.Name(), k, q.Raw})
+		p.AddRow([]string{"   ", strconv.Itoa(i + 1), file, q.Func.Name(), k, q.Raw})
 	}
-	tw.Render()
+	p.Print()
 	fmt.Fprintln(w)
 }

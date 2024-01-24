@@ -1,9 +1,7 @@
 package query
 
 import (
-	"encoding/csv"
 	"fmt"
-	"io"
 	"path/filepath"
 	"regexp"
 	"slices"
@@ -15,6 +13,7 @@ import (
 	"github.com/haijima/scone/cmd/scone/option"
 	"github.com/haijima/scone/internal/analysis"
 	"github.com/haijima/scone/internal/analysis/query"
+	internalio "github.com/haijima/scone/internal/io"
 	"github.com/olekukonko/tablewriter"
 	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
@@ -99,20 +98,34 @@ func run(cmd *cobra.Command, v *viper.Viper) error {
 	}
 	printOpt.pkgBasePath = findCommonPrefix(maps.Keys(pkgs))
 
+	var p internalio.TablePrinter
 	if format == "table" {
-		printTable(cmd.OutOrStdout(), queries, printOpt)
+		maxWidth := tablewriter.MAX_ROW_WIDTH * 4
+		includeRawQuery := printOpt.Cols != nil && slices.Contains(printOpt.Cols, 9)
+		p = internalio.NewTablePrinter(cmd.OutOrStdout(), maxWidth, includeRawQuery)
 	} else if format == "md" {
-		printMarkdown(cmd.OutOrStdout(), queries, printOpt)
+		p = internalio.NewMarkdownPrinter(cmd.OutOrStdout())
 	} else if format == "simple" {
-		printSimple(cmd.OutOrStdout(), queries, printOpt)
+		p = internalio.NewSimplePrinter(cmd.OutOrStdout(), tablewriter.MAX_ROW_WIDTH, false)
 	} else if format == "csv" {
-		return printCSV(cmd.OutOrStdout(), queries, false, printOpt)
+		p = internalio.NewCSVPrinter(cmd.OutOrStdout())
 	} else if format == "tsv" {
-		return printCSV(cmd.OutOrStdout(), queries, true, printOpt)
+		p = internalio.NewTSVPrinter(cmd.OutOrStdout())
 	} else {
 		return fmt.Errorf("unknown format: %s", format)
 	}
-	return nil
+
+	if !printOpt.NoHeader {
+		p.SetHeader(makeHeader(printOpt))
+	}
+	for i, q := range queries {
+		r := row(q, printOpt)
+		if !printOpt.NoRowNum {
+			r = append([]string{strconv.Itoa(i + 1)}, r...)
+		}
+		p.AddRow(r)
+	}
+	return p.Print()
 }
 
 func sortQuery(sortKeys []string) func(a *query.Query, b *query.Query) int {
@@ -148,75 +161,6 @@ type PrintOption struct {
 	NoRowNum            bool
 	ShowFullPackagePath bool
 	pkgBasePath         string
-}
-
-func printTable(w io.Writer, queries []*query.Query, opt *PrintOption) {
-	table := tablewriter.NewWriter(w)
-	table.SetColWidth(tablewriter.MAX_ROW_WIDTH * 4)
-	table.SetAutoWrapText(opt.Cols != nil && slices.Contains(opt.Cols, 9))
-	printWithTableWriter(table, queries, opt)
-}
-
-func printMarkdown(w io.Writer, queries []*query.Query, opt *PrintOption) {
-	table := tablewriter.NewWriter(w)
-	table.SetAutoWrapText(false)
-	table.SetBorders(tablewriter.Border{Left: true, Top: false, Right: true, Bottom: false})
-	table.SetCenterSeparator("|")
-	printWithTableWriter(table, queries, opt)
-}
-
-func printSimple(w io.Writer, queries []*query.Query, opt *PrintOption) {
-	table := tablewriter.NewWriter(w)
-	table.SetAutoWrapText(false)
-	table.SetAutoFormatHeaders(true)
-	table.SetHeaderAlignment(tablewriter.ALIGN_LEFT)
-	table.SetAlignment(tablewriter.ALIGN_LEFT)
-	table.SetCenterSeparator("")
-	table.SetColumnSeparator("")
-	table.SetRowSeparator("")
-	table.SetHeaderLine(false)
-	table.SetBorder(false)
-	//table.SetTablePadding("\t") // pad with tabs
-	table.SetTablePadding(" ")
-	table.SetNoWhiteSpace(true)
-	printWithTableWriter(table, queries, opt)
-}
-
-func printWithTableWriter(w *tablewriter.Table, queries []*query.Query, opt *PrintOption) {
-	if !opt.NoHeader {
-		w.SetHeader(makeHeader(opt))
-	}
-	for i, q := range queries {
-		r := row(q, opt)
-		if !opt.NoRowNum {
-			r = append([]string{strconv.Itoa(i + 1)}, r...)
-		}
-		w.Append(r)
-	}
-	w.Render()
-}
-
-func printCSV(w io.Writer, queries []*query.Query, isTSV bool, opt *PrintOption) error {
-	writer := csv.NewWriter(w)
-	if isTSV {
-		writer.Comma = '\t'
-	}
-	if !opt.NoHeader {
-		if err := writer.Write(makeHeader(opt)); err != nil {
-			return err
-		}
-	}
-	for i, q := range queries {
-		r := row(q, opt)
-		if !opt.NoRowNum {
-			r = append([]string{strconv.Itoa(i + 1)}, r...)
-		}
-		if err := writer.Write(r); err != nil {
-			return err
-		}
-	}
-	writer.Flush()
-	return nil
 }
 
 func makeHeader(opt *PrintOption) []string {

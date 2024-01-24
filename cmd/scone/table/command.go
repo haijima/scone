@@ -106,26 +106,19 @@ func clusterize(tables []string, queries []*query.Query, cgs []*callgraph.CallGr
 			// walk from the root nodes
 			tablesInTx := make([]string, 0)
 			callgraph.Walk(cg, r, func(edge *callgraph.Edge) bool {
-				if edge.IsQuery() {
-					if edge.SqlValue.Kind != query.Select {
-						tablesInTx = append(tablesInTx, edge.Callee)
-					}
-					return true
+				if edge.IsQuery() && edge.SqlValue.Kind != query.Select {
+					tablesInTx = append(tablesInTx, edge.Callee)
 				}
-				return false
+				return edge.IsQuery()
 			})
 			// add edges between updated tables under the same root node
-			for _, p := range util.PairCombinate(tablesInTx) {
-				g.AddEdge(p.L, p.R)
-			}
+			util.PairCombinateFunc(tablesInTx, g.AddEdge)
 		}
 	}
 
 	// extract tables used in the same query
 	for _, q := range queries {
-		for _, p := range util.PairCombinate(q.Tables) {
-			g.AddEdge(p.L, p.R)
-		}
+		util.PairCombinateFunc(q.Tables, g.AddEdge)
 	}
 
 	// find connected components

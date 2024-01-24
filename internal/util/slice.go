@@ -45,3 +45,9 @@ func PairCombinate[T cmp.Ordered](a []T) []Pair[T] {
 	}
 	return r
 }
+
+func PairCombinateFunc[T cmp.Ordered](a []T, fn func(a, b T)) {
+	for _, p := range PairCombinate(a) {
+		fn(p.L, p.R)
+	}
+}

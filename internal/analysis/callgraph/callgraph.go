@@ -68,10 +68,34 @@ type Node struct {
 	Func *ssa.Function
 }
 
+func (n *Node) IsFunc() bool {
+	return n.Func != nil
+}
+
+func (n *Node) IsTable() bool {
+	return n.Func == nil
+}
+
+func (n *Node) IsRoot() bool {
+	return len(n.In) == 0
+}
+
+func (n *Node) IsNotRoot() bool {
+	return !n.IsRoot()
+}
+
 type Edge struct {
 	SqlValue *SqlValue
 	Caller   string
 	Callee   string
+}
+
+func (e *Edge) IsFuncCall() bool {
+	return e.SqlValue == nil
+}
+
+func (e *Edge) IsQuery() bool {
+	return e.SqlValue != nil
 }
 
 type SqlValue struct {

@@ -108,9 +108,8 @@ func clusterize(tables mapset.Set[string], queries []*query.Query, cgs []*callgr
 	}
 
 	// find connected components
-	connGraphs := g.FindConnectedComponents()                    // tables and functions
-	connTables := make([]mapset.Set[string], 0, len(connGraphs)) // tables only
-	for _, nodes := range connGraphs {
+	connTables := make([]mapset.Set[string], 0)
+	for _, nodes := range g.FindConnectedComponents() {
 		ts := tables.Intersect(nodes)
 		if ts.Cardinality() > 0 {
 			connTables = append(connTables, ts)
@@ -123,9 +122,7 @@ func clusterize(tables mapset.Set[string], queries []*query.Query, cgs []*callgr
 	for _, t := range tables.ToSlice() {
 		collocationMap.Add(t, t)
 		for _, e := range g.edges[t] {
-			if tables.Contains(e) {
-				collocationMap.Add(t, e)
-			}
+			collocationMap.Add(t, e)
 		}
 	}
 
@@ -166,8 +163,7 @@ func printSummary(w io.Writer, tables mapset.Set[string], queries []*query.Query
 }
 
 func printTableResult(w io.Writer, table string, queries []*query.Query, connTables []mapset.Set[string], collocationTables mapset.Set[string], filterColumns mapset.Set[string], kinds mapset.Set[query.QueryKind]) {
-	maxKind := slices.Max(kinds.ToSlice())
-	switch maxKind {
+	switch slices.Max(kinds.ToSlice()) {
 	case query.Select:
 		fmt.Fprintln(w, color.New(color.FgBlack, color.BgBlue).Sprintf(" %s ", table))
 	case query.Insert:
@@ -182,16 +178,12 @@ func printTableResult(w io.Writer, table string, queries []*query.Query, connTab
 
 	fmt.Fprintf(w, "  %s\t:", color.MagentaString("query types"))
 	for _, k := range mapset.Sorted(kinds) {
-		if k != query.Unknown {
-			fmt.Fprintf(w, " %s", k.ColoredString())
-		} else {
-			fmt.Fprintf(w, " %s", k.String())
-		}
+		fmt.Fprintf(w, " %s", k.ColoredString())
 	}
 	fmt.Fprintln(w)
 
 	fmt.Fprintf(w, "  %s\t: ", color.MagentaString("cacheability"))
-	switch maxKind {
+	switch maxKind := slices.Max(kinds.ToSlice()); maxKind {
 	case query.Select:
 		fmt.Fprintln(w, maxKind.Color("Hard coded"))
 	case query.Insert:
@@ -227,7 +219,7 @@ func printTableResult(w io.Writer, table string, queries []*query.Query, connTab
 	p.SetHeader([]string{"", "#", "file", "function", "t", "query"})
 	for i, q := range qs {
 		k := "?"
-		if q.Kind != query.Unknown {
+		if q.Kind > query.Unknown {
 			k = q.Kind.Color(q.Kind.String()[:1])
 		}
 		p.AddRow([]string{"   ", strconv.Itoa(i + 1), q.FLC(), q.Func.Name(), k, q.Raw})

@@ -1,6 +1,7 @@
 package query
 
 import (
+	"fmt"
 	"regexp"
 	"slices"
 	"strconv"
@@ -152,6 +153,16 @@ type PrintOption struct {
 	pkgBasePath         string
 }
 
+var pathDirRegex = regexp.MustCompile(`([^/]+)/`)
+
+func (opt *PrintOption) ShortenPackagePath(path string) string {
+	if !opt.ShowFullPackagePath && opt.pkgBasePath != "" && strings.HasPrefix(path, opt.pkgBasePath) {
+		path = strings.TrimPrefix(path, opt.pkgBasePath)
+		return fmt.Sprintf("%s/%s", pathDirRegex.ReplaceAllStringFunc(opt.pkgBasePath, func(m string) string { return m[:1] }), path)
+	}
+	return path
+}
+
 func makeHeader(opt *PrintOption) []string {
 	header := make([]string, 0)
 	if !opt.NoRowNum {
@@ -164,16 +175,7 @@ func makeHeader(opt *PrintOption) []string {
 }
 
 func row(q *query.Query, opt *PrintOption) []string {
-	pkgPath := q.Package.Pkg.Path()
-	if !opt.ShowFullPackagePath && opt.pkgBasePath != "" && strings.HasPrefix(pkgPath, opt.pkgBasePath) {
-		pkgPath = strings.TrimPrefix(pkgPath, opt.pkgBasePath)
-		pkgPath = shortenPackagePath(opt.pkgBasePath) + pkgPath
-	}
-
-	sqlType := q.Kind.ColoredString()
-
-	raw := q.Raw
-	ellipsis := raw
+	ellipsis := q.Raw
 	if len(ellipsis) > 60 {
 		lastSpaceIx := -1
 		for i, r := range ellipsis {
@@ -194,15 +196,15 @@ func row(q *query.Query, opt *PrintOption) []string {
 
 	fullRow := []string{
 		q.Package.Pkg.Name(),
-		pkgPath,
+		opt.ShortenPackagePath(q.Package.Pkg.Path()),
 		q.FLC(),
 		q.Func.Name(),
-		sqlType,
+		q.Kind.ColoredString(),
 		q.MainTable,
 		tables,
 		q.Sha(),
 		ellipsis,
-		raw,
+		q.Raw,
 	}
 	res := make([]string, 0, len(opt.Cols))
 	for _, col := range opt.Cols {
@@ -222,11 +224,4 @@ func findCommonPrefix(strs []string) string {
 		}
 	}
 	return prefix
-}
-
-func shortenPackagePath(path string) string {
-	re := regexp.MustCompile(`([^/]+)/`)
-	return re.ReplaceAllStringFunc(path, func(m string) string {
-		return string(m[0]) + "/"
-	})
 }

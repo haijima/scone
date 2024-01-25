@@ -36,18 +36,9 @@ func run(cmd *cobra.Command, v *viper.Viper) error {
 		return err
 	}
 
-	result, err := analysis.Analyze(dir, pattern, opt)
+	_, _, cgs, err := analysis.Analyze(dir, pattern, opt)
 	if err != nil {
 		return err
-	}
-
-	cgs := make([]*callgraph.CallGraph, 0, len(result))
-	for _, res := range result {
-		cg, err := callgraph.BuildCallGraph(res.SSA, res.QueryResult)
-		if err != nil {
-			return err
-		}
-		cgs = append(cgs, cg)
 	}
 
 	return printGraphviz(cmd.OutOrStdout(), cgs)

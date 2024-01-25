@@ -1,8 +1,8 @@
 package analysis
 
 import (
-	"slices"
-
+	mapset "github.com/deckarep/golang-set/v2"
+	"github.com/haijima/scone/internal/analysis/callgraph"
 	"github.com/haijima/scone/internal/analysis/query"
 	"golang.org/x/tools/go/analysis/passes/buildssa"
 )
@@ -12,7 +12,31 @@ type QueryResultWithSSA struct {
 	SSA         *buildssa.SSA
 }
 
-func Analyze(dir, pattern string, opt *query.Option) ([]*QueryResultWithSSA, error) {
+func Analyze(dir, pattern string, opt *query.Option) ([]*query.Query, mapset.Set[string], []*callgraph.CallGraph, error) {
+	result, err := analyzeSSA(dir, pattern, opt)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	tables := mapset.NewSet[string]()
+	queries := make([]*query.Query, 0)
+	cgs := make([]*callgraph.CallGraph, 0, len(result))
+	for _, res := range result {
+		for _, q := range res.QueryResult.Queries {
+			queries = append(queries, q)
+			for _, t := range q.Tables {
+				tables.Add(t)
+			}
+		}
+		cg, err := callgraph.BuildCallGraph(res.SSA, res.QueryResult)
+		if err != nil {
+			return nil, nil, nil, err
+		}
+		cgs = append(cgs, cg)
+	}
+	return queries, tables, cgs, nil
+}
+
+func analyzeSSA(dir, pattern string, opt *query.Option) ([]*QueryResultWithSSA, error) {
 	pkgs, err := LoadPackages(dir, pattern)
 	if err != nil {
 		return nil, err
@@ -34,21 +58,4 @@ func Analyze(dir, pattern string, opt *query.Option) ([]*QueryResultWithSSA, err
 	}
 
 	return results, nil
-}
-
-func GetQueriesAndTablesFromResult(result []*QueryResultWithSSA) ([]*query.Query, []string) {
-	tables := make([]string, 0)
-	queries := make([]*query.Query, 0)
-	for _, res := range result {
-		for _, q := range res.QueryResult.Queries {
-			queries = append(queries, q)
-			for _, t := range q.Tables {
-				tables = append(tables, t)
-			}
-		}
-	}
-	slices.Sort(tables)
-	tables = slices.Compact(tables)
-
-	return queries, tables
 }

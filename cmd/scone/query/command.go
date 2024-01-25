@@ -2,13 +2,13 @@ package query
 
 import (
 	"fmt"
-	"path/filepath"
 	"regexp"
 	"slices"
 	"strconv"
 	"strings"
 	"unicode"
 
+	mapset "github.com/deckarep/golang-set/v2"
 	"github.com/haijima/scone/cmd/scone/option"
 	"github.com/haijima/scone/internal/analysis"
 	"github.com/haijima/scone/internal/analysis/query"
@@ -17,7 +17,6 @@ import (
 	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	"golang.org/x/exp/maps"
 )
 
 func NewCommand(v *viper.Viper, _ afero.Fs) *cobra.Command {
@@ -54,20 +53,13 @@ func run(cmd *cobra.Command, v *viper.Viper) error {
 		return err
 	}
 
-	result, err := analysis.Analyze(dir, pattern, opt)
+	queries, _, _, err := analysis.Analyze(dir, pattern, opt)
 	if err != nil {
 		return err
 	}
 
-	queries := make([]*query.Query, 0)
-	for _, res := range result {
-		queries = append(queries, res.QueryResult.Queries...)
-	}
-
-	for _, sortKey := range sortKeys {
-		if sortKey != "file" && sortKey != "function" && sortKey != "type" && sortKey != "table" && sortKey != "sha1" {
-			return fmt.Errorf("unknown sort key: %s", sortKey)
-		}
+	if !mapset.NewSet(sortKeys...).IsSubset(mapset.NewSet("file", "function", "type", "table", "sha1")) {
+		return fmt.Errorf("unknown sort key: %s", mapset.NewSet(sortKeys...).Difference(mapset.NewSet("file", "function", "type", "table", "sha1")).ToSlice())
 	}
 	if !slices.Contains(sortKeys, "file") {
 		sortKeys = append(sortKeys, "file")
@@ -89,11 +81,11 @@ func run(cmd *cobra.Command, v *viper.Viper) error {
 			}
 		}
 	}
-	pkgs := make(map[string]bool)
+	pkgs := mapset.NewSet[string]()
 	for _, q := range queries {
-		pkgs[q.Package.Pkg.Path()] = true
+		pkgs.Add(q.Package.Pkg.Path())
 	}
-	printOpt.pkgBasePath = findCommonPrefix(maps.Keys(pkgs))
+	printOpt.pkgBasePath = findCommonPrefix(pkgs.ToSlice())
 
 	var p internalio.TablePrinter
 	if format == "table" {
@@ -178,8 +170,6 @@ func row(q *query.Query, opt *PrintOption) []string {
 		pkgPath = shortenPackagePath(opt.pkgBasePath) + pkgPath
 	}
 
-	file := fmt.Sprintf("%s:%d:%d", filepath.Base(q.Position().Filename), q.Position().Line, q.Position().Column)
-
 	sqlType := q.Kind.ColoredString()
 
 	raw := q.Raw
@@ -205,7 +195,7 @@ func row(q *query.Query, opt *PrintOption) []string {
 	fullRow := []string{
 		q.Package.Pkg.Name(),
 		pkgPath,
-		file,
+		q.FLC(),
 		q.Func.Name(),
 		sqlType,
 		q.MainTable,

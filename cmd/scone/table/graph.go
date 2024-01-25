@@ -1,5 +1,7 @@
 package table
 
+import mapset "github.com/deckarep/golang-set/v2"
+
 // Graph
 type Graph struct {
 	edges   map[string][]string
@@ -24,9 +26,9 @@ func (g *Graph) AddEdge(u, v string) {
 	g.edges[v] = append(g.edges[v], u)
 }
 
-func (g *Graph) DFS(node string, component *[]string) {
+func (g *Graph) DFS(node string, component *mapset.Set[string]) {
 	g.visited[node] = true
-	*component = append(*component, node)
+	(*component).Add(node)
 	for _, v := range g.edges[node] {
 		if !g.visited[v] {
 			g.DFS(v, component)
@@ -34,11 +36,11 @@ func (g *Graph) DFS(node string, component *[]string) {
 	}
 }
 
-func (g *Graph) FindConnectedComponents() [][]string {
-	var components [][]string
+func (g *Graph) FindConnectedComponents() []mapset.Set[string] {
+	var components []mapset.Set[string]
 	for node := range g.nodeMap {
 		if !g.visited[node] {
-			var component []string
+			component := mapset.NewSet[string]()
 			g.DFS(node, &component)
 			components = append(components, component)
 		}

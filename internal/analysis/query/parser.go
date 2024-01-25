@@ -3,6 +3,7 @@ package query
 import (
 	"log/slog"
 
+	mapset "github.com/deckarep/golang-set/v2"
 	"github.com/haijima/scone/internal/util"
 	"github.com/lmittmann/tint"
 	"github.com/pingcap/tidb/pkg/parser"
@@ -137,30 +138,30 @@ func parse(sql string) (*Query, error) {
 		q.FilterColumnMap = parseStmt(s.TableRefs, s.Where)
 	default:
 		q.Kind = Unknown
-		q.FilterColumnMap = make(map[string][]string)
+		q.FilterColumnMap = make(map[string]mapset.Set[string])
 	}
 	return q, nil
 }
 
-func parseSetOprStmt(stmt *ast.SetOprStmt) map[string][]string {
-	res := make(map[string][]string)
+func parseSetOprStmt(stmt *ast.SetOprStmt) map[string]mapset.Set[string] {
+	res := util.NewSetMap[string, string]()
 	for _, s := range stmt.SelectList.Selects {
 		if stmt, ok := s.(*ast.SelectStmt); ok {
 			m := parseStmt(stmt.From, stmt.Where)
 			for k, v := range m {
-				res[k] = util.Intersect(res[k], v)
+				res.Intersect(k, v)
 			}
 		} else if stmt, ok := s.(*ast.SetOprStmt); ok {
 			m := parseSetOprStmt(stmt)
 			for k, v := range m {
-				res[k] = util.Intersect(res[k], v)
+				res.Intersect(k, v)
 			}
 		}
 	}
 	return res
 }
 
-func parseInsertStmt(stmt *ast.InsertStmt) map[string][]string {
+func parseInsertStmt(stmt *ast.InsertStmt) map[string]mapset.Set[string] {
 	if stmt.Select != nil {
 		switch s := stmt.Select.(type) {
 		case *ast.SelectStmt:
@@ -171,12 +172,12 @@ func parseInsertStmt(stmt *ast.InsertStmt) map[string][]string {
 			return parseStmt(s.Query.(*ast.SelectStmt).From, s.Query.(*ast.SelectStmt).Where)
 		}
 	}
-	return make(map[string][]string)
+	return make(map[string]mapset.Set[string])
 }
 
-func parseStmt(tableRefs *ast.TableRefsClause, condition ast.Node) map[string][]string {
+func parseStmt(tableRefs *ast.TableRefsClause, condition ast.Node) map[string]mapset.Set[string] {
 	if tableRefs == nil || tableRefs.TableRefs == nil {
-		return make(map[string][]string)
+		return make(map[string]mapset.Set[string])
 	}
 
 	jf := &JoinFlatter{tableNames: make([]*ast.TableSource, 0), selectStmts: make([]*ast.TableSource, 0), setOprStmts: make([]*ast.TableSource, 0)}
@@ -194,9 +195,9 @@ func parseStmt(tableRefs *ast.TableRefsClause, condition ast.Node) map[string][]
 	}
 
 	// Collect column names
-	ra := make(map[string][]string)
+	ra := util.NewSetMap[string, string]()
 	for a := range tableAliases {
-		ra[a] = make([]string, 0)
+		ra[a] = mapset.NewSet[string]()
 	}
 	if condition != nil {
 		vc := &colX{}
@@ -209,35 +210,34 @@ func parseStmt(tableRefs *ast.TableRefsClause, condition ast.Node) map[string][]
 				} else {
 					slog.Warn("ambiguous column name in (sub)query", "column", col.Name.L, "condition", condition.Text())
 					for a := range tableAliases {
-						ra[a] = append(ra[a], col.Name.L)
+						ra.Add(a, col.Name.L)
 					}
 					continue
 				}
 			}
-			ra[tableAlias] = append(ra[tableAlias], col.Name.L)
+			ra.Add(tableAlias, col.Name.L)
 		}
 	}
 
 	// Intersect column names
-	res := make(map[string][]string)
+	res := util.NewSetMap[string, string]()
 	for tableAlias, colNames := range ra {
 		if tableName, ok := tableAliases[tableAlias]; ok {
-			res[tableName] = util.Intersect(res[tableName], colNames)
-		}
-	}
-	for _, tableName := range jf.tableNames {
-		name := tableName.Source.(*ast.TableName).Name.L
-		if _, ok := res[name]; !ok {
-			res[name] = make([]string, 0)
+			res.Intersect(tableName, colNames)
 		}
 	}
 
 	// Intersect column names with result of sub-queries
 	for _, s := range jf.selectStmts {
-		m := parseStmt(s.Source.(*ast.SelectStmt).From, s.Source.(*ast.SelectStmt).Where)
-		for k, v := range m {
-			res[k] = util.Intersect(res[k], v)
+		for k, v := range parseStmt(s.Source.(*ast.SelectStmt).From, s.Source.(*ast.SelectStmt).Where) {
+			res.Intersect(k, v)
 		}
 	}
+	for _, s := range jf.setOprStmts {
+		for k, v := range parseSetOprStmt(s.Source.(*ast.SetOprStmt)) {
+			res.Intersect(k, v)
+		}
+	}
+
 	return res
 }

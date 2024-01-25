@@ -3,6 +3,7 @@ package query
 import (
 	"testing"
 
+	mapset "github.com/deckarep/golang-set/v2"
 	"github.com/pingcap/tidb/pkg/parser"
 	"github.com/pingcap/tidb/pkg/parser/ast"
 	"github.com/stretchr/testify/assert"
@@ -30,19 +31,19 @@ func Test_parseSelectStmt(t *testing.T) {
 	tests := []struct {
 		name string
 		sql  string
-		want map[string][]string
+		want map[string]mapset.Set[string]
 	}{
-		{"no where", "SELECT * FROM t1", map[string][]string{"t1": {}}},
-		{"simple", "SELECT * FROM t1 where t1.id = ?", map[string][]string{"t1": {"id"}}},
-		{"two where condition", "SELECT * FROM t1 where t1.id = ? AND t1.name = ?", map[string][]string{"t1": {"id", "name"}}},
-		{"alias", "SELECT * FROM t1 AS a where a.id = ?", map[string][]string{"t1": {"id"}}},
-		{"join", "SELECT * FROM t1 JOIN t2 ON t1.id = t2.id where t1.name = ?", map[string][]string{"t1": {"name"}, "t2": {}}},
-		{"join same table", "SELECT * FROM follow JOIN user AS follower ON follow.follower_id = follower.id JOIN user AS followee ON follow.followee_id = followee.id where followee.name = ?", map[string][]string{"follow": {}, "user": {}}},
-		{"join subquery", "SELECT * FROM t1 JOIN (SELECT * FROM t2 WHERE t2.id = ?) a2 ON t1.id = a2.id where t1.name = ?", map[string][]string{"t1": {"name"}, "t2": {"id"}}},
-		{"join subquery with alias", "SELECT * FROM t1 JOIN (SELECT * FROM t2 WHERE t2.id = ?) AS a2 ON t1.id = a2.id where t1.name = ?", map[string][]string{"t1": {"name"}, "t2": {"id"}}},
-		{"join subquery with same table", "SELECT * FROM t1 JOIN (SELECT * FROM t1 WHERE t1.id = ?) a2 ON t1.id = a2.id where t1.name = ?", map[string][]string{"t1": {}}},
-		{"OR condition", "SELECT * FROM t1 where t1.id = ? OR t1.name = ?", map[string][]string{"t1": {}}},
-		{"column without table name", "SELECT * FROM t1 JOIN t2 ON t1.id = t2.id where name = ?", map[string][]string{"t1": {"name"}, "t2": {"name"}}},
+		{"no where", "SELECT * FROM t1", map[string]mapset.Set[string]{"t1": mapset.NewSet[string]()}},
+		{"simple", "SELECT * FROM t1 where t1.id = ?", map[string]mapset.Set[string]{"t1": mapset.NewSet("id")}},
+		{"two where condition", "SELECT * FROM t1 where t1.id = ? AND t1.name = ?", map[string]mapset.Set[string]{"t1": mapset.NewSet("id", "name")}},
+		{"alias", "SELECT * FROM t1 AS a where a.id = ?", map[string]mapset.Set[string]{"t1": mapset.NewSet("id")}},
+		{"join", "SELECT * FROM t1 JOIN t2 ON t1.id = t2.id where t1.name = ?", map[string]mapset.Set[string]{"t1": mapset.NewSet("name"), "t2": mapset.NewSet[string]()}},
+		{"join same table", "SELECT * FROM follow JOIN user AS follower ON follow.follower_id = follower.id JOIN user AS followee ON follow.followee_id = followee.id where followee.name = ?", map[string]mapset.Set[string]{"follow": mapset.NewSet[string](), "user": mapset.NewSet[string]()}},
+		{"join subquery", "SELECT * FROM t1 JOIN (SELECT * FROM t2 WHERE t2.id = ?) a2 ON t1.id = a2.id where t1.name = ?", map[string]mapset.Set[string]{"t1": mapset.NewSet[string]("name"), "t2": mapset.NewSet[string]("id")}},
+		{"join subquery with alias", "SELECT * FROM t1 JOIN (SELECT * FROM t2 WHERE t2.id = ?) AS a2 ON t1.id = a2.id where t1.name = ?", map[string]mapset.Set[string]{"t1": mapset.NewSet[string]("name"), "t2": mapset.NewSet[string]("id")}},
+		{"join subquery with same table", "SELECT * FROM t1 JOIN (SELECT * FROM t1 WHERE t1.id = ?) a2 ON t1.id = a2.id where t1.name = ?", map[string]mapset.Set[string]{"t1": mapset.NewSet[string]()}},
+		{"OR condition", "SELECT * FROM t1 where t1.id = ? OR t1.name = ?", map[string]mapset.Set[string]{"t1": mapset.NewSet[string]()}},
+		{"column without table name", "SELECT * FROM t1 JOIN t2 ON t1.id = t2.id where name = ?", map[string]mapset.Set[string]{"t1": mapset.NewSet[string]("name"), "t2": mapset.NewSet[string]("name")}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -55,7 +56,7 @@ func Test_parseSelectStmt(t *testing.T) {
 			stmt := stmtNodes[0]
 			assert.IsType(t, stmt, &ast.SelectStmt{})
 
-			parsed := parseSelectStmt(stmt.(*ast.SelectStmt))
+			parsed := parseStmt(stmt.(*ast.SelectStmt).From, stmt.(*ast.SelectStmt).Where)
 			assert.Equal(t, tt.want, parsed)
 		})
 	}

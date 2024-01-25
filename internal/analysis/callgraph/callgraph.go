@@ -103,14 +103,19 @@ type SqlValue struct {
 	RawSQL string
 }
 
-func Walk(cg *CallGraph, in *Node, fn func(edge *Edge) bool) {
+func Walk(cg *CallGraph, in *Node, fn func(node *Node) bool) {
 	queue := []string{in.Name}
+	seen := make(map[string]bool)
 	for len(queue) > 0 {
 		callee := queue[0]
 		queue = queue[1:]
+		if seen[callee] {
+			continue
+		}
+		seen[callee] = true
 		if n, exists := cg.Nodes[callee]; exists {
-			for _, e := range n.Out {
-				if skip := fn(e); !skip {
+			if skip := fn(n); !skip {
+				for _, e := range n.Out {
 					queue = append(queue, e.Callee)
 				}
 			}

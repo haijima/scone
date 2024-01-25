@@ -4,9 +4,11 @@ import (
 	"crypto/sha1"
 	"fmt"
 	"go/token"
+	"path/filepath"
 	"regexp"
 	"strings"
 
+	mapset "github.com/deckarep/golang-set/v2"
 	"github.com/fatih/color"
 	"github.com/haijima/scone/internal/analysis/analysisutil"
 	"golang.org/x/tools/go/ssa"
@@ -22,7 +24,7 @@ type Query struct {
 	Raw             string
 	MainTable       string
 	Tables          []string
-	FilterColumnMap map[string][]string
+	FilterColumnMap map[string]mapset.Set[string]
 }
 
 func (q *Query) Position() token.Position {
@@ -33,6 +35,10 @@ func (q *Query) Sha() string {
 	h := sha1.New()
 	h.Write([]byte(q.Raw))
 	return fmt.Sprintf("%x", h.Sum(nil))[:8]
+}
+
+func (q *Query) FLC() string {
+	return fmt.Sprintf("%s:%d:%d", filepath.Base(q.Position().Filename), q.Position().Line, q.Position().Column)
 }
 
 type QueryKind int

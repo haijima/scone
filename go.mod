@@ -3,6 +3,7 @@ module github.com/haijima/scone
 go 1.21.5
 
 require (
+	github.com/deckarep/golang-set/v2 v2.6.0
 	github.com/fatih/color v1.15.0
 	github.com/haijima/cobrax v0.1.5
 	github.com/lmittmann/tint v1.0.4

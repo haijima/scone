@@ -1,13 +1,13 @@
 package query
 
 import (
-	"fmt"
 	"regexp"
 	"slices"
 	"strconv"
 	"strings"
 	"unicode"
 
+	"github.com/cockroachdb/errors"
 	mapset "github.com/deckarep/golang-set/v2"
 	"github.com/haijima/scone/cmd/scone/option"
 	"github.com/haijima/scone/internal/analysis"
@@ -59,7 +59,7 @@ func run(cmd *cobra.Command, v *viper.Viper) error {
 	}
 
 	if !mapset.NewSet(sortKeys...).IsSubset(mapset.NewSet("file", "function", "type", "table", "sha1")) {
-		return fmt.Errorf("unknown sort key: %s", mapset.NewSet(sortKeys...).Difference(mapset.NewSet("file", "function", "type", "table", "sha1")).ToSlice())
+		return errors.Newf("unknown sort key: %s", mapset.NewSet(sortKeys...).Difference(mapset.NewSet("file", "function", "type", "table", "sha1")).ToSlice())
 	}
 	if !slices.Contains(sortKeys, "file") {
 		sortKeys = append(sortKeys, "file")
@@ -71,7 +71,7 @@ func run(cmd *cobra.Command, v *viper.Viper) error {
 		printOpt.Cols = make([]int, 0, len(cols))
 		for _, col := range cols {
 			if !slices.Contains(headerColumns, col) {
-				return fmt.Errorf("unknown columns: %s", col)
+				return errors.Newf("unknown columns: %s", col)
 			}
 			for i, header := range headerColumns {
 				if col == header {
@@ -101,7 +101,7 @@ func run(cmd *cobra.Command, v *viper.Viper) error {
 	} else if format == "tsv" {
 		p = internalio.NewTSVPrinter(cmd.OutOrStdout())
 	} else {
-		return fmt.Errorf("unknown format: %s", format)
+		return errors.Newf("unknown format: %s", format)
 	}
 
 	if !printOpt.NoHeader {

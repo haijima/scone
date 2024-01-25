@@ -1,8 +1,7 @@
 package option
 
 import (
-	"fmt"
-
+	"github.com/cockroachdb/errors"
 	"github.com/haijima/scone/internal/analysis/query"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -56,7 +55,7 @@ func QueryOptionFromViper(v *viper.Viper) (*query.Option, error) {
 	} else if modeFlg == "ast" {
 		mode = query.Ast
 	} else {
-		return nil, fmt.Errorf("unknown mode: %s", modeFlg)
+		return nil, errors.Newf("unknown mode: %s", modeFlg)
 	}
 
 	return &query.Option{

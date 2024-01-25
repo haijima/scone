@@ -1,9 +1,7 @@
 package analysis
 
 import (
-	"errors"
-	"fmt"
-
+	"github.com/cockroachdb/errors"
 	"golang.org/x/tools/go/packages"
 )
 
@@ -19,7 +17,7 @@ func LoadPackages(dir string, patterns ...string) ([]*packages.Package, error) {
 	}
 
 	if len(pkgs) == 0 {
-		return nil, fmt.Errorf("no packages matched %s", patterns)
+		return nil, errors.Newf("no packages matched %s", patterns)
 	}
 
 	errs := make([]error, 0)

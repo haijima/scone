@@ -5,30 +5,6 @@ import (
 	"slices"
 )
 
-func Intersect(a, b []string) []string {
-	if a == nil {
-		return b
-	} else if b == nil {
-		return a
-	}
-
-	seen := make(map[string]bool)
-	for _, v := range a {
-		seen[v] = true
-	}
-	r := make([]string, 0)
-	for _, v := range b {
-		if seen[v] {
-			r = append(r, v)
-		}
-	}
-	return r
-}
-
-func Empty(a []string) bool {
-	return len(a) == 0
-}
-
 type Pair[T any] struct{ L, R T }
 
 func PairCombinate[T cmp.Ordered](a []T) []Pair[T] {

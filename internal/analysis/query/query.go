@@ -90,14 +90,6 @@ func (k QueryKind) Color(str string) string {
 	}
 }
 
-var SelectPattern = regexp.MustCompile("^(?i)(SELECT .+? FROM `?(?:[a-z0-9_]+\\.)?)([a-z0-9_]+)(`?)")
-var JoinPattern = regexp.MustCompile("(?i)(JOIN `?(?:[a-z0-9_]+\\.)?)([a-z0-9_]+)(`?(?:(?: as)? [a-z0-9_]+)? (?:ON|USING)?)")
-var SubQueryPattern = regexp.MustCompile("(?i)(SELECT .+? FROM `?(?:[a-z0-9_]+\\.)?)([a-z0-9_]+)(`?)")
-var InsertPattern = regexp.MustCompile("^(?i)(INSERT(?: IGNORE)?(?: INTO)? `?(?:[a-z0-9_]+\\.)?)([a-z0-9_]+)(`?)")
-var UpdatePattern = regexp.MustCompile("^(?i)(UPDATE(?: IGNORE)? `?(?:[a-z0-9_]+\\.)?)([a-z0-9_]+)(`?.* SET)")
-var ReplacePattern = regexp.MustCompile("^(?i)(REPLACE(?: INTO)? `?(?:[a-z0-9_]+\\.)?)([a-z0-9_]+)(`?)")
-var DeletePattern = regexp.MustCompile("^(?i)(DELETE(?: IGNORE)? FROM `?(?:[a-z0-9_]+\\.)?)([a-z0-9_]+)(`?)")
-
 func toSqlQuery(str string) (*Query, bool) {
 	str, err := normalize(str)
 	if err != nil {
@@ -126,30 +118,4 @@ func normalize(str string) (string, error) {
 	str = strings.TrimSpace(str)                           // remove leading and trailing spaces
 
 	return str, nil
-}
-
-// reserved keywords in SQL
-var keywords = []string{
-	"SELECT", "FROM", "WHERE", "INSERT", "UPDATE", "DELETE", "JOIN",
-	"COUNT", "GROUP", "BY", "HAVING", "ORDER", "LIMIT", "OFFSET",
-	"INNER", "LEFT", "RIGHT", "FULL", "OUTER", "CROSS", "NATURAL",
-	"UNION", "ALL", "AND", "OR", "NOT", "AS", "IN", "ON", "IS",
-	"NULL", "LIKE", "EXISTS", "CASE", "WHEN", "THEN", "ELSE",
-	"END", "CREATE", "ALTER", "DROP", "TABLE", "INDEX", "VIEW",
-	"TRIGGER", "USE", "DATABASE", "PRIMARY", "KEY", "FOREIGN",
-	"REFERENCES", "DISTINCT", "SET", "VALUES", "INTO", "PROCEDURE",
-	"FUNCTION", "DECLARE", "CURSOR", "FETCH", "GRANT", "REVOKE",
-	"BEGIN", "TRANSACTION", "COMMIT", "ROLLBACK", "SAVEPOINT",
-	"LOCK", "UNLOCK", "MERGE", "EXCEPT", "INTERSECT", "MINUS",
-	"DESC", "ASC", "BETWEEN", "TRUNCATE", "CAST", "CONVERT",
-}
-var reservedKeywordsRegexp = regexp.MustCompile(`(?i)\b(` + strings.Join(keywords, "|") + `)\b`)
-var backQuoteRegexp = regexp.MustCompile("`(.+)`")
-
-func convertSQLKeywordsToUpper(sql string) string {
-	// convert reserved keywords to upper case
-	sql = reservedKeywordsRegexp.ReplaceAllStringFunc(sql, strings.ToUpper)
-	// convert table names to lower case
-	sql = backQuoteRegexp.ReplaceAllStringFunc(sql, strings.ToLower)
-	return sql
 }

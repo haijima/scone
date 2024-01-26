@@ -74,12 +74,7 @@ func printResult(w io.Writer, queries []*query.Query, tables mapset.Set[string],
 }
 
 func clusterize(tables mapset.Set[string], queries []*query.Query, cgs []*callgraph.CallGraph) ([]mapset.Set[string], map[string]mapset.Set[string]) {
-	g := NewGraph()
-
-	// Add tables as nodes
-	for _, t := range tables.ToSlice() {
-		g.AddNode(t)
-	}
+	g := NewGraph(tables.ToSlice()...) // Create a graph with tables as nodes
 
 	// Extract tables updated in the same transaction
 	for _, cg := range cgs {

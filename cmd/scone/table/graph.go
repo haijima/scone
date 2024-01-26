@@ -9,12 +9,16 @@ type Graph struct {
 	nodeMap map[string]bool
 }
 
-func NewGraph() *Graph {
-	return &Graph{
+func NewGraph(nodes ...string) *Graph {
+	g := &Graph{
 		edges:   make(map[string][]string),
 		visited: make(map[string]bool),
 		nodeMap: make(map[string]bool),
 	}
+	for _, node := range nodes {
+		g.AddNode(node)
+	}
+	return g
 }
 
 func (g *Graph) AddNode(node string) {

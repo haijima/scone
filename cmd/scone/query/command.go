@@ -14,6 +14,7 @@ import (
 	"github.com/haijima/scone/internal/analysis"
 	"github.com/haijima/scone/internal/analysis/query"
 	internalio "github.com/haijima/scone/internal/io"
+	"github.com/haijima/scone/internal/util"
 	"github.com/olekukonko/tablewriter"
 	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
@@ -86,7 +87,7 @@ func run(cmd *cobra.Command, v *viper.Viper) error {
 	for _, q := range queries {
 		pkgs.Add(q.Package.Pkg.Path())
 	}
-	printOpt.pkgBasePath = findCommonPrefix(pkgs.ToSlice())
+	printOpt.pkgBasePath = util.FindCommonPrefix(pkgs.ToSlice())
 
 	var p internalio.TablePrinter
 	if format == "table" {
@@ -211,17 +212,4 @@ func row(q *query.Query, opt *PrintOption) []string {
 		res = append(res, fullRow[col])
 	}
 	return res
-}
-
-func findCommonPrefix(strs []string) string {
-	if len(strs) == 0 {
-		return ""
-	}
-	prefix := strs[0]
-	for _, str := range strs {
-		for len(str) < len(prefix) || str[:len(prefix)] != prefix {
-			prefix = prefix[:len(prefix)-1]
-		}
-	}
-	return prefix
 }

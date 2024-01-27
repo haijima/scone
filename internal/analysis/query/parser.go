@@ -3,6 +3,7 @@ package query
 import (
 	"log/slog"
 
+	"github.com/cockroachdb/errors"
 	mapset "github.com/deckarep/golang-set/v2"
 	"github.com/haijima/scone/internal/util"
 	"github.com/lmittmann/tint"
@@ -95,6 +96,9 @@ func parse(sql string) (*Query, error) {
 	}
 	if len(stmtNodes) > 1 {
 		slog.Warn("multiple statements in one query")
+	}
+	if len(stmtNodes) == 0 {
+		return nil, errors.New("no SQL statement found")
 	}
 
 	stmt := stmtNodes[0]

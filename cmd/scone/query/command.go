@@ -159,7 +159,7 @@ var pathDirRegex = regexp.MustCompile(`([^/]+)/`)
 func (opt *PrintOption) ShortenPackagePath(path string) string {
 	if !opt.ShowFullPackagePath && opt.pkgBasePath != "" && strings.HasPrefix(path, opt.pkgBasePath) {
 		path = strings.TrimPrefix(path, opt.pkgBasePath)
-		return fmt.Sprintf("%s/%s", pathDirRegex.ReplaceAllStringFunc(opt.pkgBasePath, func(m string) string { return m[:1] }), path)
+		return fmt.Sprintf("%s%s", pathDirRegex.ReplaceAllStringFunc(opt.pkgBasePath, func(m string) string { return m[:1] + "/" }), path)
 	}
 	return path
 }

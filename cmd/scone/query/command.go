@@ -6,7 +6,6 @@ import (
 	"slices"
 	"strconv"
 	"strings"
-	"unicode"
 
 	"github.com/cockroachdb/errors"
 	mapset "github.com/deckarep/golang-set/v2"
@@ -72,15 +71,11 @@ func run(cmd *cobra.Command, v *viper.Viper) error {
 	if len(cols) > 0 {
 		printOpt.Cols = make([]int, 0, len(cols))
 		for _, col := range cols {
-			if !slices.Contains(headerColumns, col) {
+			i := slices.Index(headerColumns, col)
+			if i == -1 {
 				return errors.Newf("unknown columns: %s", col)
 			}
-			for i, header := range headerColumns {
-				if col == header {
-					printOpt.Cols = append(printOpt.Cols, i)
-					break
-				}
-			}
+			printOpt.Cols = append(printOpt.Cols, i)
 		}
 	}
 	pkgs := mapset.NewSet[string]()
@@ -92,7 +87,7 @@ func run(cmd *cobra.Command, v *viper.Viper) error {
 	var p internalio.TablePrinter
 	if format == "table" {
 		maxWidth := tablewriter.MAX_ROW_WIDTH * 4
-		includeRawQuery := printOpt.Cols != nil && slices.Contains(printOpt.Cols, 9)
+		includeRawQuery := printOpt.Cols != nil && slices.Contains(printOpt.Cols, slices.Index(headerColumns, "raw-query"))
 		p = internalio.NewTablePrinter(cmd.OutOrStdout(), maxWidth, includeRawQuery)
 	} else if format == "md" {
 		p = internalio.NewMarkdownPrinter(cmd.OutOrStdout())
@@ -176,20 +171,6 @@ func makeHeader(opt *PrintOption) []string {
 }
 
 func row(q *query.Query, opt *PrintOption) []string {
-	ellipsis := q.Raw
-	if len(ellipsis) > 60 {
-		lastSpaceIx := -1
-		for i, r := range ellipsis {
-			if unicode.IsSpace(r) {
-				lastSpaceIx = i
-			}
-			if i >= 60-4 && lastSpaceIx != -1 {
-				ellipsis = ellipsis[:lastSpaceIx] + " ..."
-				break
-			}
-		}
-	}
-
 	var tables string
 	if len(q.Tables) > 0 {
 		tables = strings.Join(q.Tables[1:], ", ")
@@ -204,7 +185,7 @@ func row(q *query.Query, opt *PrintOption) []string {
 		q.MainTable,
 		tables,
 		q.Sha(),
-		ellipsis,
+		q.String(),
 		q.Raw,
 	}
 	res := make([]string, 0, len(opt.Cols))

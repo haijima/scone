@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"log/slog"
 	"os"
 	"time"
@@ -36,7 +37,7 @@ func main() {
 	rootCmd.SetOut(colorable.NewColorableStdout())
 	rootCmd.SetErr(colorable.NewColorableStderr())
 	if err := rootCmd.Execute(); err != nil {
-		slog.Error(err.Error())
+		slog.Error(fmt.Sprintf("%+v", err))
 		os.Exit(1)
 	}
 }

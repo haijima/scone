@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"unicode"
 
 	mapset "github.com/deckarep/golang-set/v2"
 	"github.com/fatih/color"
@@ -39,6 +40,23 @@ func (q *Query) Sha() string {
 
 func (q *Query) FLC() string {
 	return fmt.Sprintf("%s:%d:%d", filepath.Base(q.Position().Filename), q.Position().Line, q.Position().Column)
+}
+
+func (q *Query) String() string {
+	ellipsis := q.Raw
+	if len(ellipsis) > 60 {
+		lastSpaceIx := -1
+		for i, r := range ellipsis {
+			if unicode.IsSpace(r) {
+				lastSpaceIx = i
+			}
+			if i >= 60-4 && lastSpaceIx != -1 {
+				ellipsis = ellipsis[:lastSpaceIx] + " ..."
+				break
+			}
+		}
+	}
+	return ellipsis
 }
 
 type QueryKind int

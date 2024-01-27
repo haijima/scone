@@ -175,49 +175,28 @@ func analyzeFuncBySsaMethod(pkg *ssa.Package, fn *ssa.Function, pos []token.Pos,
 	foundQueries := make([]*Query, 0)
 	for _, block := range fn.Blocks {
 		for _, instr := range block.Instrs {
-			c, ok := instr.(*ssa.Call)
-			if !ok {
-				continue
-			}
-			common := c.Common()
-
-			var mp, mn string
-			if common.IsInvoke() && common.Method.Pkg() != nil {
-				mp = common.Method.Pkg().Path()
-				mn = common.Method.Name()
-			} else if m, ok := common.Value.(*ssa.Function); ok {
-				if m.Pkg != nil {
-					mp = m.Pkg.Pkg.Path()
-				} else if m.Signature.Recv() != nil && m.Signature.Recv().Pkg() != nil {
-					mp = m.Signature.Recv().Pkg().Path()
-				}
-				mn = m.Name()
-			} else {
-				continue // Can't get package name of the function
-			}
-
-			for _, t := range tms {
-				if mp == t.Package && mn == t.Method {
-					idx := t.ArgIndex
-					if !common.IsInvoke() {
-						idx++ // Set first argument as receiver
-					}
-					arg := common.Args[idx]
-
-					if phi, ok := arg.(*ssa.Phi); ok {
-						for _, edge := range phi.Edges {
-							if qs, ok := constLikeStringValueToQueries(pkg, edge, fn, append([]token.Pos{arg.Pos(), c.Pos(), fn.Pos()}, pos...), opt); ok {
-								for _, q := range qs {
-									foundQueries = append(foundQueries, q)
-								}
+			if c, ok := instr.(*ssa.Call); ok {
+				common := c.Common()
+				if mp, mn, ok := analysisutil.GetFuncInfo(common); ok {
+					for _, t := range tms {
+						if mp == t.Package && mn == t.Method {
+							idx := t.ArgIndex
+							if !common.IsInvoke() {
+								idx++ // Set first argument as receiver
 							}
-						}
-					} else if qs, ok := constLikeStringValueToQueries(pkg, arg, fn, append([]token.Pos{c.Pos(), fn.Pos()}, pos...), opt); ok {
-						for _, q := range qs {
-							foundQueries = append(foundQueries, q)
+							arg := common.Args[idx]
+							if phi, ok := arg.(*ssa.Phi); ok {
+								for _, edge := range phi.Edges {
+									if qs, ok := constLikeStringValueToQueries(pkg, edge, fn, append([]token.Pos{arg.Pos(), c.Pos(), fn.Pos()}, pos...), opt); ok {
+										foundQueries = append(foundQueries, qs...)
+									}
+								}
+							} else if qs, ok := constLikeStringValueToQueries(pkg, arg, fn, append([]token.Pos{c.Pos(), fn.Pos()}, pos...), opt); ok {
+								foundQueries = append(foundQueries, qs...)
+							}
+							break // Found target method
 						}
 					}
-					break // Found target method
 				}
 			}
 		}

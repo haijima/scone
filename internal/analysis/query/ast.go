@@ -7,8 +7,8 @@ import (
 	"golang.org/x/tools/go/ssa"
 )
 
-func analyzeFuncByAst(pkg *ssa.Package, fn *ssa.Function, pos []token.Pos, opt *Option) []*Query {
-	foundQueries := make([]*Query, 0)
+func analyzeFuncByAst(pkg *ssa.Package, fn *ssa.Function, pos []token.Pos, opt *Option) []*QueryGroup {
+	foundQueryGroups := make([]*QueryGroup, 0)
 	ast.Inspect(fn.Syntax(), func(n ast.Node) bool {
 		if lit, ok := n.(*ast.BasicLit); ok && lit.Kind == token.STRING {
 			if q, ok := toSqlQuery(lit.Value); ok {
@@ -16,11 +16,11 @@ func analyzeFuncByAst(pkg *ssa.Package, fn *ssa.Function, pos []token.Pos, opt *
 				q.Pos = append([]token.Pos{lit.Pos()}, pos...)
 				q.Package = pkg
 				if opt.Filter(q) {
-					foundQueries = append(foundQueries, q)
+					foundQueryGroups = append(foundQueryGroups, &QueryGroup{List: []*Query{q}})
 				}
 			}
 		}
 		return true
 	})
-	return foundQueries
+	return foundQueryGroups
 }

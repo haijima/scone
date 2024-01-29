@@ -42,38 +42,40 @@ func run(cmd *cobra.Command, v *viper.Viper) error {
 		return err
 	}
 
-	queries, tables, cgs, err := analysis.Analyze(dir, pattern, opt)
+	queryGroups, tables, cgs, err := analysis.Analyze(dir, pattern, opt)
 	if err != nil {
 		return err
 	}
-	return printResult(cmd.OutOrStdout(), queries, tables, cgs, PrintOption{SummarizeOnly: summarizeOnly})
+	return printResult(cmd.OutOrStdout(), queryGroups, tables, cgs, PrintOption{SummarizeOnly: summarizeOnly})
 }
 
 type PrintOption struct{ SummarizeOnly bool }
 
-func printResult(w io.Writer, queries []*query.Query, tables mapset.Set[string], cgs []*callgraph.CallGraph, opt PrintOption) error {
+func printResult(w io.Writer, queryGroups []*query.QueryGroup, tables mapset.Set[string], cgs []*callgraph.CallGraph, opt PrintOption) error {
 	filterColumns := util.NewSetMap[string, string]()
 	kindsMap := util.NewSetMap[string, query.QueryKind]()
-	for _, q := range queries {
-		for t, cols := range q.FilterColumnMap {
-			filterColumns.Intersect(t, cols)
-		}
-		for _, t := range q.Tables {
-			kindsMap.Add(t, q.Kind)
+	for _, qg := range queryGroups {
+		for _, q := range qg.List {
+			for t, cols := range q.FilterColumnMap {
+				filterColumns.Intersect(t, cols)
+			}
+			for _, t := range q.Tables {
+				kindsMap.Add(t, q.Kind)
+			}
 		}
 	}
-	connTables, collocationMap := clusterize(tables, queries, cgs)
+	connTables, collocationMap := clusterize(tables, queryGroups, cgs)
 
-	printSummary(w, tables, queries, connTables, filterColumns, kindsMap)
+	printSummary(w, tables, queryGroups, connTables, filterColumns, kindsMap)
 	if !opt.SummarizeOnly {
 		for _, t := range mapset.Sorted(tables) {
-			printTableResult(w, t, queries, connTables, collocationMap[t], filterColumns[t], kindsMap[t])
+			printTableResult(w, t, queryGroups, connTables, collocationMap[t], filterColumns[t], kindsMap[t])
 		}
 	}
 	return nil
 }
 
-func clusterize(tables mapset.Set[string], queries []*query.Query, cgs []*callgraph.CallGraph) ([]mapset.Set[string], map[string]mapset.Set[string]) {
+func clusterize(tables mapset.Set[string], queryGroups []*query.QueryGroup, cgs []*callgraph.CallGraph) ([]mapset.Set[string], map[string]mapset.Set[string]) {
 	g := NewGraph(tables.ToSlice()...) // Create a graph with tables as nodes
 
 	// Extract tables updated in the same transaction
@@ -98,8 +100,10 @@ func clusterize(tables mapset.Set[string], queries []*query.Query, cgs []*callgr
 	}
 
 	// extract tables used in the same query
-	for _, q := range queries {
-		util.PairCombinateFunc(q.Tables, g.AddEdge)
+	for _, qg := range queryGroups {
+		for _, q := range qg.List {
+			util.PairCombinateFunc(q.Tables, g.AddEdge)
+		}
 	}
 
 	// find connected components
@@ -124,9 +128,9 @@ func clusterize(tables mapset.Set[string], queries []*query.Query, cgs []*callgr
 	return connTables, collocationMap
 }
 
-func printSummary(w io.Writer, tables mapset.Set[string], queries []*query.Query, connTables []mapset.Set[string], filterColumns map[string]mapset.Set[string], kindsMap map[string]mapset.Set[query.QueryKind]) {
+func printSummary(w io.Writer, tables mapset.Set[string], queryGroups []*query.QueryGroup, connTables []mapset.Set[string], filterColumns map[string]mapset.Set[string], kindsMap map[string]mapset.Set[query.QueryKind]) {
 	fmt.Fprintf(w, "%s\n", color.CyanString("Summary"))
-	fmt.Fprintf(w, "  %s : %d\n", color.MagentaString("queries       "), len(queries))
+	fmt.Fprintf(w, "  %s : %d\n", color.MagentaString("queries       "), len(queryGroups))
 	fmt.Fprintf(w, "  %s : %d\n", color.MagentaString("tables        "), tables.Cardinality())
 	fmt.Fprintf(w, "  %s :\n", color.MagentaString("cacheability  "))
 	var hardCoded, readThrough, writeThrough []string
@@ -157,7 +161,7 @@ func printSummary(w io.Writer, tables mapset.Set[string], queries []*query.Query
 	fmt.Fprintln(w)
 }
 
-func printTableResult(w io.Writer, table string, queries []*query.Query, connTables []mapset.Set[string], collocationTables mapset.Set[string], filterColumns mapset.Set[string], kinds mapset.Set[query.QueryKind]) {
+func printTableResult(w io.Writer, table string, queryGroups []*query.QueryGroup, connTables []mapset.Set[string], collocationTables mapset.Set[string], filterColumns mapset.Set[string], kinds mapset.Set[query.QueryKind]) {
 	switch slices.Max(kinds.ToSlice()) {
 	case query.Select:
 		fmt.Fprintln(w, color.New(color.FgBlack, color.BgBlue).Sprintf(" %s ", table))
@@ -202,22 +206,27 @@ func printTableResult(w io.Writer, table string, queries []*query.Query, connTab
 		fmt.Fprintf(w, "  \t\t  %s\n", color.HiBlackString("It is likely that this table will always be filtered by these column(s)"))
 	}
 
-	qs := make([]*query.Query, 0)
-	for _, q := range queries {
-		if slices.Contains(q.Tables, table) {
-			qs = append(qs, q)
+	qgs := make([]*query.QueryGroup, 0)
+	for _, qg := range queryGroups {
+		for _, q := range qg.List {
+			if slices.Contains(q.Tables, table) {
+				qgs = append(qgs, qg)
+				break
+			}
 		}
 	}
-	fmt.Fprintf(w, "  %s\t: %d\n", color.MagentaString("queries"), len(qs))
+	fmt.Fprintf(w, "  %s\t: %d\n", color.MagentaString("queries"), len(qgs))
 
 	p := internalio.NewSimplePrinter(w, tablewriter.MAX_ROW_WIDTH*5, true)
 	p.SetHeader([]string{"", "#", "file", "function", "t", "query"})
-	for i, q := range qs {
-		k := "?"
-		if q.Kind > query.Unknown {
-			k = q.Kind.Color(q.Kind.String()[:1])
+	for i, qg := range qgs {
+		for _, q := range qg.List {
+			k := "?"
+			if q.Kind > query.Unknown {
+				k = q.Kind.Color(q.Kind.String()[:1])
+			}
+			p.AddRow([]string{"   ", strconv.Itoa(i + 1), q.FLC(), q.Func.Name(), k, q.Raw})
 		}
-		p.AddRow([]string{"   ", strconv.Itoa(i + 1), q.FLC(), q.Func.Name(), k, q.Raw})
 	}
 	p.Print()
 	fmt.Fprintln(w)

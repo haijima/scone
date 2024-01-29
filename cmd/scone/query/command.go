@@ -54,7 +54,7 @@ func run(cmd *cobra.Command, v *viper.Viper) error {
 		return err
 	}
 
-	queries, _, _, err := analysis.Analyze(dir, pattern, opt)
+	queryGroups, _, _, err := analysis.Analyze(dir, pattern, opt)
 	if err != nil {
 		return err
 	}
@@ -65,7 +65,7 @@ func run(cmd *cobra.Command, v *viper.Viper) error {
 	if !slices.Contains(sortKeys, "file") {
 		sortKeys = append(sortKeys, "file")
 	}
-	slices.SortFunc(queries, sortQuery(sortKeys))
+	slices.SortFunc(queryGroups, sortQuery(sortKeys))
 
 	printOpt := &PrintOption{Cols: defaultHeaderIndex, NoHeader: noHeader, NoRowNum: noRowNum, ShowFullPackagePath: showFullPackagePath}
 	if len(cols) > 0 {
@@ -79,8 +79,10 @@ func run(cmd *cobra.Command, v *viper.Viper) error {
 		}
 	}
 	pkgs := mapset.NewSet[string]()
-	for _, q := range queries {
-		pkgs.Add(q.Package.Pkg.Path())
+	for _, qg := range queryGroups {
+		for _, q := range qg.List {
+			pkgs.Add(q.Package.Pkg.Path())
+		}
 	}
 	printOpt.pkgBasePath = util.FindCommonPrefix(pkgs.ToSlice())
 
@@ -104,18 +106,28 @@ func run(cmd *cobra.Command, v *viper.Viper) error {
 	if !printOpt.NoHeader {
 		p.SetHeader(makeHeader(printOpt))
 	}
-	for i, q := range queries {
+	for i, qg := range queryGroups {
+		q := qg.List[0]
+		//for _, q := range qg.List {
 		r := row(q, printOpt)
+		phi := ""
+		if len(qg.List) > 1 {
+			phi = "P"
+		}
+		r = append([]string{phi}, r...)
 		if !printOpt.NoRowNum {
 			r = append([]string{strconv.Itoa(i + 1)}, r...)
 		}
 		p.AddRow(r)
+		//}
 	}
 	return p.Print()
 }
 
-func sortQuery(sortKeys []string) func(a *query.Query, b *query.Query) int {
-	return func(a, b *query.Query) int {
+func sortQuery(sortKeys []string) func(a, b *query.QueryGroup) int {
+	return func(aa, bb *query.QueryGroup) int {
+		a := aa.List[0]
+		b := bb.List[0]
 		for _, sortKey := range sortKeys {
 			if sortKey == "function" && a.Func.Name() != b.Func.Name() {
 				return strings.Compare(a.Func.Name(), b.Func.Name())
@@ -164,6 +176,7 @@ func makeHeader(opt *PrintOption) []string {
 	if !opt.NoRowNum {
 		header = append(header, "#")
 	}
+	header = append(header, "*")
 	for _, col := range opt.Cols {
 		header = append(header, strings.ReplaceAll(headerColumns[col], "-", " "))
 	}

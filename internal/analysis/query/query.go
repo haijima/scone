@@ -17,6 +17,10 @@ import (
 	_ "github.com/pingcap/tidb/pkg/parser/test_driver"
 )
 
+type QueryGroup struct {
+	List []*Query
+}
+
 type Query struct {
 	Kind            QueryKind
 	Func            *ssa.Function

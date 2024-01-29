@@ -34,24 +34,26 @@ func BuildCallGraph(ssaProg *buildssa.SSA, q *query.Result) (*CallGraph, error) 
 		Package: ssaProg.Pkg.Pkg,
 		Nodes:   make(map[string]*Node),
 	}
-	foundQueries := q.Queries
+	foundQueryGroups := q.QueryGroups
 	cg := static.CallGraph(ssaProg.Pkg.Prog)
-	callerFuncs := make([]*ssa.Function, 0, len(foundQueries))
+	callerFuncs := make([]*ssa.Function, 0, len(foundQueryGroups))
 	queryEdgeMemo := make(map[string]bool)
-	for _, q := range foundQueries {
-		for _, t := range q.Tables {
-			k := fmt.Sprintf("%s#%s#%s", q.Func.Name(), q.Kind, t)
-			if queryEdgeMemo[k] {
-				continue
-			}
-			queryEdgeMemo[k] = true
+	for _, qg := range foundQueryGroups {
+		for _, q := range qg.List {
+			for _, t := range q.Tables {
+				k := fmt.Sprintf("%s#%s#%s", q.Func.Name(), q.Kind, t)
+				if queryEdgeMemo[k] {
+					continue
+				}
+				queryEdgeMemo[k] = true
 
-			if q.Func.Name() == "main" || q.Func.Name() == "init" {
-				continue
-			}
-			result.AddQueryEdge(q.Func, t, &SqlValue{Kind: q.Kind, RawSQL: q.Raw})
+				if q.Func.Name() == "main" || q.Func.Name() == "init" {
+					continue
+				}
+				result.AddQueryEdge(q.Func, t, &SqlValue{Kind: q.Kind, RawSQL: q.Raw})
 
-			callerFuncs = append(callerFuncs, q.Func)
+				callerFuncs = append(callerFuncs, q.Func)
+			}
 		}
 	}
 

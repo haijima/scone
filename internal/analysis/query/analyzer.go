@@ -26,17 +26,17 @@ var Analyzer = &analysis.Analyzer{
 }
 
 type Result struct {
-	Queries []*Query
+	QueryGroups []*QueryGroup
 }
 
 // ExtractQuery extracts queries from the given package.
 func ExtractQuery(ssaProg *buildssa.SSA, files []*ast.File, opt *Option) (*Result, error) {
-	foundQueries := make([]*Query, 0)
+	foundQueryGroups := make([]*QueryGroup, 0)
 	opt.queryCommentPositions = make([]token.Pos, 0)
 	opt.isIgnoredFunc = func(pos token.Pos) bool { return false }
 
 	// Get queries from comments
-	foundQueries = append(foundQueries, getQueriesInComment(ssaProg, files, opt)...)
+	foundQueryGroups = append(foundQueryGroups, getQueriesInComment(ssaProg, files, opt)...)
 
 	//ignoreCommentPrefix := "// scone:ignore"
 	for _, file := range files {
@@ -61,22 +61,22 @@ func ExtractQuery(ssaProg *buildssa.SSA, files []*ast.File, opt *Option) (*Resul
 	for _, member := range ssaProg.SrcFuncs {
 		switch opt.Mode {
 		case SsaMethod:
-			foundQueries = append(foundQueries, analyzeFuncBySsaMethod(ssaProg.Pkg, member, []token.Pos{}, opt)...)
+			foundQueryGroups = append(foundQueryGroups, analyzeFuncBySsaMethod(ssaProg.Pkg, member, []token.Pos{}, opt)...)
 		case SsaConst:
-			foundQueries = append(foundQueries, analyzeFuncBySsaConst(ssaProg.Pkg, member, []token.Pos{}, opt)...)
+			foundQueryGroups = append(foundQueryGroups, analyzeFuncBySsaConst(ssaProg.Pkg, member, []token.Pos{}, opt)...)
 		case Ast:
-			foundQueries = append(foundQueries, analyzeFuncByAst(ssaProg.Pkg, member, []token.Pos{}, opt)...)
+			foundQueryGroups = append(foundQueryGroups, analyzeFuncByAst(ssaProg.Pkg, member, []token.Pos{}, opt)...)
 		}
 	}
 
-	slices.SortFunc(foundQueries, func(a, b *Query) int {
-		if a.Position().Offset != b.Position().Offset {
-			return a.Position().Offset - b.Position().Offset
+	slices.SortFunc(foundQueryGroups, func(a, b *QueryGroup) int {
+		if a.List[0].Position().Offset != b.List[0].Position().Offset {
+			return a.List[0].Position().Offset - b.List[0].Position().Offset
 		}
-		return strings.Compare(a.Raw, b.Raw)
+		return strings.Compare(a.List[0].Raw, b.List[0].Raw)
 	})
-	foundQueries = slices.CompactFunc(foundQueries, func(a, b *Query) bool {
-		return a.Raw == b.Raw && a.Position().Offset == b.Position().Offset
+	foundQueryGroups = slices.CompactFunc(foundQueryGroups, func(a, b *QueryGroup) bool {
+		return a.List[0].Raw == b.List[0].Raw && a.List[0].Position().Offset == b.List[0].Position().Offset
 	})
-	return &Result{Queries: foundQueries}, nil
+	return &Result{QueryGroups: foundQueryGroups}, nil
 }

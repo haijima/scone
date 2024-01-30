@@ -152,7 +152,7 @@ var targetMethods = []methodArg{
 	{Package: "github.com/jmoiron/sqlx", Method: "GetContext", ArgIndex: 2},
 	{Package: "github.com/jmoiron/sqlx", Method: "QueryRowxContext", ArgIndex: 1},
 	{Package: "github.com/jmoiron/sqlx", Method: "NamedExecContext", ArgIndex: 1},
-	{Package: "github.com/jmoiron/sqlx", Method: "Exec", ArgIndex: 0},
+	{Package: "github.com/jmoiron/sqlx", Method: "ExecContext", ArgIndex: 1},
 	{Package: "github.com/jmoiron/sqlx", Method: "In", ArgIndex: -1},
 }
 

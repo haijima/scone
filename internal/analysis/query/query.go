@@ -4,7 +4,6 @@ import (
 	"crypto/sha1"
 	"fmt"
 	"go/token"
-	"path/filepath"
 	"regexp"
 	"strings"
 	"unicode"
@@ -40,10 +39,6 @@ func (q *Query) Sha() string {
 	h := sha1.New()
 	h.Write([]byte(q.Raw))
 	return fmt.Sprintf("%x", h.Sum(nil))[:8]
-}
-
-func (q *Query) FLC() string {
-	return fmt.Sprintf("%s:%d:%d", filepath.Base(q.Position().Filename), q.Position().Line, q.Position().Column)
 }
 
 func (q *Query) String() string {

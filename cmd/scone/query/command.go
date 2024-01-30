@@ -11,6 +11,7 @@ import (
 	mapset "github.com/deckarep/golang-set/v2"
 	"github.com/haijima/scone/cmd/scone/option"
 	"github.com/haijima/scone/internal/analysis"
+	"github.com/haijima/scone/internal/analysis/analysisutil"
 	"github.com/haijima/scone/internal/analysis/query"
 	internalio "github.com/haijima/scone/internal/io"
 	"github.com/haijima/scone/internal/util"
@@ -192,7 +193,7 @@ func row(q *query.Query, opt *PrintOption) []string {
 	fullRow := []string{
 		q.Package.Pkg.Name(),
 		opt.ShortenPackagePath(q.Package.Pkg.Path()),
-		q.FLC(),
+		analysisutil.FLC(q.Position()),
 		q.Func.Name(),
 		q.Kind.ColoredString(),
 		q.MainTable,

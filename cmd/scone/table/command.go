@@ -10,6 +10,7 @@ import (
 	"github.com/fatih/color"
 	"github.com/haijima/scone/cmd/scone/option"
 	"github.com/haijima/scone/internal/analysis"
+	"github.com/haijima/scone/internal/analysis/analysisutil"
 	"github.com/haijima/scone/internal/analysis/callgraph"
 	"github.com/haijima/scone/internal/analysis/query"
 	internalio "github.com/haijima/scone/internal/io"
@@ -225,7 +226,7 @@ func printTableResult(w io.Writer, table string, queryGroups []*query.QueryGroup
 			if q.Kind > query.Unknown {
 				k = q.Kind.Color(q.Kind.String()[:1])
 			}
-			p.AddRow([]string{"   ", strconv.Itoa(i + 1), q.FLC(), q.Func.Name(), k, q.Raw})
+			p.AddRow([]string{"   ", strconv.Itoa(i + 1), analysisutil.FLC(q.Position()), q.Func.Name(), k, q.Raw})
 		}
 	}
 	p.Print()

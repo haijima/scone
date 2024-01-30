@@ -114,49 +114,49 @@ func Unquote(str string) (string, error) {
 func GetFuncInfo(common *ssa.CallCommon) (pkgPath, funcName string, ok bool) {
 	switch fn := common.Value.(type) {
 	case *ssa.Builtin:
-		//if common.IsInvoke() {
-		//	panic(fmt.Sprintf("built-in function call(%s) should not be invoked", fn.Name()))
-		//}
-		//if common.StaticCallee() != nil {
-		//	panic(fmt.Sprintf("built-in function call(%s) should not have static callee", fn.Name()))
-		//}
-		//fmt.Fprintf(os.Stderr, "built-in function call: %#v\t%#v\t%#v\n", fn, common.Args, common.Signature())
-		//fmt.Fprintf(os.Stderr, "name: %s, args: %q\n", fn.Name(), common.Args)
+		// built-in function call
+		//fmt.Fprintf(os.Stderr, "built-in function call: %v\n", fn)
 	case *ssa.MakeClosure:
-		//fmt.Fprintf(os.Stderr, "static function closure call: %#v\n", fn)
+		// static function closure call
+		//fmt.Fprintf(os.Stderr, "static function closure call: %v\n", fn)
 	case *ssa.Function:
 		if fn.Signature.Recv() != nil {
-			//if common.IsInvoke() {
-			//	panic(fmt.Sprintf("static method call(%s) should not be invoked", fn.Name()))
-			//}
-			//if common.StaticCallee() == nil {
-			//	panic(fmt.Sprintf("static method call(%s) should have static callee", fn.Name()))
-			//}
-			//fmt.Fprintf(os.Stderr, "## static method call(%v): %s\t%s\t%s\t%s\n", fn, common.Signature().Recv(), common.Args, common.Signature(), common.StaticCallee())
-			//fmt.Fprintf(os.Stderr, "name: %s, args: %q\n", fn.Name(), common.Args)
-			//fmt.Fprintf(os.Stderr, "static method call: %#v\n", fn)
+			if fn.Signature.Recv().Pkg() != nil {
+				// static method call
+				//fmt.Fprintf(os.Stderr, "static method call: %v\n", fn)
+				return fn.Signature.Recv().Pkg().Path(), fn.Name(), true
+			} else {
+				// builtin?
+				//fmt.Fprintf(os.Stderr, "static method call(%s) should have package\n", fn.Name())
+			}
+		} else {
+			if fn.Pkg != nil {
+				// static function call
+				//fmt.Fprintf(os.Stderr, "static function call: %v\n", fn)
+				return fn.Pkg.Pkg.Path(), fn.Name(), true
+			} else if fn.Origin() != nil && fn.Origin().Pkg != nil {
+				// generics?
+				// static function call
+				//fmt.Fprintf(os.Stderr, "static function call: %v\n", fn)
+				return fn.Origin().Pkg.Pkg.Path(), fn.Origin().Name(), true
+			}
 		}
-		//fmt.Fprintf(os.Stderr, "static function call: %#v\n", fn)
 	default:
 		if common.IsInvoke() {
-			//fmt.Fprintf(os.Stderr, "dynamic method call: %#v\n", common.Method)
-		}
-		//fmt.Fprintf(os.Stderr, "dynamic function call: %#v\n", common.Method)
-	}
-
-	if common.IsInvoke() && common.Method.Pkg() != nil {
-		return common.Method.Pkg().Path(), common.Method.Name(), true
-	} else if m, ok := common.Value.(*ssa.Function); ok {
-		if m.Pkg != nil {
-			return m.Pkg.Pkg.Path(), m.Name(), true
-		} else if m.Signature.Recv() != nil && m.Signature.Recv().Pkg() != nil {
-			return m.Signature.Recv().Pkg().Path(), m.Name(), true
+			if common.Method.Pkg() != nil {
+				// dynamic method call
+				//fmt.Fprintf(os.Stderr, "dynamic method call: %v\n", common.Method)
+				return common.Method.Pkg().Path(), common.Method.Name(), true
+			} else {
+				// builtin dynamic method call
+				//fmt.Fprintf(os.Stderr, "builtin dynamic method call: %v\n", common.Method)
+			}
 		} else {
-			return "", "", false // Can't get package name of the function
+			// dynamic function call
+			//fmt.Fprintf(os.Stderr, "dynamic function call: %v\n", fn)
 		}
-	} else {
-		return "", "", false // Can't get package name of the function
 	}
+	return "", "", false // Can't get package name of the function
 }
 
 func GetCommentGroups(files []*ast.File, prefix string) []ast.CommentGroup {

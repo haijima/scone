@@ -1,4 +1,4 @@
-package query
+package main
 
 import (
 	"fmt"
@@ -9,7 +9,6 @@ import (
 
 	"github.com/cockroachdb/errors"
 	mapset "github.com/deckarep/golang-set/v2"
-	"github.com/haijima/scone/cmd/scone/option"
 	"github.com/haijima/scone/internal/analysis"
 	"github.com/haijima/scone/internal/analysis/analysisutil"
 	"github.com/haijima/scone/internal/analysis/query"
@@ -21,11 +20,11 @@ import (
 	"github.com/spf13/viper"
 )
 
-func NewCommand(v *viper.Viper, _ afero.Fs) *cobra.Command {
+func NewQueryCommand(v *viper.Viper, _ afero.Fs) *cobra.Command {
 	cmd := &cobra.Command{}
 	cmd.Use = "query"
 	cmd.Short = "List SQL queries"
-	cmd.RunE = func(cmd *cobra.Command, args []string) error { return run(cmd, v) }
+	cmd.RunE = func(cmd *cobra.Command, args []string) error { return runQuery(cmd, v) }
 
 	cmd.Flags().String("format", "table", "The output format {table|md|csv|tsv|simple}")
 	cmd.Flags().StringSlice("sort", []string{"file"}, "The sort `keys` {file|function|type|table|sha1}")
@@ -33,7 +32,7 @@ func NewCommand(v *viper.Viper, _ afero.Fs) *cobra.Command {
 	cmd.Flags().Bool("no-header", false, "Hide header")
 	cmd.Flags().Bool("no-rownum", false, "Hide row number")
 	cmd.Flags().Bool("full-package-path", false, "Show full package path")
-	option.SetQueryOptionFlags(cmd)
+	SetQueryOptionFlags(cmd)
 
 	return cmd
 }
@@ -41,7 +40,7 @@ func NewCommand(v *viper.Viper, _ afero.Fs) *cobra.Command {
 var headerColumns = []string{"package", "package-path", "file", "function", "type", "table", "related-tables", "sha1", "query", "raw-query"}
 var defaultHeaderIndex = []int{0, 1, 2, 3, 4, 5, 6, 7, 8}
 
-func run(cmd *cobra.Command, v *viper.Viper) error {
+func runQuery(cmd *cobra.Command, v *viper.Viper) error {
 	dir := v.GetString("dir")
 	pattern := v.GetString("pattern")
 	format := v.GetString("format")
@@ -50,7 +49,7 @@ func run(cmd *cobra.Command, v *viper.Viper) error {
 	noRowNum := v.GetBool("no-rownum")
 	sortKeys := v.GetStringSlice("sort")
 	showFullPackagePath := v.GetBool("full-package-path")
-	opt, err := option.QueryOptionFromViper(v)
+	opt, err := QueryOptionFromViper(v)
 	if err != nil {
 		return err
 	}
@@ -68,7 +67,7 @@ func run(cmd *cobra.Command, v *viper.Viper) error {
 	}
 	slices.SortFunc(queryGroups, sortQuery(sortKeys))
 
-	printOpt := &PrintOption{Cols: defaultHeaderIndex, NoHeader: noHeader, NoRowNum: noRowNum, ShowFullPackagePath: showFullPackagePath}
+	printOpt := &PrintQueryOption{Cols: defaultHeaderIndex, NoHeader: noHeader, NoRowNum: noRowNum, ShowFullPackagePath: showFullPackagePath}
 	if len(cols) > 0 {
 		printOpt.Cols = make([]int, 0, len(cols))
 		for _, col := range cols {
@@ -154,7 +153,7 @@ func sortQuery(sortKeys []string) func(a, b *query.QueryGroup) int {
 	}
 }
 
-type PrintOption struct {
+type PrintQueryOption struct {
 	Cols                []int
 	NoHeader            bool
 	NoRowNum            bool
@@ -164,7 +163,7 @@ type PrintOption struct {
 
 var pathDirRegex = regexp.MustCompile(`([^/]+)/`)
 
-func (opt *PrintOption) ShortenPackagePath(path string) string {
+func (opt *PrintQueryOption) ShortenPackagePath(path string) string {
 	if !opt.ShowFullPackagePath && opt.pkgBasePath != "" && strings.HasPrefix(path, opt.pkgBasePath) {
 		path = strings.TrimPrefix(path, opt.pkgBasePath)
 		return fmt.Sprintf("%s%s", pathDirRegex.ReplaceAllStringFunc(opt.pkgBasePath, func(m string) string { return m[:1] + "/" }), path)
@@ -172,7 +171,7 @@ func (opt *PrintOption) ShortenPackagePath(path string) string {
 	return path
 }
 
-func makeHeader(opt *PrintOption) []string {
+func makeHeader(opt *PrintQueryOption) []string {
 	header := make([]string, 0)
 	if !opt.NoRowNum {
 		header = append(header, "#")
@@ -184,7 +183,7 @@ func makeHeader(opt *PrintOption) []string {
 	return header
 }
 
-func row(q *query.Query, opt *PrintOption) []string {
+func row(q *query.Query, opt *PrintQueryOption) []string {
 	var tables string
 	if len(q.Tables) > 0 {
 		tables = strings.Join(q.Tables[1:], ", ")

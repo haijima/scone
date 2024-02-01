@@ -1,10 +1,9 @@
-package callgraph
+package main
 
 import (
 	"fmt"
 	"io"
 
-	"github.com/haijima/scone/cmd/scone/option"
 	"github.com/haijima/scone/internal/analysis"
 	"github.com/haijima/scone/internal/analysis/callgraph"
 	"github.com/haijima/scone/internal/analysis/query"
@@ -14,24 +13,24 @@ import (
 	"golang.org/x/exp/maps"
 )
 
-func NewCommand(v *viper.Viper, _ afero.Fs) *cobra.Command {
+func NewCallgraphCommand(v *viper.Viper, _ afero.Fs) *cobra.Command {
 	cmd := &cobra.Command{}
 	cmd.Use = "callgraph"
 	cmd.Short = "Generate a call graph"
 	cmd.RunE = func(cmd *cobra.Command, args []string) error {
-		return run(cmd, v)
+		return runCallgraph(cmd, v)
 	}
 
 	cmd.Flags().String("format", "dot", "The output format {dot|mermaid|text}")
-	option.SetQueryOptionFlags(cmd)
+	SetQueryOptionFlags(cmd)
 
 	return cmd
 }
 
-func run(cmd *cobra.Command, v *viper.Viper) error {
+func runCallgraph(cmd *cobra.Command, v *viper.Viper) error {
 	dir := v.GetString("dir")
 	pattern := v.GetString("pattern")
-	opt, err := option.QueryOptionFromViper(v)
+	opt, err := QueryOptionFromViper(v)
 	if err != nil {
 		return err
 	}

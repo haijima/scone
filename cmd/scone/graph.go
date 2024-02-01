@@ -1,4 +1,4 @@
-package table
+package main
 
 import mapset "github.com/deckarep/golang-set/v2"
 

@@ -1,4 +1,4 @@
-package option
+package main
 
 import (
 	"github.com/cockroachdb/errors"

@@ -1,4 +1,4 @@
-package table
+package main
 
 import (
 	"fmt"
@@ -8,7 +8,6 @@ import (
 
 	mapset "github.com/deckarep/golang-set/v2"
 	"github.com/fatih/color"
-	"github.com/haijima/scone/cmd/scone/option"
 	"github.com/haijima/scone/internal/analysis"
 	"github.com/haijima/scone/internal/analysis/analysisutil"
 	"github.com/haijima/scone/internal/analysis/callgraph"
@@ -22,23 +21,23 @@ import (
 	"golang.org/x/exp/maps"
 )
 
-func NewCommand(v *viper.Viper, _ afero.Fs) *cobra.Command {
+func NewTableCommand(v *viper.Viper, _ afero.Fs) *cobra.Command {
 	cmd := &cobra.Command{}
 	cmd.Use = "table"
 	cmd.Short = "List tables information from queries"
-	cmd.RunE = func(cmd *cobra.Command, args []string) error { return run(cmd, v) }
+	cmd.RunE = func(cmd *cobra.Command, args []string) error { return runTable(cmd, v) }
 
 	cmd.Flags().Bool("summary", false, "Print summary only")
-	option.SetQueryOptionFlags(cmd)
+	SetQueryOptionFlags(cmd)
 
 	return cmd
 }
 
-func run(cmd *cobra.Command, v *viper.Viper) error {
+func runTable(cmd *cobra.Command, v *viper.Viper) error {
 	dir := v.GetString("dir")
 	pattern := v.GetString("pattern")
 	summarizeOnly := v.GetBool("summary")
-	opt, err := option.QueryOptionFromViper(v)
+	opt, err := QueryOptionFromViper(v)
 	if err != nil {
 		return err
 	}
@@ -47,12 +46,12 @@ func run(cmd *cobra.Command, v *viper.Viper) error {
 	if err != nil {
 		return err
 	}
-	return printResult(cmd.OutOrStdout(), queryGroups, tables, cgs, PrintOption{SummarizeOnly: summarizeOnly})
+	return printResult(cmd.OutOrStdout(), queryGroups, tables, cgs, PrintTableOption{SummarizeOnly: summarizeOnly})
 }
 
-type PrintOption struct{ SummarizeOnly bool }
+type PrintTableOption struct{ SummarizeOnly bool }
 
-func printResult(w io.Writer, queryGroups []*query.QueryGroup, tables mapset.Set[string], cgs []*callgraph.CallGraph, opt PrintOption) error {
+func printResult(w io.Writer, queryGroups []*query.QueryGroup, tables mapset.Set[string], cgs []*callgraph.CallGraph, opt PrintTableOption) error {
 	filterColumns := util.NewSetMap[string, string]()
 	kindsMap := util.NewSetMap[string, query.QueryKind]()
 	for _, qg := range queryGroups {

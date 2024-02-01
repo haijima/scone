@@ -1,4 +1,4 @@
-package callgraph
+package main
 
 import (
 	"fmt"

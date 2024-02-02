@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/haijima/scone/internal"
 	"github.com/haijima/scone/internal/analysis"
 	"github.com/haijima/scone/internal/analysis/callgraph"
 	"github.com/haijima/scone/internal/analysis/query"
@@ -45,7 +46,7 @@ func runCallgraph(cmd *cobra.Command, v *viper.Viper) error {
 
 func printGraphviz(w io.Writer, cgs []*callgraph.CallGraph) error {
 	//c := &DotCluster{ID: "callgraph", Clusters: make(map[string]*DotCluster), Nodes: make([]*DotNode, 0), Attrs: make(DotAttrs)}
-	g := &DotGraph{Nodes: make([]*DotNode, 0), Edges: make([]*DotEdge, 0)}
+	g := &internal.DotGraph{Nodes: make([]*internal.DotNode, 0), Edges: make([]*internal.DotEdge, 0)}
 
 	for _, cg := range cgs {
 		pkg := cg.Package.Path()
@@ -53,7 +54,7 @@ func printGraphviz(w io.Writer, cgs []*callgraph.CallGraph) error {
 			// Print edges
 			for _, edge := range node.Out {
 				if edge.SqlValue != nil {
-					attrs := make(DotAttrs)
+					attrs := make(internal.DotAttrs)
 					attrs["weight"] = "100"
 					switch edge.SqlValue.Kind {
 					case query.Select:
@@ -67,15 +68,15 @@ func printGraphviz(w io.Writer, cgs []*callgraph.CallGraph) error {
 						attrs["color"] = "red"
 					default:
 					}
-					g.Edges = append(g.Edges, &DotEdge{From: fmt.Sprintf("%s.%s", pkg, edge.Caller), To: edge.Callee, Attrs: attrs})
-					g.Nodes = append(g.Nodes, &DotNode{ID: fmt.Sprintf("%s.%s", pkg, edge.Caller), Attrs: map[string]string{"label": edge.Caller}})
+					g.Edges = append(g.Edges, &internal.DotEdge{From: fmt.Sprintf("%s.%s", pkg, edge.Caller), To: edge.Callee, Attrs: attrs})
+					g.Nodes = append(g.Nodes, &internal.DotNode{ID: fmt.Sprintf("%s.%s", pkg, edge.Caller), Attrs: map[string]string{"label": edge.Caller}})
 				} else {
-					attrs := make(DotAttrs)
+					attrs := make(internal.DotAttrs)
 					attrs["style"] = "dashed"
 					attrs["weight"] = "100"
-					g.Edges = append(g.Edges, &DotEdge{From: fmt.Sprintf("%s.%s", pkg, edge.Caller), To: fmt.Sprintf("%s.%s", pkg, edge.Callee), Attrs: attrs})
-					g.Nodes = append(g.Nodes, &DotNode{ID: fmt.Sprintf("%s.%s", pkg, edge.Caller), Attrs: map[string]string{"label": edge.Caller}})
-					g.Nodes = append(g.Nodes, &DotNode{ID: fmt.Sprintf("%s.%s", pkg, edge.Callee), Attrs: map[string]string{"label": edge.Callee}})
+					g.Edges = append(g.Edges, &internal.DotEdge{From: fmt.Sprintf("%s.%s", pkg, edge.Caller), To: fmt.Sprintf("%s.%s", pkg, edge.Callee), Attrs: attrs})
+					g.Nodes = append(g.Nodes, &internal.DotNode{ID: fmt.Sprintf("%s.%s", pkg, edge.Caller), Attrs: map[string]string{"label": edge.Caller}})
+					g.Nodes = append(g.Nodes, &internal.DotNode{ID: fmt.Sprintf("%s.%s", pkg, edge.Callee), Attrs: map[string]string{"label": edge.Callee}})
 				}
 			}
 		}
@@ -125,7 +126,7 @@ func printGraphviz(w io.Writer, cgs []*callgraph.CallGraph) error {
 
 		for n, k := range selectOnlyNodes {
 			name := fmt.Sprintf("%s.%s", cg.Package.Path(), n)
-			attr := make(DotAttrs)
+			attr := make(internal.DotAttrs)
 			if k == query.Select {
 				attr["color"] = "blue"
 				attr["fillcolor"] = "lightblue1"
@@ -142,7 +143,7 @@ func printGraphviz(w io.Writer, cgs []*callgraph.CallGraph) error {
 				attr["style"] = "bold"
 				attr["shape"] = "box"
 			}
-			g.Nodes = append(g.Nodes, &DotNode{ID: name, Attrs: attr})
+			g.Nodes = append(g.Nodes, &internal.DotNode{ID: name, Attrs: attr})
 		}
 
 		// Reset
@@ -163,10 +164,10 @@ func printGraphviz(w io.Writer, cgs []*callgraph.CallGraph) error {
 			}
 		}
 	}
-	g.Ranks = append(g.Ranks, &DotRank{Name: "min", Nodes: maps.Keys(minNodeNames)})
-	g.Ranks = append(g.Ranks, &DotRank{Name: "max", Nodes: maps.Keys(maxNodeNames)})
+	g.Ranks = append(g.Ranks, &internal.DotRank{Name: "min", Nodes: maps.Keys(minNodeNames)})
+	g.Ranks = append(g.Ranks, &internal.DotRank{Name: "max", Nodes: maps.Keys(maxNodeNames)})
 
-	return WriteDotGraph(w, *g)
+	return internal.WriteDotGraph(w, *g)
 }
 
 func showLegend(w io.Writer) {

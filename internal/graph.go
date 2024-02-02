@@ -1,19 +1,19 @@
-package main
+package internal
 
 import mapset "github.com/deckarep/golang-set/v2"
 
 // Graph
 type Graph struct {
-	edges   map[string][]string
+	Edges   map[string][]string
 	visited map[string]bool
-	nodeMap map[string]bool
+	NodeMap map[string]bool
 }
 
 func NewGraph(nodes ...string) *Graph {
 	g := &Graph{
-		edges:   make(map[string][]string),
+		Edges:   make(map[string][]string),
 		visited: make(map[string]bool),
-		nodeMap: make(map[string]bool),
+		NodeMap: make(map[string]bool),
 	}
 	for _, node := range nodes {
 		g.AddNode(node)
@@ -22,18 +22,18 @@ func NewGraph(nodes ...string) *Graph {
 }
 
 func (g *Graph) AddNode(node string) {
-	g.nodeMap[node] = true
+	g.NodeMap[node] = true
 }
 
 func (g *Graph) AddEdge(u, v string) {
-	g.edges[u] = append(g.edges[u], v)
-	g.edges[v] = append(g.edges[v], u)
+	g.Edges[u] = append(g.Edges[u], v)
+	g.Edges[v] = append(g.Edges[v], u)
 }
 
 func (g *Graph) DFS(node string, component *mapset.Set[string]) {
 	g.visited[node] = true
 	(*component).Add(node)
-	for _, v := range g.edges[node] {
+	for _, v := range g.Edges[node] {
 		if !g.visited[v] {
 			g.DFS(v, component)
 		}
@@ -42,7 +42,7 @@ func (g *Graph) DFS(node string, component *mapset.Set[string]) {
 
 func (g *Graph) FindConnectedComponents() []mapset.Set[string] {
 	var components []mapset.Set[string]
-	for node := range g.nodeMap {
+	for node := range g.NodeMap {
 		if !g.visited[node] {
 			component := mapset.NewSet[string]()
 			g.DFS(node, &component)

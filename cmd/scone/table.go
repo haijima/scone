@@ -8,6 +8,7 @@ import (
 
 	mapset "github.com/deckarep/golang-set/v2"
 	"github.com/fatih/color"
+	"github.com/haijima/scone/internal"
 	"github.com/haijima/scone/internal/analysis"
 	"github.com/haijima/scone/internal/analysis/analysisutil"
 	"github.com/haijima/scone/internal/analysis/callgraph"
@@ -76,7 +77,7 @@ func printResult(w io.Writer, queryGroups []*query.QueryGroup, tables mapset.Set
 }
 
 func clusterize(tables mapset.Set[string], queryGroups []*query.QueryGroup, cgs []*callgraph.CallGraph) ([]mapset.Set[string], map[string]mapset.Set[string]) {
-	g := NewGraph(tables.ToSlice()...) // Create a graph with tables as nodes
+	g := internal.NewGraph(tables.ToSlice()...) // Create a graph with tables as nodes
 
 	// Extract tables updated in the same transaction
 	for _, cg := range cgs {
@@ -120,7 +121,7 @@ func clusterize(tables mapset.Set[string], queryGroups []*query.QueryGroup, cgs 
 	collocationMap := util.NewSetMap[string, string]()
 	for _, t := range tables.ToSlice() {
 		collocationMap.Add(t, t)
-		for _, e := range g.edges[t] {
+		for _, e := range g.Edges[t] {
 			collocationMap.Add(t, e)
 		}
 	}

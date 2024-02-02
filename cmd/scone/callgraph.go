@@ -44,39 +44,38 @@ func runCallgraph(cmd *cobra.Command, v *viper.Viper) error {
 }
 
 func printGraphviz(w io.Writer, cgs []*callgraph.CallGraph) error {
-	fmt.Fprintln(w, "digraph {")
-	fmt.Fprintln(w, "\trankdir=\"LR\"")
-	fmt.Fprintln(w)
+	//c := &DotCluster{ID: "callgraph", Clusters: make(map[string]*DotCluster), Nodes: make([]*DotNode, 0), Attrs: make(DotAttrs)}
+	g := &DotGraph{Nodes: make([]*DotNode, 0), Edges: make([]*DotEdge, 0)}
 
-	showLegend(w)
-
-	fmt.Fprintln(w, "\tsubgraph callgraph {")
 	for _, cg := range cgs {
+		pkg := cg.Package.Path()
 		for _, node := range cg.Nodes {
 			// Print edges
 			for _, edge := range node.Out {
 				if edge.SqlValue != nil {
-					gve := &GraphvizEdge{From: fmt.Sprintf("%s%s", cg.Package.Path(), edge.Caller), To: edge.Callee, Style: "bold", Weight: 100}
-					fmt.Fprintf(w, "\t\"%s%s\"[label=\"%s\"]\n", cg.Package.Path(), edge.Caller, edge.Caller)
+					attrs := make(DotAttrs)
+					attrs["weight"] = "100"
 					switch edge.SqlValue.Kind {
 					case query.Select:
-						gve.Style = "dotted"
-						gve.Weight = 1
+						attrs["style"] = "dotted"
+						//attrs["weight"] = "1"
 					case query.Insert:
-						gve.Color = "green"
+						attrs["color"] = "green"
 					case query.Update:
-						gve.Color = "orange"
+						attrs["color"] = "orange"
 					case query.Delete:
-						gve.Color = "red"
+						attrs["color"] = "red"
 					default:
 					}
-					fmt.Fprintln(w, gve)
+					g.Edges = append(g.Edges, &DotEdge{From: fmt.Sprintf("%s.%s", pkg, edge.Caller), To: edge.Callee, Attrs: attrs})
+					g.Nodes = append(g.Nodes, &DotNode{ID: fmt.Sprintf("%s.%s", pkg, edge.Caller), Attrs: map[string]string{"label": edge.Caller}})
 				} else {
-					gve := &GraphvizEdge{From: fmt.Sprintf("%s%s", cg.Package.Path(), edge.Caller), To: fmt.Sprintf("%s%s", cg.Package.Path(), edge.Callee), Style: "bold", Weight: 100}
-					fmt.Fprintf(w, "\t\"%s%s\"[label=\"%s\"]\n", cg.Package.Path(), edge.Caller, edge.Caller)
-					fmt.Fprintf(w, "\t\"%s%s\"[label=\"%s\"]\n", cg.Package.Path(), edge.Callee, edge.Callee)
-					gve.Style = "dashed"
-					fmt.Fprintln(w, gve)
+					attrs := make(DotAttrs)
+					attrs["style"] = "dashed"
+					attrs["weight"] = "100"
+					g.Edges = append(g.Edges, &DotEdge{From: fmt.Sprintf("%s.%s", pkg, edge.Caller), To: fmt.Sprintf("%s.%s", pkg, edge.Callee), Attrs: attrs})
+					g.Nodes = append(g.Nodes, &DotNode{ID: fmt.Sprintf("%s.%s", pkg, edge.Caller), Attrs: map[string]string{"label": edge.Caller}})
+					g.Nodes = append(g.Nodes, &DotNode{ID: fmt.Sprintf("%s.%s", pkg, edge.Callee), Attrs: map[string]string{"label": edge.Callee}})
 				}
 			}
 		}
@@ -125,25 +124,25 @@ func printGraphviz(w io.Writer, cgs []*callgraph.CallGraph) error {
 		}
 
 		for n, k := range selectOnlyNodes {
-			gvn := &GraphvizNode{Name: fmt.Sprintf("%s%s", cg.Package.Path(), n), Style: "bold,filled", FontSize: "21"}
+			name := fmt.Sprintf("%s.%s", cg.Package.Path(), n)
+			attr := make(DotAttrs)
 			if k == query.Select {
-				gvn.Color = "blue"
-				gvn.FillColor = "lightblue1"
+				attr["color"] = "blue"
+				attr["fillcolor"] = "lightblue1"
 			} else if k == query.Insert {
-				gvn.Color = "green"
-				gvn.FillColor = "darkolivegreen1"
+				attr["color"] = "green"
+				attr["fillcolor"] = "darkolivegreen1"
 			} else if k == query.Update {
-				gvn.Style = "solid"
-				gvn.Color = "orange"
+				attr["color"] = "orange"
 			} else if k == query.Delete {
-				gvn.Style = "solid"
-				gvn.Color = "red"
+				attr["color"] = "red"
 			}
 			if cg.Nodes[n].Func == nil {
-				gvn.Name = n
-				gvn.Shape = "box"
+				name = n
+				attr["style"] = "bold"
+				attr["shape"] = "box"
 			}
-			fmt.Fprintln(w, gvn)
+			g.Nodes = append(g.Nodes, &DotNode{ID: name, Attrs: attr})
 		}
 
 		// Reset
@@ -160,16 +159,14 @@ func printGraphviz(w io.Writer, cgs []*callgraph.CallGraph) error {
 			if node.Func == nil {
 				maxNodeNames[node.Name] = true
 			} else if len(node.In) == 0 {
-				minNodeNames[fmt.Sprintf("%s%s", cg.Package.Path(), node.Name)] = true
+				minNodeNames[fmt.Sprintf("%s.%s", cg.Package.Path(), node.Name)] = true
 			}
 		}
 	}
-	fmt.Fprintln(w, GraphvizRank("min", maps.Keys(minNodeNames)...))
-	fmt.Fprintln(w, GraphvizRank("max", maps.Keys(maxNodeNames)...))
+	g.Ranks = append(g.Ranks, &DotRank{Name: "min", Nodes: maps.Keys(minNodeNames)})
+	g.Ranks = append(g.Ranks, &DotRank{Name: "max", Nodes: maps.Keys(maxNodeNames)})
 
-	fmt.Fprintln(w, "\t}")
-	fmt.Fprintln(w, "}")
-	return nil
+	return WriteDotGraph(w, *g)
 }
 
 func showLegend(w io.Writer) {

@@ -17,7 +17,7 @@ import (
 	"golang.org/x/tools/go/ssa"
 )
 
-func getQueriesInComment(ssaProg *buildssa.SSA, files []*ast.File, opt *Option) []*QueryGroup {
+func getQueryGroupsInComment(ssaProg *buildssa.SSA, files []*ast.File, opt *Option) []*QueryGroup {
 	foundQueryGroups := make([]*QueryGroup, 0)
 
 	commentPrefix := "// scone:sql"
@@ -58,7 +58,7 @@ func analyzeFuncBySsaConst(pkg *ssa.Package, fn *ssa.Function, pos []token.Pos, 
 	foundQueryGroups := make([]*QueryGroup, 0)
 	for _, block := range fn.Blocks {
 		for _, instr := range block.Instrs {
-			foundQueryGroups = append(foundQueryGroups, analyzeInstr(pkg, instr, append([]token.Pos{fn.Pos()}, pos...), opt)...)
+			foundQueryGroups = append(foundQueryGroups, instructionToQueryGroups(pkg, instr, append([]token.Pos{fn.Pos()}, pos...), opt)...)
 		}
 	}
 	for _, anon := range fn.AnonFuncs {
@@ -67,25 +67,25 @@ func analyzeFuncBySsaConst(pkg *ssa.Package, fn *ssa.Function, pos []token.Pos, 
 	return foundQueryGroups
 }
 
-func analyzeInstr(pkg *ssa.Package, instr ssa.Instruction, pos []token.Pos, opt *Option) []*QueryGroup {
+func instructionToQueryGroups(pkg *ssa.Package, instr ssa.Instruction, pos []token.Pos, opt *Option) []*QueryGroup {
 	switch i := instr.(type) {
 	case *ssa.Call:
-		return callToQueries(pkg, i, instr.Parent(), pos, opt)
+		return callToQueryGroups(pkg, i, instr.Parent(), pos, opt)
 	case *ssa.Phi:
-		return []*QueryGroup{phiToQueries(pkg, i, instr.Parent(), pos, opt)}
+		return []*QueryGroup{phiToQueryGroup(pkg, i, instr.Parent(), pos, opt)}
 	}
 	return []*QueryGroup{}
 }
 
-func callToQueries(pkg *ssa.Package, i *ssa.Call, fn *ssa.Function, pos []token.Pos, opt *Option) []*QueryGroup {
+func callToQueryGroups(pkg *ssa.Package, i *ssa.Call, fn *ssa.Function, pos []token.Pos, opt *Option) []*QueryGroup {
 	res := make([]*QueryGroup, 0)
 	pos = append([]token.Pos{i.Pos()}, pos...)
 	for _, arg := range i.Common().Args {
 		switch a := arg.(type) {
 		case *ssa.Phi:
-			res = append(res, phiToQueries(pkg, a, fn, pos, opt))
+			res = append(res, phiToQueryGroup(pkg, a, fn, pos, opt))
 		case *ssa.Const:
-			if q, ok := constToQuery(pkg, a, fn, pos, opt); ok {
+			if q, ok := constToQueryGroup(pkg, a, fn, pos, opt); ok {
 				res = append(res, q)
 			}
 		}
@@ -93,12 +93,12 @@ func callToQueries(pkg *ssa.Package, i *ssa.Call, fn *ssa.Function, pos []token.
 	return res
 }
 
-func phiToQueries(pkg *ssa.Package, a *ssa.Phi, fn *ssa.Function, pos []token.Pos, opt *Option) *QueryGroup {
+func phiToQueryGroup(pkg *ssa.Package, a *ssa.Phi, fn *ssa.Function, pos []token.Pos, opt *Option) *QueryGroup {
 	qg := &QueryGroup{}
 	for _, edge := range a.Edges {
 		switch e := edge.(type) {
 		case *ssa.Const:
-			if qg, ok := constToQuery(pkg, e, fn, append([]token.Pos{a.Pos()}, pos...), opt); ok {
+			if qg, ok := constToQueryGroup(pkg, e, fn, append([]token.Pos{a.Pos()}, pos...), opt); ok {
 				qg.List = append(qg.List, qg.List...)
 			}
 		}
@@ -106,7 +106,7 @@ func phiToQueries(pkg *ssa.Package, a *ssa.Phi, fn *ssa.Function, pos []token.Po
 	return qg
 }
 
-func constToQuery(pkg *ssa.Package, a *ssa.Const, fn *ssa.Function, pos []token.Pos, opt *Option) (*QueryGroup, bool) {
+func constToQueryGroup(pkg *ssa.Package, a *ssa.Const, fn *ssa.Function, pos []token.Pos, opt *Option) (*QueryGroup, bool) {
 	if a.Value != nil && a.Value.Kind() == constant.String {
 		if q, ok := toSqlQuery(a.Value.ExactString()); ok {
 			q.Func = fn

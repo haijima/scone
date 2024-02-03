@@ -36,7 +36,7 @@ func ExtractQuery(ssaProg *buildssa.SSA, files []*ast.File, opt *Option) (*Resul
 	opt.isIgnoredFunc = func(pos token.Pos) bool { return false }
 
 	// Get queries from comments
-	foundQueryGroups = append(foundQueryGroups, getQueriesInComment(ssaProg, files, opt)...)
+	foundQueryGroups = append(foundQueryGroups, getQueryGroupsInComment(ssaProg, files, opt)...)
 
 	//ignoreCommentPrefix := "// scone:ignore"
 	for _, file := range files {

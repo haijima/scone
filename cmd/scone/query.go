@@ -32,6 +32,7 @@ func NewQueryCommand(v *viper.Viper, _ afero.Fs) *cobra.Command {
 	cmd.Flags().Bool("no-header", false, "Hide header")
 	cmd.Flags().Bool("no-rownum", false, "Hide row number")
 	cmd.Flags().Bool("full-package-path", false, "Show full package path")
+	cmd.Flags().Bool("expand-query-group", false, "Expand query group")
 	SetQueryOptionFlags(cmd)
 
 	return cmd
@@ -48,6 +49,7 @@ func runQuery(cmd *cobra.Command, v *viper.Viper) error {
 	noHeader := v.GetBool("no-header")
 	noRowNum := v.GetBool("no-rownum")
 	sortKeys := v.GetStringSlice("sort")
+	expandQueryGroup := v.GetBool("expand-query-group")
 	showFullPackagePath := v.GetBool("full-package-path")
 	opt, err := QueryOptionFromViper(v)
 	if err != nil {
@@ -67,7 +69,7 @@ func runQuery(cmd *cobra.Command, v *viper.Viper) error {
 	}
 	slices.SortFunc(queryGroups, sortQuery(sortKeys))
 
-	printOpt := &PrintQueryOption{Cols: defaultHeaderIndex, NoHeader: noHeader, NoRowNum: noRowNum, ShowFullPackagePath: showFullPackagePath}
+	printOpt := &PrintQueryOption{Cols: defaultHeaderIndex, NoHeader: noHeader, NoRowNum: noRowNum, ExpandQueryGroup: expandQueryGroup, ShowFullPackagePath: showFullPackagePath}
 	if len(cols) > 0 {
 		printOpt.Cols = make([]int, 0, len(cols))
 		for _, col := range cols {
@@ -107,19 +109,20 @@ func runQuery(cmd *cobra.Command, v *viper.Viper) error {
 		p.SetHeader(makeHeader(printOpt))
 	}
 	for i, qg := range queryGroups {
-		q := qg.List[0]
-		//for _, q := range qg.List {
-		r := row(q, printOpt)
 		phi := ""
 		if len(qg.List) > 1 {
 			phi = "P"
 		}
-		r = append([]string{phi}, r...)
-		if !printOpt.NoRowNum {
-			r = append([]string{strconv.Itoa(i + 1)}, r...)
+		for _, q := range qg.List {
+			r := append([]string{phi}, row(q, printOpt)...)
+			if !printOpt.NoRowNum {
+				r = append([]string{strconv.Itoa(i + 1)}, r...)
+			}
+			p.AddRow(r)
+			if !expandQueryGroup {
+				break
+			}
 		}
-		p.AddRow(r)
-		//}
 	}
 	return p.Print()
 }
@@ -157,6 +160,7 @@ type PrintQueryOption struct {
 	Cols                []int
 	NoHeader            bool
 	NoRowNum            bool
+	ExpandQueryGroup    bool
 	ShowFullPackagePath bool
 	pkgBasePath         string
 }

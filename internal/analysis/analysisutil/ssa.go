@@ -53,8 +53,8 @@ func ConstLikeStringValues(v ssa.Value) ([]string, bool) {
 	case *ssa.Call:
 		common := t.Common()
 		if cvFn, ok := common.Value.(*ssa.Function); ok {
-			// fmt.Sprintf
 			if cvFn.Pkg != nil && cvFn.Pkg.Pkg.Path() == "fmt" && cvFn.Name() == "Sprintf" {
+				// fmt.Sprintf
 				if fs, ok := ConstLikeStringValues(t.Call.Args[0]); ok && len(fs) == 1 {
 					f := fmtVerbRegexp.ReplaceAllStringFunc(fs[0], func(s string) string {
 						m := fmtVerbRegexp.FindAllStringSubmatch(s, 1)
@@ -89,6 +89,39 @@ func ConstLikeStringValues(v ssa.Value) ([]string, bool) {
 					if !fmtVerbRegexp.MatchString(f) {
 						return []string{f}, true
 					}
+				}
+			} else if cvFn.Pkg != nil && cvFn.Pkg.Pkg.Path() == "strings" && cvFn.Name() == "Join" {
+				// strings.Join
+				joiner, ok := ConstLikeStringValues(t.Call.Args[1])
+				if !ok || len(joiner) != 1 {
+					return []string{}, false
+				}
+				firstArg := t.Call.Args[0]
+				astArgs := make([]string, 0)
+				ast.Inspect(v.Parent().Syntax(), func(n ast.Node) bool {
+					if n == nil {
+						return false
+					}
+					if n.Pos() <= firstArg.Pos() && firstArg.Pos() < n.End() {
+						if cl, ok := n.(*ast.CompositeLit); ok {
+							for _, elt := range cl.Elts {
+								if bl, ok := elt.(*ast.BasicLit); ok {
+									if unquoted, err := Unquote(bl.Value); err == nil {
+										astArgs = append(astArgs, unquoted)
+									}
+								}
+							}
+							if len(astArgs) != len(cl.Elts) {
+								// not all elements are constant or some elements are failed to unquote
+								astArgs = []string{}
+							}
+							return false
+						}
+					}
+					return true
+				})
+				if len(astArgs) > 0 {
+					return []string{strings.Join(astArgs, joiner[0])}, true
 				}
 			}
 		}

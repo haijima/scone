@@ -110,17 +110,21 @@ func runQuery(cmd *cobra.Command, v *viper.Viper) error {
 	}
 	for i, qg := range queryGroups {
 		phi := ""
-		if len(qg.List) > 1 {
-			phi = "P"
-		}
-		for _, q := range qg.List {
+		for j, q := range qg.List {
+			if len(qg.List) > 1 {
+				if expandQueryGroup {
+					phi = fmt.Sprintf("P%d", j+1)
+				} else {
+					phi = "P"
+				}
+			}
 			r := append([]string{phi}, row(q, printOpt)...)
 			if !printOpt.NoRowNum {
 				r = append([]string{strconv.Itoa(i + 1)}, r...)
 			}
 			p.AddRow(r)
 			if !expandQueryGroup {
-				break
+				break // only print the first query in the group
 			}
 		}
 	}

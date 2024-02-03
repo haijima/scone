@@ -7,7 +7,6 @@ import (
 	"go/constant"
 	"go/token"
 	"log/slog"
-	"path/filepath"
 	"slices"
 	"strconv"
 	"strings"
@@ -214,8 +213,7 @@ func analyzeFuncBySsaMethod(pkg *ssa.Package, fn *ssa.Function, pos []token.Pos,
 }
 
 func constLikeStringValueToQueryGroup(pkg *ssa.Package, v ssa.Value, fn *ssa.Function, pos []token.Pos, opt *Option) (*QueryGroup, bool) {
-	position := analysisutil.GetPosition(pkg, append([]token.Pos{v.Pos()}, pos...))
-	file := fmt.Sprintf("%s:%d:%d", filepath.Base(position.Filename), position.Line, position.Column)
+	file := analysisutil.FLC(analysisutil.GetPosition(pkg, append([]token.Pos{v.Pos()}, pos...)))
 	if as, ok := analysisutil.ConstLikeStringValues(v); ok {
 		qg := &QueryGroup{}
 		for _, a := range as {

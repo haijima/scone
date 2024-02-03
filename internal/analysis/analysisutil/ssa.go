@@ -20,113 +20,137 @@ func GetPosition(pkg *ssa.Package, pos []token.Pos) token.Position {
 	return pkg.Prog.Fset.Position(pos[i])
 }
 
-var fmtVerbRegexp = regexp.MustCompile(`(^|[^%]|(?:%%)+)(%(?:-?\d+|\+|#)?)(\w)`)
-
 func ConstLikeStringValues(v ssa.Value) ([]string, bool) {
 	switch t := v.(type) {
 	case *ssa.Const:
-		if t.Value != nil && t.Value.Kind() == constant.String {
-			if s, err := Unquote(t.Value.ExactString()); err == nil {
-				return []string{s}, true
-			}
-		}
+		return constToStrings(t)
 	case *ssa.BinOp:
-		x, xok := ConstLikeStringValues(t.X)
-		y, yok := ConstLikeStringValues(t.Y)
-		if xok && yok && t.Op == token.ADD {
-			res := make([]string, 0, len(x)*len(y))
-			for _, xx := range x {
-				for _, yy := range y {
-					res = append(res, xx+yy)
-				}
-			}
-			return res, len(res) > 0
-		}
+		return binOpToStrings(t)
 	case *ssa.Phi:
-		res := make([]string, 0, len(t.Edges))
-		for _, edge := range t.Edges {
-			if c, ok := ConstLikeStringValues(edge); ok {
-				res = append(res, c...)
-			}
-		}
-		return res, len(res) > 0
+		return phiToStrings(t)
 	case *ssa.Call:
-		common := t.Common()
-		if cvFn, ok := common.Value.(*ssa.Function); ok {
+		if cvFn, ok := t.Common().Value.(*ssa.Function); ok {
 			if cvFn.Pkg != nil && cvFn.Pkg.Pkg.Path() == "fmt" && cvFn.Name() == "Sprintf" {
-				// fmt.Sprintf
-				if fs, ok := ConstLikeStringValues(t.Call.Args[0]); ok && len(fs) == 1 {
-					f := fmtVerbRegexp.ReplaceAllStringFunc(fs[0], func(s string) string {
-						m := fmtVerbRegexp.FindAllStringSubmatch(s, 1)
-						if m == nil || len(m) < 1 || len(m[0]) < 4 {
-							return s
-						}
-						switch m[0][3] {
-						case "b":
-							return m[0][1] + "01"
-						case "c":
-							return m[0][1] + "a"
-						case "t":
-							return m[0][1] + "true"
-						case "T":
-							return m[0][1] + "string"
-						case "e":
-							return m[0][1] + "1.234000e+08"
-						case "E":
-							return m[0][1] + "1.234000E+08"
-						case "p":
-							return m[0][1] + "0xc0000ba000"
-						case "x":
-							return m[0][1] + "1f"
-						case "d":
-							return m[0][1] + "1"
-						case "f":
-							return m[0][1] + "1.0"
-						default:
-							return s
-						}
-					})
-					if !fmtVerbRegexp.MatchString(f) {
-						return []string{f}, true
-					}
-				}
+				return fmtSprintfToStrings(t)
 			} else if cvFn.Pkg != nil && cvFn.Pkg.Pkg.Path() == "strings" && cvFn.Name() == "Join" {
-				// strings.Join
-				joiner, ok := ConstLikeStringValues(t.Call.Args[1])
-				if !ok || len(joiner) != 1 {
-					return []string{}, false
-				}
-				firstArg := t.Call.Args[0]
-				astArgs := make([]string, 0)
-				ast.Inspect(v.Parent().Syntax(), func(n ast.Node) bool {
-					if n == nil {
-						return false
-					}
-					if n.Pos() <= firstArg.Pos() && firstArg.Pos() < n.End() {
-						if cl, ok := n.(*ast.CompositeLit); ok {
-							for _, elt := range cl.Elts {
-								if bl, ok := elt.(*ast.BasicLit); ok {
-									if unquoted, err := Unquote(bl.Value); err == nil {
-										astArgs = append(astArgs, unquoted)
-									}
-								}
-							}
-							if len(astArgs) != len(cl.Elts) {
-								// not all elements are constant or some elements are failed to unquote
-								astArgs = []string{}
-							}
-							return false
-						}
-					}
-					return true
-				})
-				if len(astArgs) > 0 {
-					return []string{strings.Join(astArgs, joiner[0])}, true
-				}
+				return stringsJoinToStrings(t)
 			}
 		}
 	}
 	return []string{}, false
+}
+
+func constToStrings(t *ssa.Const) ([]string, bool) {
+	if t.Value != nil && t.Value.Kind() == constant.String {
+		if s, err := Unquote(t.Value.ExactString()); err == nil {
+			return []string{s}, true
+		}
+	}
+	return []string{}, false
+}
+
+func binOpToStrings(t *ssa.BinOp) ([]string, bool) {
+	x, xok := ConstLikeStringValues(t.X)
+	y, yok := ConstLikeStringValues(t.Y)
+	if xok && yok && len(x) > 0 && len(y) > 0 && t.Op == token.ADD {
+		res := make([]string, 0, len(x)*len(y))
+		for _, xx := range x {
+			for _, yy := range y {
+				res = append(res, xx+yy)
+			}
+		}
+		return res, true
+	}
+	return []string{}, false
+}
+
+func phiToStrings(t *ssa.Phi) ([]string, bool) {
+	res := make([]string, 0, len(t.Edges))
+	for _, edge := range t.Edges {
+		if c, ok := ConstLikeStringValues(edge); ok {
+			res = append(res, c...)
+		}
+	}
+	return res, len(res) > 0
+}
+
+var fmtVerbRegexp = regexp.MustCompile(`(^|[^%]|(?:%%)+)(%(?:-?\d+|\+|#)?)(\w)`)
+
+// fmtSprintfToStrings returns the possible string values of fmt.Sprintf.
+func fmtSprintfToStrings(t *ssa.Call) ([]string, bool) {
+	fs, ok := ConstLikeStringValues(t.Call.Args[0])
+	if !ok && len(fs) == 1 {
+		return []string{}, false
+	}
+	f := fmtVerbRegexp.ReplaceAllStringFunc(fs[0], func(s string) string {
+		m := fmtVerbRegexp.FindAllStringSubmatch(s, 1)
+		if m == nil || len(m) < 1 || len(m[0]) < 4 {
+			return s
+		}
+		switch m[0][3] {
+		case "b":
+			return m[0][1] + "01"
+		case "c":
+			return m[0][1] + "a"
+		case "t":
+			return m[0][1] + "true"
+		case "T":
+			return m[0][1] + "string"
+		case "e":
+			return m[0][1] + "1.234000e+08"
+		case "E":
+			return m[0][1] + "1.234000E+08"
+		case "p":
+			return m[0][1] + "0xc0000ba000"
+		case "x":
+			return m[0][1] + "1f"
+		case "d":
+			return m[0][1] + "1"
+		case "f":
+			return m[0][1] + "1.0"
+		default:
+			return s
+		}
+	})
+	if !fmtVerbRegexp.MatchString(f) { // no more verbs
+		return []string{f}, true
+	}
+	return []string{}, false
+}
+
+// stringsJoinToStrings returns the possible string values of strings.Join.
+func stringsJoinToStrings(t *ssa.Call) ([]string, bool) {
+	// strings.Join
+	joiner, ok := ConstLikeStringValues(t.Call.Args[1])
+	if !ok || len(joiner) != 1 {
+		return []string{}, false
+	}
+	firstArg := t.Call.Args[0]
+	astArgs := make([]string, 0)
+	ast.Inspect(t.Parent().Syntax(), func(n ast.Node) bool {
+		if n == nil {
+			return false
+		}
+		if cl, ok := n.(*ast.CompositeLit); ok && n.Pos() <= firstArg.Pos() && firstArg.Pos() < n.End() {
+			for _, elt := range cl.Elts {
+				if bl, ok := elt.(*ast.BasicLit); ok {
+					if unquoted, err := Unquote(bl.Value); err == nil {
+						astArgs = append(astArgs, unquoted)
+					}
+				}
+			}
+			if len(astArgs) != len(cl.Elts) {
+				// not all elements are constant or some elements are failed to unquote
+				astArgs = []string{}
+			}
+			return false
+		}
+		return true
+	})
+	if len(astArgs) > 0 {
+		return []string{strings.Join(astArgs, joiner[0])}, true
+	}
+	return nil, false
 }
 
 func Unquote(str string) (string, error) {

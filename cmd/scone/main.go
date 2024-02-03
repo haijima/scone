@@ -1,6 +1,8 @@
 package main
 
 import (
+	"context"
+	"flag"
 	"fmt"
 	"log/slog"
 	"os"
@@ -23,13 +25,17 @@ func init() {
 		// Colorization settings
 		color.NoColor = color.NoColor || v.GetBool("no-color")
 		// Set Logger
-		l := slog.New(tint.NewHandler(rootCmd.ErrOrStderr(), &tint.Options{Level: cobrax.VerbosityLevel(v), NoColor: color.NoColor, TimeFormat: time.Kitchen}))
+		lv := cobrax.VerbosityLevel(v)
+		l := slog.New(tint.NewHandler(rootCmd.ErrOrStderr(), &tint.Options{Level: lv, AddSource: lv < slog.LevelDebug, NoColor: color.NoColor, TimeFormat: time.Kitchen}))
 		slog.SetDefault(l)
 		cobrax.SetLogger(l)
 	})
 }
 
 func main() {
+	flag.Parse()
+	flag.CommandLine.PrintDefaults()
+	slog.SetDefault(slog.New(tint.NewHandler(colorable.NewColorableStderr(), &tint.Options{Level: slog.LevelError, NoColor: color.NoColor, TimeFormat: time.Kitchen})))
 	v = viper.NewWithOptions(viper.WithLogger(slog.Default()))
 	fs := afero.NewOsFs()
 	v.SetFs(fs)
@@ -37,7 +43,11 @@ func main() {
 	rootCmd.SetOut(colorable.NewColorableStdout())
 	rootCmd.SetErr(colorable.NewColorableStderr())
 	if err := rootCmd.Execute(); err != nil {
-		slog.Error(fmt.Sprintf("%+v", err))
+		if slog.Default().Enabled(context.Background(), slog.LevelInfo) {
+			slog.Error(fmt.Sprintf("%+v", err))
+		} else {
+			slog.Error("Error: ", tint.Err(err))
+		}
 		os.Exit(1)
 	}
 }

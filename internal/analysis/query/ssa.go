@@ -8,6 +8,7 @@ import (
 	"go/token"
 	"log/slog"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -240,6 +241,8 @@ func constLikeStringValueToQueryGroup(pkg *ssa.Package, v ssa.Value, fn *ssa.Fun
 			}
 		}
 		if len(qg.List) > 0 {
+			slices.SortFunc(qg.List, func(a, b *Query) int { return strings.Compare(a.Raw, b.Raw) })
+			qg.List = slices.CompactFunc(qg.List, func(a, b *Query) bool { return a.Raw == b.Raw })
 			return qg, true
 		}
 	} else {

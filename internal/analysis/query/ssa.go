@@ -225,6 +225,7 @@ func constLikeStringValueToQueryGroup(pkg *ssa.Package, v ssa.Value, fn *ssa.Fun
 					qg.List = append(qg.List, q)
 				} else {
 					slog.Debug("filtered", "SQL", v, "package", pkg.Pkg.Path(), "file", file)
+					return &QueryGroup{}, false
 				}
 			} else {
 				level := slog.LevelWarn
@@ -232,10 +233,9 @@ func constLikeStringValueToQueryGroup(pkg *ssa.Package, v ssa.Value, fn *ssa.Fun
 					level = slog.LevelDebug
 				}
 				if norm, err := normalize(a); err == nil {
-					slog.Log(context.Background(), level, "Cannot parse query", "SQL", norm, "package", pkg.Pkg.Path(), "file", file)
-				} else {
-					slog.Log(context.Background(), level, "Cannot parse query", "SQL", a, "package", pkg.Pkg.Path(), "file", file)
+					a = norm
 				}
+				slog.Log(context.Background(), level, "Cannot parse as SQL", "SQL", a, "package", pkg.Pkg.Path(), "file", file, "function", fn.Name())
 			}
 		}
 		if len(qg.List) > 0 {
@@ -254,12 +254,15 @@ func constLikeStringValueToQueryGroup(pkg *ssa.Package, v ssa.Value, fn *ssa.Fun
 				}
 			}
 		}
-		level := slog.LevelWarn
 		if IsCommented(pkg, append([]token.Pos{v.Pos()}, pos...), opt) {
-			level = slog.LevelDebug
+			slog.Debug("Can't parse value as string constant", "type", fmt.Sprintf("%T", v), "value", fmt.Sprintf("%v", v), "package", pkg.Pkg.Path(), "file", file, "function", fn.Name())
+			return &QueryGroup{}, false
 		}
-		slog.Log(context.Background(), level,
-			"Can't parse value as string constant", "type", fmt.Sprintf("%T", v), "value", fmt.Sprintf("%v", v), "package", pkg.Pkg.Path(), "file", file)
+		slog.Warn("Can't parse value as string constant", "type", fmt.Sprintf("%T", v), "value", fmt.Sprintf("%v", v), "package", pkg.Pkg.Path(), "file", file, "function", fn.Name())
+	}
+	q := &Query{Kind: Unknown, Func: fn, Pos: append([]token.Pos{v.Pos()}, pos...), Package: pkg}
+	if opt.Filter(q) {
+		return &QueryGroup{List: []*Query{q}}, true
 	}
 	return &QueryGroup{}, false
 }

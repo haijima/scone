@@ -56,7 +56,7 @@ func Test_parseSelectStmt(t *testing.T) {
 			stmt := stmtNodes[0]
 			assert.IsType(t, stmt, &ast.SelectStmt{})
 
-			parsed := parseStmt(stmt.(*ast.SelectStmt).From, stmt.(*ast.SelectStmt).Where)
+			parsed := parseStmt(stmt.(*ast.SelectStmt).From, stmt.(*ast.SelectStmt).Where, "")
 			assert.Equal(t, tt.want, parsed)
 		})
 	}

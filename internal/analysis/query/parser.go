@@ -119,27 +119,26 @@ func parse(sql string) (*Query, error) {
 		}
 	}
 	q.Tables = tableSet // q.Tables[0] == q.MainTable
-
 	switch s := stmt.(type) {
 	case *ast.SelectStmt:
 		q.Kind = Select
-		q.FilterColumnMap = parseStmt(s.From, s.Where)
+		q.FilterColumnMap = parseStmt(s.From, s.Where, q.Raw)
 	case *ast.SetOprStmt:
 		q.Kind = Select
-		q.FilterColumnMap = parseSetOprStmt(s)
+		q.FilterColumnMap = parseSetOprStmt(s, q.Raw)
 	case *ast.InsertStmt:
 		if s.IsReplace {
 			q.Kind = Replace
 		} else {
 			q.Kind = Insert
 		}
-		q.FilterColumnMap = parseInsertStmt(s)
+		q.FilterColumnMap = parseInsertStmt(s, q.Raw)
 	case *ast.UpdateStmt:
 		q.Kind = Update
-		q.FilterColumnMap = parseStmt(s.TableRefs, s.Where)
+		q.FilterColumnMap = parseStmt(s.TableRefs, s.Where, q.Raw)
 	case *ast.DeleteStmt:
 		q.Kind = Delete
-		q.FilterColumnMap = parseStmt(s.TableRefs, s.Where)
+		q.FilterColumnMap = parseStmt(s.TableRefs, s.Where, q.Raw)
 	default:
 		q.Kind = Unknown
 		q.FilterColumnMap = make(map[string]mapset.Set[string])
@@ -147,16 +146,16 @@ func parse(sql string) (*Query, error) {
 	return q, nil
 }
 
-func parseSetOprStmt(stmt *ast.SetOprStmt) map[string]mapset.Set[string] {
+func parseSetOprStmt(stmt *ast.SetOprStmt, wholeSQL string) map[string]mapset.Set[string] {
 	res := util.NewSetMap[string, string]()
 	for _, s := range stmt.SelectList.Selects {
 		if stmt, ok := s.(*ast.SelectStmt); ok {
-			m := parseStmt(stmt.From, stmt.Where)
+			m := parseStmt(stmt.From, stmt.Where, wholeSQL)
 			for k, v := range m {
 				res.Intersect(k, v)
 			}
 		} else if stmt, ok := s.(*ast.SetOprStmt); ok {
-			m := parseSetOprStmt(stmt)
+			m := parseSetOprStmt(stmt, wholeSQL)
 			for k, v := range m {
 				res.Intersect(k, v)
 			}
@@ -165,21 +164,21 @@ func parseSetOprStmt(stmt *ast.SetOprStmt) map[string]mapset.Set[string] {
 	return res
 }
 
-func parseInsertStmt(stmt *ast.InsertStmt) map[string]mapset.Set[string] {
+func parseInsertStmt(stmt *ast.InsertStmt, wholeSQL string) map[string]mapset.Set[string] {
 	if stmt.Select != nil {
 		switch s := stmt.Select.(type) {
 		case *ast.SelectStmt:
-			return parseStmt(s.From, s.Where)
+			return parseStmt(s.From, s.Where, wholeSQL)
 		case *ast.SetOprStmt:
-			return parseSetOprStmt(s)
+			return parseSetOprStmt(s, wholeSQL)
 		case *ast.SubqueryExpr:
-			return parseStmt(s.Query.(*ast.SelectStmt).From, s.Query.(*ast.SelectStmt).Where)
+			return parseStmt(s.Query.(*ast.SelectStmt).From, s.Query.(*ast.SelectStmt).Where, wholeSQL)
 		}
 	}
 	return make(map[string]mapset.Set[string])
 }
 
-func parseStmt(tableRefs *ast.TableRefsClause, condition ast.Node) map[string]mapset.Set[string] {
+func parseStmt(tableRefs *ast.TableRefsClause, condition ast.ExprNode, wholeSQL string) map[string]mapset.Set[string] {
 	if tableRefs == nil || tableRefs.TableRefs == nil {
 		return make(map[string]mapset.Set[string])
 	}
@@ -212,7 +211,12 @@ func parseStmt(tableRefs *ast.TableRefsClause, condition ast.Node) map[string]ma
 				if len(jf.tableNames) == 1 && len(jf.selectStmts) == 0 && len(jf.setOprStmts) == 0 {
 					tableAlias = jf.tableNames[0].Source.(*ast.TableName).Name.L
 				} else {
-					slog.Warn("ambiguous column name in (sub)query", "column", col.Name.L, "condition", condition.Text())
+					ts := make([]string, 0, len(jf.tableNames))
+					for _, t := range jf.tableNames {
+						ts = append(ts, t.Source.(*ast.TableName).Name.L)
+					}
+					slog.Warn("ambiguous column name in (sub)query", "column", col.Name.L, "tables", ts, "SQL", wholeSQL)
+
 					for a := range tableAliases {
 						ra.Add(a, col.Name.L)
 					}
@@ -233,12 +237,12 @@ func parseStmt(tableRefs *ast.TableRefsClause, condition ast.Node) map[string]ma
 
 	// Intersect column names with result of sub-queries
 	for _, s := range jf.selectStmts {
-		for k, v := range parseStmt(s.Source.(*ast.SelectStmt).From, s.Source.(*ast.SelectStmt).Where) {
+		for k, v := range parseStmt(s.Source.(*ast.SelectStmt).From, s.Source.(*ast.SelectStmt).Where, wholeSQL) {
 			res.Intersect(k, v)
 		}
 	}
 	for _, s := range jf.setOprStmts {
-		for k, v := range parseSetOprStmt(s.Source.(*ast.SetOprStmt)) {
+		for k, v := range parseSetOprStmt(s.Source.(*ast.SetOprStmt), wholeSQL) {
 			res.Intersect(k, v)
 		}
 	}

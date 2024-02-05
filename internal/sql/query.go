@@ -1,4 +1,4 @@
-package query
+package sql
 
 import (
 	"crypto/sha1"

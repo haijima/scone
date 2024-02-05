@@ -6,7 +6,7 @@ import (
 
 	"github.com/haijima/scone/internal"
 	"github.com/haijima/scone/internal/analysis"
-	"github.com/haijima/scone/internal/query"
+	"github.com/haijima/scone/internal/sql"
 	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -55,14 +55,14 @@ func printGraphviz(w io.Writer, cgs map[string]*analysis.CallGraph) error {
 					attrs := make(internal.DotAttrs)
 					attrs["weight"] = "100"
 					switch edge.SqlValue.Kind {
-					case query.Select:
+					case sql.Select:
 						attrs["style"] = "dotted"
 						//attrs["weight"] = "1"
-					case query.Insert:
+					case sql.Insert:
 						attrs["color"] = "green"
-					case query.Update:
+					case sql.Update:
 						attrs["color"] = "orange"
-					case query.Delete:
+					case sql.Delete:
 						attrs["color"] = "red"
 					default:
 					}
@@ -86,12 +86,12 @@ func printGraphviz(w io.Writer, cgs map[string]*analysis.CallGraph) error {
 	fmt.Fprintln(w)
 
 	// Print cacheable func and table node styles
-	selectOnlyNodes := make(map[string]query.QueryKind)
+	selectOnlyNodes := make(map[string]sql.QueryKind)
 	for pkg, cg := range cgs {
 		for _, node := range analysis.TopologicalSort(cg.Nodes) {
 			// table node
 			if node.Func == nil {
-				kind := query.Select
+				kind := sql.Select
 				for _, cg2 := range cgs {
 					n, ok := cg2.Nodes[node.Name]
 					if ok {
@@ -107,17 +107,17 @@ func printGraphviz(w io.Writer, cgs map[string]*analysis.CallGraph) error {
 			}
 			// func node
 			selectOnly := true
-			kind := query.Unknown
+			kind := sql.Unknown
 			for _, edge := range node.Out {
 				if edge.SqlValue != nil {
-					selectOnly = selectOnly && edge.SqlValue.Kind == query.Select
+					selectOnly = selectOnly && edge.SqlValue.Kind == sql.Select
 				} else {
 					_, ok := selectOnlyNodes[edge.Callee]
 					selectOnly = selectOnly && ok
 				}
 				kind = max(kind, selectOnlyNodes[edge.Callee])
 			}
-			if selectOnly && kind != query.Unknown {
+			if selectOnly && kind != sql.Unknown {
 				selectOnlyNodes[node.Name] = kind
 			}
 		}
@@ -125,15 +125,15 @@ func printGraphviz(w io.Writer, cgs map[string]*analysis.CallGraph) error {
 		for n, k := range selectOnlyNodes {
 			name := fmt.Sprintf("%s.%s", pkg, n)
 			attr := make(internal.DotAttrs)
-			if k == query.Select {
+			if k == sql.Select {
 				attr["color"] = "blue"
 				attr["fillcolor"] = "lightblue1"
-			} else if k == query.Insert {
+			} else if k == sql.Insert {
 				attr["color"] = "green"
 				attr["fillcolor"] = "darkolivegreen1"
-			} else if k == query.Update {
+			} else if k == sql.Update {
 				attr["color"] = "orange"
-			} else if k == query.Delete {
+			} else if k == sql.Delete {
 				attr["color"] = "red"
 			}
 			if cg.Nodes[n].Func == nil {
@@ -145,7 +145,7 @@ func printGraphviz(w io.Writer, cgs map[string]*analysis.CallGraph) error {
 		}
 
 		// Reset
-		selectOnlyNodes = make(map[string]query.QueryKind)
+		selectOnlyNodes = make(map[string]sql.QueryKind)
 	}
 
 	fmt.Fprintln(w)

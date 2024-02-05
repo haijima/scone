@@ -12,7 +12,7 @@ import (
 	"github.com/haijima/scone/internal/analysis"
 	"github.com/haijima/scone/internal/analysis/analysisutil"
 	internalio "github.com/haijima/scone/internal/io"
-	"github.com/haijima/scone/internal/query"
+	"github.com/haijima/scone/internal/sql"
 	"github.com/haijima/scone/internal/util"
 	"github.com/olekukonko/tablewriter"
 	"github.com/spf13/afero"
@@ -189,7 +189,7 @@ func makeHeader(opt *PrintQueryOption) []string {
 	return header
 }
 
-func row(q *query.Query, meta *analysis.Meta, opt *PrintQueryOption) []string {
+func row(q *sql.Query, meta *analysis.Meta, opt *PrintQueryOption) []string {
 	var tables string
 	if len(q.Tables) > 0 {
 		tables = strings.Join(q.Tables[1:], ", ")

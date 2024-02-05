@@ -5,7 +5,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/haijima/scone/internal/query"
+	"github.com/haijima/scone/internal/sql"
 )
 
 type AnalyzeMode int
@@ -38,7 +38,7 @@ type Option struct {
 	IsIgnoredFunc         func(pos token.Pos) bool
 }
 
-func (o *Option) Filter(q *query.Query, meta *Meta) bool {
+func (o *Option) Filter(q *sql.Query, meta *Meta) bool {
 	pkgName := meta.Package.Pkg.Name()
 	pkgPath := meta.Package.Pkg.Path()
 	file := meta.Position().Filename

@@ -3,7 +3,7 @@ package analysis
 import (
 	"slices"
 
-	"github.com/haijima/scone/internal/query"
+	"github.com/haijima/scone/internal/sql"
 	"golang.org/x/tools/go/callgraph/static"
 	"golang.org/x/tools/go/ssa"
 )
@@ -107,7 +107,7 @@ func (e *Edge) IsQuery() bool {
 }
 
 type SqlValue struct {
-	Kind   query.QueryKind
+	Kind   sql.QueryKind
 	RawSQL string
 }
 

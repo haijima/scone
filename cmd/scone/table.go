@@ -12,7 +12,7 @@ import (
 	"github.com/haijima/scone/internal/analysis"
 	"github.com/haijima/scone/internal/analysis/analysisutil"
 	internalio "github.com/haijima/scone/internal/io"
-	"github.com/haijima/scone/internal/query"
+	"github.com/haijima/scone/internal/sql"
 	"github.com/haijima/scone/internal/util"
 	"github.com/olekukonko/tablewriter"
 	"github.com/spf13/afero"
@@ -52,7 +52,7 @@ type PrintTableOption struct{ SummarizeOnly bool }
 
 func printResult(w io.Writer, queryResults []*analysis.QueryResult, tables mapset.Set[string], cgs map[string]*analysis.CallGraph, opt PrintTableOption) error {
 	filterColumns := util.NewSetMap[string, string]()
-	kindsMap := util.NewSetMap[string, query.QueryKind]()
+	kindsMap := util.NewSetMap[string, sql.QueryKind]()
 	for _, qr := range queryResults {
 		for _, q := range qr.Queries() {
 			for t, cols := range q.FilterColumnMap {
@@ -91,7 +91,7 @@ func clusterize(tables mapset.Set[string], queryResults []*analysis.QueryResult,
 			tablesInTx := mapset.NewSet[string]()
 			analysis.Walk(cg, r, func(n *analysis.Node) bool {
 				for _, edge := range n.Out {
-					if edge.IsQuery() && edge.SqlValue.Kind != query.Select {
+					if edge.IsQuery() && edge.SqlValue.Kind != sql.Select {
 						tablesInTx.Add(edge.Callee)
 					}
 				}
@@ -128,7 +128,7 @@ const tmplSummary = `{{title "Summary"}}
   {{- end}}
 `
 
-func printSummary(w io.Writer, tables mapset.Set[string], queryGroups []*analysis.QueryResult, tableConn util.Connection, filterColumns map[string]mapset.Set[string], kindsMap map[string]mapset.Set[query.QueryKind]) error {
+func printSummary(w io.Writer, tables mapset.Set[string], queryGroups []*analysis.QueryResult, tableConn util.Connection, filterColumns map[string]mapset.Set[string], kindsMap map[string]mapset.Set[sql.QueryKind]) error {
 	data := make(map[string]any)
 
 	data["queries"] = len(queryGroups)
@@ -136,11 +136,11 @@ func printSummary(w io.Writer, tables mapset.Set[string], queryGroups []*analysi
 	var hardCoded, readThrough, writeThrough []string
 	for _, t := range mapset.Sorted(tables) {
 		switch slices.Max(kindsMap[t].ToSlice()) {
-		case query.Select:
+		case sql.Select:
 			hardCoded = append(hardCoded, t)
-		case query.Insert:
+		case sql.Insert:
 			readThrough = append(readThrough, t)
-		case query.Delete, query.Replace, query.Update:
+		case sql.Delete, sql.Replace, sql.Update:
 			writeThrough = append(writeThrough, t)
 		}
 	}
@@ -188,7 +188,7 @@ var tmplTableResult = `
 {{/* Show queries by TablePrinter */}}
 `
 
-func printTableResult(w io.Writer, table string, queryResults []*analysis.QueryResult, tableConn util.Connection, filterColumns mapset.Set[string], kinds mapset.Set[query.QueryKind]) error {
+func printTableResult(w io.Writer, table string, queryResults []*analysis.QueryResult, tableConn util.Connection, filterColumns mapset.Set[string], kinds mapset.Set[sql.QueryKind]) error {
 	data := make(map[string]any)
 	data["table"] = table
 	data["maxKind"] = slices.Max(kinds.ToSlice())
@@ -198,13 +198,13 @@ func printTableResult(w io.Writer, table string, queryResults []*analysis.QueryR
 	}
 	data["cacheability"] = slices.Max(kinds.ToSlice()).Color(slices.Max(kinds.ToSlice()).String())
 	switch maxKind := slices.Max(kinds.ToSlice()); maxKind {
-	case query.Select:
+	case sql.Select:
 		data["cacheability"] = maxKind.Color("Hard coded")
-	case query.Insert:
+	case sql.Insert:
 		data["cacheability"] = maxKind.Color("Read-through")
-	case query.Delete, query.Replace, query.Update:
+	case sql.Delete, sql.Replace, sql.Update:
 		data["cacheability"] = "Write-through"
-	case query.Unknown:
+	case sql.Unknown:
 		data["cacheability"] = maxKind.Color("Unknown")
 	}
 	data["collocation"] = mapset.Sorted(tableConn.GetConnection(table, 1).Difference(mapset.NewSet(table)))
@@ -223,16 +223,16 @@ func printTableResult(w io.Writer, table string, queryResults []*analysis.QueryR
 
 	funcs := make(map[string]interface{})
 	funcs["key"] = color.MagentaString
-	funcs["title"] = func(table string, kind query.QueryKind) string {
+	funcs["title"] = func(table string, kind sql.QueryKind) string {
 		c := color.New(color.FgBlack, color.BgWhite)
 		switch kind {
-		case query.Select:
+		case sql.Select:
 			c = color.New(color.FgBlack, color.BgBlue)
-		case query.Insert:
+		case sql.Insert:
 			c = color.New(color.FgBlack, color.BgGreen)
-		case query.Delete:
+		case sql.Delete:
 			c = color.New(color.FgBlack, color.BgRed)
-		case query.Replace, query.Update:
+		case sql.Replace, sql.Update:
 			c = color.New(color.FgBlack, color.BgYellow)
 		}
 		return c.Sprintf(" %s ", table)
@@ -256,7 +256,7 @@ func printTableResult(w io.Writer, table string, queryResults []*analysis.QueryR
 	for i, qr := range qrs {
 		for _, q := range qr.Queries() {
 			k := "?"
-			if q.Kind > query.Unknown {
+			if q.Kind > sql.Unknown {
 				k = q.Kind.Color(q.Kind.String()[:1])
 			}
 			p.AddRow([]string{"   ", strconv.Itoa(i + 1), analysisutil.FLC(qr.Meta.Position()), qr.Meta.Func.Name(), k, q.Raw})

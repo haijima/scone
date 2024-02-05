@@ -13,32 +13,32 @@ import (
 
 	mapset "github.com/deckarep/golang-set/v2"
 	"github.com/haijima/scone/internal/analysis/analysisutil"
-	"github.com/haijima/scone/internal/query"
+	"github.com/haijima/scone/internal/sql"
 	"golang.org/x/tools/go/analysis/passes/buildssa"
 	"golang.org/x/tools/go/ssa"
 )
 
 type QueryResult struct {
-	QueryGroup *query.QueryGroup
+	QueryGroup *sql.QueryGroup
 	Meta       *Meta
 }
 
-func (qr *QueryResult) Queries() []*query.Query {
+func (qr *QueryResult) Queries() []*sql.Query {
 	if qr.QueryGroup == nil {
-		qr.QueryGroup = query.NewQueryGroup()
+		qr.QueryGroup = sql.NewQueryGroup()
 	} else if qr.QueryGroup.List == nil {
-		qr.QueryGroup.List = mapset.NewSet[*query.Query]()
+		qr.QueryGroup.List = mapset.NewSet[*sql.Query]()
 	}
 	s := qr.QueryGroup.List.ToSlice()
-	slices.SortFunc(s, func(a, b *query.Query) int { return strings.Compare(a.Raw, b.Raw) })
+	slices.SortFunc(s, func(a, b *sql.Query) int { return strings.Compare(a.Raw, b.Raw) })
 	return s
 }
 
-func (qr *QueryResult) Append(qs ...*query.Query) {
+func (qr *QueryResult) Append(qs ...*sql.Query) {
 	if qr.QueryGroup == nil {
-		qr.QueryGroup = query.NewQueryGroup()
+		qr.QueryGroup = sql.NewQueryGroup()
 	} else if qr.QueryGroup.List == nil {
-		qr.QueryGroup.List = mapset.NewSet[*query.Query]()
+		qr.QueryGroup.List = mapset.NewSet[*sql.Query]()
 	}
 	qr.QueryGroup.List.Append(qs...)
 }
@@ -125,7 +125,7 @@ func GetQueryResultsInComment(ssaProg *buildssa.SSA, files []*ast.File, opt *Opt
 			}
 			for _, comment := range cg.List {
 				if strings.HasPrefix(comment.Text, commentPrefix) {
-					if q, ok := query.ParseString(strings.TrimPrefix(comment.Text, commentPrefix)); ok {
+					if q, ok := sql.ParseString(strings.TrimPrefix(comment.Text, commentPrefix)); ok {
 						if opt.Filter(q, qr.Meta) {
 							qr.Append(q)
 							opt.QueryCommentPositions = append(opt.QueryCommentPositions, comment.Pos())
@@ -195,8 +195,8 @@ func phiToQueryGroup(pkg *ssa.Package, a *ssa.Phi, fn *ssa.Function, pos []token
 
 func constToQueryGroup(pkg *ssa.Package, a *ssa.Const, fn *ssa.Function, pos []token.Pos, opt *Option) (*QueryResult, bool) {
 	if a.Value != nil && a.Value.Kind() == constant.String {
-		if q, ok := query.ParseString(a.Value.ExactString()); ok {
-			qr := &QueryResult{QueryGroup: query.NewQueryGroupFrom(q), Meta: NewMeta(pkg, fn, a.Pos(), pos...)}
+		if q, ok := sql.ParseString(a.Value.ExactString()); ok {
+			qr := &QueryResult{QueryGroup: sql.NewQueryGroupFrom(q), Meta: NewMeta(pkg, fn, a.Pos(), pos...)}
 			if opt.Filter(q, qr.Meta) {
 				return qr, true
 			}
@@ -303,7 +303,7 @@ func constLikeStringValueToQueryGroup(pkg *ssa.Package, v ssa.Value, fn *ssa.Fun
 	if as, ok := analysisutil.ConstLikeStringValues(v); ok {
 		qr := &QueryResult{Meta: NewMeta(pkg, fn, v.Pos(), pos...)}
 		for _, a := range as {
-			if q, ok := query.ParseString(a); ok {
+			if q, ok := sql.ParseString(a); ok {
 				if opt.Filter(q, qr.Meta) {
 					qr.Append(q)
 				} else {
@@ -315,7 +315,7 @@ func constLikeStringValueToQueryGroup(pkg *ssa.Package, v ssa.Value, fn *ssa.Fun
 				if IsCommented(pkg, append([]token.Pos{v.Pos()}, pos...), opt) {
 					level = slog.LevelDebug
 				}
-				if norm, err := query.Normalize(a); err == nil {
+				if norm, err := sql.Normalize(a); err == nil {
 					a = norm
 				}
 				slog.Log(context.Background(), level, "Cannot parse as SQL", "SQL", a, "package", pkg.Pkg.Path(), "file", file, "function", fn.Name())
@@ -341,8 +341,8 @@ func constLikeStringValueToQueryGroup(pkg *ssa.Package, v ssa.Value, fn *ssa.Fun
 		}
 		slog.Warn("Can't parse value as string constant", "type", fmt.Sprintf("%T", v), "value", fmt.Sprintf("%v", v), "package", pkg.Pkg.Path(), "file", file, "function", fn.Name())
 	}
-	q := &query.Query{Kind: query.Unknown}
-	qr := &QueryResult{QueryGroup: query.NewQueryGroupFrom(q), Meta: NewMeta(pkg, fn, v.Pos(), pos...)}
+	q := &sql.Query{Kind: sql.Unknown}
+	qr := &QueryResult{QueryGroup: sql.NewQueryGroupFrom(q), Meta: NewMeta(pkg, fn, v.Pos(), pos...)}
 	if opt.Filter(q, qr.Meta) {
 		return qr, true
 	}

@@ -118,7 +118,7 @@ const tmplGraph = `digraph scone {
 	{{range .Nodes}}
 	{{printf "%q [ %s ]" .ID .Attrs}}
 	{{- end}}
-    {{- range .edges}}
+    {{- range .Edges}}
 	{{printf "%q -> %q [ %s ]" .From .To .Attrs}}
 	{{- end}}
 

@@ -224,6 +224,6 @@ func printTableResult(w io.Writer, table string, queryResults []*analysis.QueryR
 			p.AddRow([]string{"   ", strconv.Itoa(i + 1), analysisutil.FLC(qr.Meta.Position()), qr.Meta.Func.Name(), k, q.Raw})
 		}
 	}
-	p.Print()
+	_ = p.Print()
 	fmt.Fprintln(w)
 }

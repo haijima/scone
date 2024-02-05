@@ -1,10 +1,11 @@
 package main
 
 import (
-	"fmt"
+	"bytes"
 	"io"
 	"slices"
 	"strconv"
+	"text/template"
 
 	mapset "github.com/deckarep/golang-set/v2"
 	"github.com/fatih/color"
@@ -17,7 +18,6 @@ import (
 	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	"golang.org/x/exp/maps"
 )
 
 func NewTableCommand(v *viper.Viper, _ afero.Fs) *cobra.Command {
@@ -63,18 +63,22 @@ func printResult(w io.Writer, queryResults []*analysis.QueryResult, tables mapse
 			}
 		}
 	}
-	connTables, collocationMap := clusterize(tables, queryResults, cgs)
+	tableConn := clusterize(tables, queryResults, cgs)
 
-	printSummary(w, tables, queryResults, connTables, filterColumns, kindsMap)
+	if err := printSummary(w, tables, queryResults, tableConn, filterColumns, kindsMap); err != nil {
+		return err
+	}
 	if !opt.SummarizeOnly {
 		for _, t := range mapset.Sorted(tables) {
-			printTableResult(w, t, queryResults, connTables, collocationMap[t], filterColumns[t], kindsMap[t])
+			if err := printTableResult(w, t, queryResults, tableConn, filterColumns[t], kindsMap[t]); err != nil {
+				return err
+			}
 		}
 	}
 	return nil
 }
 
-func clusterize(tables mapset.Set[string], queryResults []*analysis.QueryResult, cgs map[string]*analysis.CallGraph) ([]mapset.Set[string], map[string]mapset.Set[string]) {
+func clusterize(tables mapset.Set[string], queryResults []*analysis.QueryResult, cgs map[string]*analysis.CallGraph) util.Connection {
 	c := util.NewConnection(tables.ToSlice()...) // Create a graph with tables as nodes
 
 	// Extract tables updated in the same transaction
@@ -104,25 +108,31 @@ func clusterize(tables mapset.Set[string], queryResults []*analysis.QueryResult,
 			util.PairCombinateFunc(q.Tables, c.Connect)
 		}
 	}
-
-	// find connected components
-	connTables := c.GetClusters()
-	slices.SortFunc(connTables, func(a, b mapset.Set[string]) int { return b.Cardinality() - a.Cardinality() })
-
-	// find collocation
-	collocationMap := util.NewSetMap[string, string]()
-	for _, t := range tables.ToSlice() {
-		collocationMap[t] = c.GetConnection(t, 1)
-	}
-
-	return connTables, collocationMap
+	return c
 }
 
-func printSummary(w io.Writer, tables mapset.Set[string], queryGroups []*analysis.QueryResult, connTables []mapset.Set[string], filterColumns map[string]mapset.Set[string], kindsMap map[string]mapset.Set[query.QueryKind]) {
-	fmt.Fprintf(w, "%s\n", color.CyanString("Summary"))
-	fmt.Fprintf(w, "  %s : %d\n", color.MagentaString("queries       "), len(queryGroups))
-	fmt.Fprintf(w, "  %s : %d\n", color.MagentaString("tables        "), tables.Cardinality())
-	fmt.Fprintf(w, "  %s :\n", color.MagentaString("cacheability  "))
+const tmplSummary = `{{title "Summary"}}
+  {{key "queries"}}         : {{.queries}}
+  {{key "tables"}}          : {{.tables}}
+  {{key "cacheability"}}
+	hard coded    : {{len .hardcoded}}	{{printf "%q" .hardcoded}}
+	read-through  : {{len .readThrough}}	{{printf "%q" .readThrough}}
+	write-through : {{len .writeThrough}}	{{printf "%q" .writeThrough}}
+  {{key "table clusters"}}  : {{len .clusters}}
+  {{- range .clusters}}
+	{{printf "%q" .}}
+  {{- end}}
+  {{key "partition keys"}}  : found in {{len .partitionKeys}} table(s)
+  {{- range $key, $value := .partitionKeys}}
+	{{printf "%q for %q" $value $key}}
+  {{- end}}
+`
+
+func printSummary(w io.Writer, tables mapset.Set[string], queryGroups []*analysis.QueryResult, tableConn util.Connection, filterColumns map[string]mapset.Set[string], kindsMap map[string]mapset.Set[query.QueryKind]) error {
+	data := make(map[string]any)
+
+	data["queries"] = len(queryGroups)
+	data["tables"] = tables.Cardinality()
 	var hardCoded, readThrough, writeThrough []string
 	for _, t := range mapset.Sorted(tables) {
 		switch slices.Max(kindsMap[t].ToSlice()) {
@@ -132,70 +142,74 @@ func printSummary(w io.Writer, tables mapset.Set[string], queryGroups []*analysi
 			readThrough = append(readThrough, t)
 		case query.Delete, query.Replace, query.Update:
 			writeThrough = append(writeThrough, t)
-		default:
 		}
 	}
-	fmt.Fprintf(w, "    %s : %d\t%q\n", color.BlueString("hard coded   "), len(hardCoded), hardCoded)
-	fmt.Fprintf(w, "    %s : %d\t%q\n", color.GreenString("read-through "), len(readThrough), readThrough)
-	fmt.Fprintf(w, "    %s : %d\t%q\n", color.YellowString("write-through"), len(writeThrough), writeThrough)
-	fmt.Fprintf(w, "  %s : %d\n", color.MagentaString("table clusters"), len(connTables))
-	for _, ts := range connTables {
-		fmt.Fprintf(w, "    %q\n", mapset.Sorted(ts))
+	data["hardcoded"] = hardCoded
+	data["readThrough"] = readThrough
+	data["writeThrough"] = writeThrough
+	clusters := make([][]string, 0, len(tableConn.GetClusters()))
+	for _, ts := range tableConn.GetClusters() {
+		clusters = append(clusters, mapset.Sorted(ts))
 	}
-	fmt.Fprintf(w, "  %s : found in %d table(s)\n", color.MagentaString("partition keys"), len(slices.DeleteFunc(maps.Values(filterColumns), func(m mapset.Set[string]) bool { return m.Cardinality() == 0 })))
+	data["clusters"] = clusters
+	partitionKeys := make(map[string][]string)
 	for t, cols := range filterColumns {
 		if cols.Cardinality() > 0 {
-			fmt.Fprintf(w, "    %s: %q\n", t, mapset.Sorted(cols))
+			partitionKeys[t] = mapset.Sorted(cols)
 		}
 	}
-	fmt.Fprintln(w)
+	data["partitionKeys"] = partitionKeys
+
+	funcs := make(map[string]interface{})
+	funcs["title"] = color.CyanString
+	funcs["key"] = color.MagentaString
+	t, err := template.New("summary").Funcs(funcs).Parse(tmplSummary)
+	if err != nil {
+		return err
+	}
+	var buf bytes.Buffer
+	if err := t.Execute(&buf, data); err != nil {
+		return err
+	}
+	_, err = buf.WriteTo(w)
+	return err
 }
 
-func printTableResult(w io.Writer, table string, queryResults []*analysis.QueryResult, connTables []mapset.Set[string], collocationTables mapset.Set[string], filterColumns mapset.Set[string], kinds mapset.Set[query.QueryKind]) {
-	switch slices.Max(kinds.ToSlice()) {
-	case query.Select:
-		fmt.Fprintln(w, color.New(color.FgBlack, color.BgBlue).Sprintf(" %s ", table))
-	case query.Insert:
-		fmt.Fprintln(w, color.New(color.FgBlack, color.BgGreen).Sprintf(" %s ", table))
-	case query.Delete:
-		fmt.Fprintln(w, color.New(color.FgBlack, color.BgRed).Sprintf(" %s ", table))
-	case query.Replace, query.Update:
-		fmt.Fprintln(w, color.New(color.FgBlack, color.BgYellow).Sprintf(" %s ", table))
-	default:
-		fmt.Fprintln(w, color.New(color.FgBlack, color.BgWhite).Sprintf(" %s ", table))
-	}
+var tmplTableResult = `
+{{title .table .maxKind}}
+  {{key "query types"}}	:{{range .kinds}} {{.}}{{end}}
+  {{key "cacheability"}}	: {{.cacheability}}
+  {{key "collocation"}}	: {{printf "%q" .collocation}}
+  {{key "cluster"}}	: {{printf "%q" .cluster}}
+  {{- if .partitionKey}}
+  {{key "partition key"}}	: {{printf "%q" .partitionKey}}
+  {{- end}}
+  {{key "queries"}}	: {{len .queries}}
+{{/* Show queries by TablePrinter */}}
+`
 
-	fmt.Fprintf(w, "  %s\t:", color.MagentaString("query types"))
+func printTableResult(w io.Writer, table string, queryResults []*analysis.QueryResult, tableConn util.Connection, filterColumns mapset.Set[string], kinds mapset.Set[query.QueryKind]) error {
+	data := make(map[string]any)
+	data["table"] = table
+	data["maxKind"] = slices.Max(kinds.ToSlice())
+	data["kinds"] = make([]string, 0, kinds.Cardinality())
 	for _, k := range mapset.Sorted(kinds) {
-		fmt.Fprintf(w, " %s", k.ColoredString())
+		data["kinds"] = append(data["kinds"].([]string), k.Color(k.String()))
 	}
-	fmt.Fprintln(w)
-
-	fmt.Fprintf(w, "  %s\t: ", color.MagentaString("cacheability"))
+	data["cacheability"] = slices.Max(kinds.ToSlice()).Color(slices.Max(kinds.ToSlice()).String())
 	switch maxKind := slices.Max(kinds.ToSlice()); maxKind {
 	case query.Select:
-		fmt.Fprintln(w, maxKind.Color("Hard coded"))
+		data["cacheability"] = maxKind.Color("Hard coded")
 	case query.Insert:
-		fmt.Fprintln(w, maxKind.Color("Read-through"))
+		data["cacheability"] = maxKind.Color("Read-through")
 	case query.Delete, query.Replace, query.Update:
-		fmt.Fprintln(w, "Write-through")
+		data["cacheability"] = "Write-through"
 	case query.Unknown:
-		fmt.Fprintln(w, maxKind.Color("Unknown"))
+		data["cacheability"] = maxKind.Color("Unknown")
 	}
-
-	fmt.Fprintf(w, "  %s\t: %q\n", color.MagentaString("collocation"), mapset.Sorted(collocationTables.Difference(mapset.NewSet(table))))
-
-	for _, ts := range connTables {
-		if ts.Contains(table) {
-			fmt.Fprintf(w, "  %s\t: %q\n", color.MagentaString("cluster"), mapset.Sorted(ts))
-		}
-	}
-
-	if filterColumns.Cardinality() > 0 {
-		fmt.Fprintf(w, "  %s\t: %q\n", color.MagentaString("partition key"), mapset.Sorted(filterColumns))
-		fmt.Fprintf(w, "  \t\t  %s\n", color.HiBlackString("It is likely that this table will always be filtered by these column(s)"))
-	}
-
+	data["collocation"] = mapset.Sorted(tableConn.GetConnection(table, 1).Difference(mapset.NewSet(table)))
+	data["cluster"] = mapset.Sorted(tableConn.GetConnection(table, -1))
+	data["partitionKey"] = mapset.Sorted(filterColumns)
 	qrs := make([]*analysis.QueryResult, 0)
 	for _, qr := range queryResults {
 		for _, q := range qr.Queries() {
@@ -205,8 +219,38 @@ func printTableResult(w io.Writer, table string, queryResults []*analysis.QueryR
 			}
 		}
 	}
-	fmt.Fprintf(w, "  %s\t: %d\n", color.MagentaString("queries"), len(qrs))
+	data["queries"] = qrs
 
+	funcs := make(map[string]interface{})
+	funcs["key"] = color.MagentaString
+	funcs["title"] = func(table string, kind query.QueryKind) string {
+		c := color.New(color.FgBlack, color.BgWhite)
+		switch kind {
+		case query.Select:
+			c = color.New(color.FgBlack, color.BgBlue)
+		case query.Insert:
+			c = color.New(color.FgBlack, color.BgGreen)
+		case query.Delete:
+			c = color.New(color.FgBlack, color.BgRed)
+		case query.Replace, query.Update:
+			c = color.New(color.FgBlack, color.BgYellow)
+		}
+		return c.Sprintf(" %s ", table)
+	}
+	t, err := template.New("tableResult").Funcs(funcs).Parse(tmplTableResult)
+	if err != nil {
+		return err
+	}
+	var buf bytes.Buffer
+	if err := t.Execute(&buf, data); err != nil {
+		return err
+	}
+	_, err = buf.WriteTo(w)
+	if err != nil {
+		return err
+	}
+
+	// Print queries by TablePrinter
 	p := internalio.NewSimplePrinter(w, tablewriter.MAX_ROW_WIDTH*5, true)
 	p.SetHeader([]string{"", "#", "file", "function", "t", "query"})
 	for i, qr := range qrs {
@@ -218,6 +262,5 @@ func printTableResult(w io.Writer, table string, queryResults []*analysis.QueryR
 			p.AddRow([]string{"   ", strconv.Itoa(i + 1), analysisutil.FLC(qr.Meta.Position()), qr.Meta.Func.Name(), k, q.Raw})
 		}
 	}
-	_ = p.Print()
-	fmt.Fprintln(w)
+	return p.Print()
 }

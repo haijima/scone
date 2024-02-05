@@ -215,17 +215,3 @@ func GetFuncInfo(common *ssa.CallCommon) (pkgPath, funcName string, ok bool) {
 	}
 	return "", "", false // Can't get package name of the function
 }
-
-func GetCommentGroups(files []*ast.File, prefix string) []ast.CommentGroup {
-	res := make([]ast.CommentGroup, 0)
-	for _, file := range files {
-		for _, cg := range file.Comments {
-			for _, c := range strings.Split(cg.Text(), "\n") {
-				if strings.HasPrefix(c, prefix) {
-					res = append(res, *cg)
-				}
-			}
-		}
-	}
-	return res
-}

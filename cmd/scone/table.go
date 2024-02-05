@@ -184,6 +184,9 @@ func printTableResult(w io.Writer, table *sql.Table, queryResults analysis.Query
 	p.SetHeader([]string{"", "#", "file", "function", "t", "query"})
 	for i, qr := range qrs {
 		for _, q := range qr.Queries() {
+			if !slices.Contains(q.Tables, table.Name) {
+				continue
+			}
 			k := "?"
 			if q.Kind > sql.Unknown {
 				k = q.Kind.Color(q.Kind.String()[:1])

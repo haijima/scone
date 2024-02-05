@@ -30,11 +30,15 @@ func (qrs QueryResults) AllQueries() []*sql.Query {
 }
 
 func (qrs QueryResults) AllTables() []*sql.Table {
-	return maps.Values(qrs.allTableMap())
+	s := maps.Values(qrs.allTableMap())
+	slices.SortFunc(s, func(a, b *sql.Table) int { return strings.Compare(a.Name, b.Name) })
+	return s
 }
 
 func (qrs QueryResults) AllTableNames() []string {
-	return maps.Keys(qrs.allTableMap())
+	s := maps.Keys(qrs.allTableMap())
+	slices.Sort(s)
+	return s
 }
 
 func (qrs QueryResults) allTableMap() map[string]*sql.Table {

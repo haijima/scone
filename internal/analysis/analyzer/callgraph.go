@@ -4,7 +4,6 @@ import (
 	"reflect"
 
 	"github.com/haijima/scone/internal/analysis"
-	"github.com/haijima/scone/internal/query"
 	toolsAnalysis "golang.org/x/tools/go/analysis"
 	"golang.org/x/tools/go/analysis/passes/buildssa"
 )
@@ -17,7 +16,7 @@ var CallgraphAnalyzer = &toolsAnalysis.Analyzer{
 	Doc:  doc,
 	Run: func(pass *toolsAnalysis.Pass) (interface{}, error) {
 		ssaProg := pass.ResultOf[buildssa.Analyzer].(*buildssa.SSA)
-		qgs := pass.ResultOf[QueryAnalyzer].([]*query.QueryGroup)
+		qgs := pass.ResultOf[QueryAnalyzer].([]*analysis.QueryResult)
 		return analysis.BuildCallGraph(ssaProg, qgs)
 	},
 	Requires: []*toolsAnalysis.Analyzer{

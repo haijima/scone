@@ -38,17 +38,17 @@ type Option struct {
 	IsIgnoredFunc         func(pos token.Pos) bool
 }
 
-func (o *Option) Filter(q *query.Query) bool {
-	pkgName := q.Package.Pkg.Name()
-	pkgPath := q.Package.Pkg.Path()
-	file := q.Position().Filename
-	funcName := q.Func.Name()
+func (o *Option) Filter(q *query.Query, meta *Meta) bool {
+	pkgName := meta.Package.Pkg.Name()
+	pkgPath := meta.Package.Pkg.Path()
+	file := meta.Position().Filename
+	funcName := meta.Func.Name()
 	queryType := q.Kind.String()
 	tables := q.Tables
 	hash := q.Sha()
 
 	commented := false
-	for _, p := range q.Pos {
+	for _, p := range meta.Pos {
 		if p.IsValid() {
 			commented = commented || o.IsIgnoredFunc(p)
 		}

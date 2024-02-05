@@ -3,7 +3,6 @@ package query
 import (
 	"crypto/sha1"
 	"fmt"
-	"go/token"
 	"regexp"
 	"strings"
 	"unicode"
@@ -11,28 +10,31 @@ import (
 	mapset "github.com/deckarep/golang-set/v2"
 	"github.com/fatih/color"
 	"github.com/haijima/scone/internal/analysis/analysisutil"
-	"golang.org/x/tools/go/ssa"
-
 	_ "github.com/pingcap/tidb/pkg/parser/test_driver"
 )
 
 type QueryGroup struct {
-	List []*Query
+	List mapset.Set[*Query]
+}
+
+func NewQueryGroup() *QueryGroup {
+	return &QueryGroup{List: mapset.NewSet[*Query]()}
+}
+
+func NewQueryGroupFrom(queries ...*Query) *QueryGroup {
+	qg := NewQueryGroup()
+	for _, q := range queries {
+		qg.List.Add(q)
+	}
+	return qg
 }
 
 type Query struct {
 	Kind            QueryKind
-	Func            *ssa.Function
-	Pos             []token.Pos
-	Package         *ssa.Package
 	Raw             string
 	MainTable       string
 	Tables          []string
 	FilterColumnMap map[string]mapset.Set[string]
-}
-
-func (q *Query) Position() token.Position {
-	return analysisutil.GetPosition(q.Package, q.Pos)
 }
 
 func (q *Query) Sha() string {

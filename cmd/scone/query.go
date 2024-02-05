@@ -56,7 +56,7 @@ func runQuery(cmd *cobra.Command, v *viper.Viper) error {
 		return err
 	}
 
-	queryGroups, _, _, err := analysis.Analyze(dir, pattern, opt)
+	queryResults, _, _, err := analysis.Analyze(dir, pattern, opt)
 	if err != nil {
 		return err
 	}
@@ -67,7 +67,7 @@ func runQuery(cmd *cobra.Command, v *viper.Viper) error {
 	if !slices.Contains(sortKeys, "file") {
 		sortKeys = append(sortKeys, "file")
 	}
-	slices.SortFunc(queryGroups, sortQuery(sortKeys))
+	slices.SortFunc(queryResults, sortQuery(sortKeys))
 
 	printOpt := &PrintQueryOption{Cols: defaultHeaderIndex, NoHeader: noHeader, NoRowNum: noRowNum, ExpandQueryGroup: expandQueryGroup, ShowFullPackagePath: showFullPackagePath}
 	if len(cols) > 0 {
@@ -81,10 +81,8 @@ func runQuery(cmd *cobra.Command, v *viper.Viper) error {
 		}
 	}
 	pkgs := mapset.NewSet[string]()
-	for _, qg := range queryGroups {
-		for _, q := range qg.List {
-			pkgs.Add(q.Package.Pkg.Path())
-		}
+	for _, qr := range queryResults {
+		pkgs.Add(qr.Meta.Package.Pkg.Path())
 	}
 	printOpt.pkgBasePath = util.FindCommonPrefix(pkgs.ToSlice())
 
@@ -108,17 +106,17 @@ func runQuery(cmd *cobra.Command, v *viper.Viper) error {
 	if !printOpt.NoHeader {
 		p.SetHeader(makeHeader(printOpt))
 	}
-	for i, qg := range queryGroups {
+	for i, qr := range queryResults {
 		phi := ""
-		for j, q := range qg.List {
-			if len(qg.List) > 1 {
+		for j, q := range qr.Queries() {
+			if len(qr.Queries()) > 1 {
 				if expandQueryGroup {
 					phi = fmt.Sprintf("P%d", j+1)
 				} else {
 					phi = "P"
 				}
 			}
-			r := append([]string{phi}, row(q, printOpt)...)
+			r := append([]string{phi}, row(q, qr.Meta, printOpt)...)
 			if !printOpt.NoRowNum {
 				r = append([]string{strconv.Itoa(i + 1)}, r...)
 			}
@@ -131,28 +129,28 @@ func runQuery(cmd *cobra.Command, v *viper.Viper) error {
 	return p.Print()
 }
 
-func sortQuery(sortKeys []string) func(a, b *query.QueryGroup) int {
-	return func(aa, bb *query.QueryGroup) int {
-		a := aa.List[0]
-		b := bb.List[0]
+func sortQuery(sortKeys []string) func(a, b *analysis.QueryResult) int {
+	return func(aa, bb *analysis.QueryResult) int {
+		a := aa.Queries()[0]
+		b := bb.Queries()[0]
 		for _, sortKey := range sortKeys {
-			if sortKey == "function" && a.Func.Name() != b.Func.Name() {
-				return strings.Compare(a.Func.Name(), b.Func.Name())
-			} else if sortKey == "type" && a.Kind != b.Kind {
+			if sortKey == "type" && a.Kind != b.Kind {
 				return int(a.Kind) - int(b.Kind)
 			} else if sortKey == "table" && a.MainTable != b.MainTable {
 				return strings.Compare(a.MainTable, b.MainTable)
 			} else if sortKey == "sha1" && a.Sha() != b.Sha() {
 				return strings.Compare(a.Sha(), b.Sha())
+			} else if sortKey == "function" && aa.Meta.Func.Name() != bb.Meta.Func.Name() {
+				return strings.Compare(aa.Meta.Func.Name(), bb.Meta.Func.Name())
 			} else if sortKey == "file" {
-				if a.Package.Pkg.Path() != b.Package.Pkg.Path() {
-					return strings.Compare(a.Package.Pkg.Path(), b.Package.Pkg.Path())
-				} else if a.Position().Filename != b.Position().Filename {
-					return strings.Compare(a.Position().Filename, b.Position().Filename)
-				} else if a.Position().Line != b.Position().Line {
-					return a.Position().Line - b.Position().Line
-				} else if a.Position().Column != b.Position().Column {
-					return a.Position().Column - b.Position().Column
+				if aa.Meta.Package.Pkg.Path() != bb.Meta.Package.Pkg.Path() {
+					return strings.Compare(aa.Meta.Package.Pkg.Path(), bb.Meta.Package.Pkg.Path())
+				} else if aa.Meta.Position().Filename != bb.Meta.Position().Filename {
+					return strings.Compare(aa.Meta.Position().Filename, bb.Meta.Position().Filename)
+				} else if aa.Meta.Position().Line != bb.Meta.Position().Line {
+					return aa.Meta.Position().Line - bb.Meta.Position().Line
+				} else if aa.Meta.Position().Column != bb.Meta.Position().Column {
+					return aa.Meta.Position().Column - bb.Meta.Position().Column
 				}
 			}
 		}
@@ -191,17 +189,17 @@ func makeHeader(opt *PrintQueryOption) []string {
 	return header
 }
 
-func row(q *query.Query, opt *PrintQueryOption) []string {
+func row(q *query.Query, meta *analysis.Meta, opt *PrintQueryOption) []string {
 	var tables string
 	if len(q.Tables) > 0 {
 		tables = strings.Join(q.Tables[1:], ", ")
 	}
 
 	fullRow := []string{
-		q.Package.Pkg.Name(),
-		opt.ShortenPackagePath(q.Package.Pkg.Path()),
-		analysisutil.FLC(q.Position()),
-		q.Func.Name(),
+		meta.Package.Pkg.Name(),
+		opt.ShortenPackagePath(meta.Package.Pkg.Path()),
+		analysisutil.FLC(meta.Position()),
+		meta.Func.Name(),
 		q.Kind.ColoredString(),
 		q.MainTable,
 		tables,

@@ -4,7 +4,6 @@ import (
 	"reflect"
 
 	"github.com/haijima/scone/internal/analysis"
-	"github.com/haijima/scone/internal/query"
 	toolsAnalysis "golang.org/x/tools/go/analysis"
 	"golang.org/x/tools/go/analysis/passes/buildssa"
 )
@@ -20,5 +19,5 @@ var QueryAnalyzer = &toolsAnalysis.Analyzer{
 	Requires: []*toolsAnalysis.Analyzer{
 		buildssa.Analyzer,
 	},
-	ResultType: reflect.TypeOf([]*query.QueryGroup{}),
+	ResultType: reflect.TypeOf([]*analysis.QueryResult{}),
 }

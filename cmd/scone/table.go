@@ -42,20 +42,20 @@ func runTable(cmd *cobra.Command, v *viper.Viper) error {
 		return err
 	}
 
-	queryGroups, tables, cgs, err := analysis.Analyze(dir, pattern, opt)
+	queryResults, tables, cgs, err := analysis.Analyze(dir, pattern, opt)
 	if err != nil {
 		return err
 	}
-	return printResult(cmd.OutOrStdout(), queryGroups, tables, cgs, PrintTableOption{SummarizeOnly: summarizeOnly})
+	return printResult(cmd.OutOrStdout(), queryResults, tables, cgs, PrintTableOption{SummarizeOnly: summarizeOnly})
 }
 
 type PrintTableOption struct{ SummarizeOnly bool }
 
-func printResult(w io.Writer, queryGroups []*query.QueryGroup, tables mapset.Set[string], cgs []*analysis.CallGraph, opt PrintTableOption) error {
+func printResult(w io.Writer, queryResults []*analysis.QueryResult, tables mapset.Set[string], cgs []*analysis.CallGraph, opt PrintTableOption) error {
 	filterColumns := util.NewSetMap[string, string]()
 	kindsMap := util.NewSetMap[string, query.QueryKind]()
-	for _, qg := range queryGroups {
-		for _, q := range qg.List {
+	for _, qr := range queryResults {
+		for _, q := range qr.Queries() {
 			for t, cols := range q.FilterColumnMap {
 				filterColumns.Intersect(t, cols)
 			}
@@ -64,18 +64,18 @@ func printResult(w io.Writer, queryGroups []*query.QueryGroup, tables mapset.Set
 			}
 		}
 	}
-	connTables, collocationMap := clusterize(tables, queryGroups, cgs)
+	connTables, collocationMap := clusterize(tables, queryResults, cgs)
 
-	printSummary(w, tables, queryGroups, connTables, filterColumns, kindsMap)
+	printSummary(w, tables, queryResults, connTables, filterColumns, kindsMap)
 	if !opt.SummarizeOnly {
 		for _, t := range mapset.Sorted(tables) {
-			printTableResult(w, t, queryGroups, connTables, collocationMap[t], filterColumns[t], kindsMap[t])
+			printTableResult(w, t, queryResults, connTables, collocationMap[t], filterColumns[t], kindsMap[t])
 		}
 	}
 	return nil
 }
 
-func clusterize(tables mapset.Set[string], queryGroups []*query.QueryGroup, cgs []*analysis.CallGraph) ([]mapset.Set[string], map[string]mapset.Set[string]) {
+func clusterize(tables mapset.Set[string], queryResults []*analysis.QueryResult, cgs []*analysis.CallGraph) ([]mapset.Set[string], map[string]mapset.Set[string]) {
 	g := internal.NewGraph(tables.ToSlice()...) // Create a graph with tables as nodes
 
 	// Extract tables updated in the same transaction
@@ -100,8 +100,8 @@ func clusterize(tables mapset.Set[string], queryGroups []*query.QueryGroup, cgs 
 	}
 
 	// extract tables used in the same query
-	for _, qg := range queryGroups {
-		for _, q := range qg.List {
+	for _, qr := range queryResults {
+		for _, q := range qr.Queries() {
 			util.PairCombinateFunc(q.Tables, g.AddEdge)
 		}
 	}
@@ -128,7 +128,7 @@ func clusterize(tables mapset.Set[string], queryGroups []*query.QueryGroup, cgs 
 	return connTables, collocationMap
 }
 
-func printSummary(w io.Writer, tables mapset.Set[string], queryGroups []*query.QueryGroup, connTables []mapset.Set[string], filterColumns map[string]mapset.Set[string], kindsMap map[string]mapset.Set[query.QueryKind]) {
+func printSummary(w io.Writer, tables mapset.Set[string], queryGroups []*analysis.QueryResult, connTables []mapset.Set[string], filterColumns map[string]mapset.Set[string], kindsMap map[string]mapset.Set[query.QueryKind]) {
 	fmt.Fprintf(w, "%s\n", color.CyanString("Summary"))
 	fmt.Fprintf(w, "  %s : %d\n", color.MagentaString("queries       "), len(queryGroups))
 	fmt.Fprintf(w, "  %s : %d\n", color.MagentaString("tables        "), tables.Cardinality())
@@ -161,7 +161,7 @@ func printSummary(w io.Writer, tables mapset.Set[string], queryGroups []*query.Q
 	fmt.Fprintln(w)
 }
 
-func printTableResult(w io.Writer, table string, queryGroups []*query.QueryGroup, connTables []mapset.Set[string], collocationTables mapset.Set[string], filterColumns mapset.Set[string], kinds mapset.Set[query.QueryKind]) {
+func printTableResult(w io.Writer, table string, queryResults []*analysis.QueryResult, connTables []mapset.Set[string], collocationTables mapset.Set[string], filterColumns mapset.Set[string], kinds mapset.Set[query.QueryKind]) {
 	switch slices.Max(kinds.ToSlice()) {
 	case query.Select:
 		fmt.Fprintln(w, color.New(color.FgBlack, color.BgBlue).Sprintf(" %s ", table))
@@ -206,26 +206,26 @@ func printTableResult(w io.Writer, table string, queryGroups []*query.QueryGroup
 		fmt.Fprintf(w, "  \t\t  %s\n", color.HiBlackString("It is likely that this table will always be filtered by these column(s)"))
 	}
 
-	qgs := make([]*query.QueryGroup, 0)
-	for _, qg := range queryGroups {
-		for _, q := range qg.List {
+	qrs := make([]*analysis.QueryResult, 0)
+	for _, qr := range queryResults {
+		for _, q := range qr.Queries() {
 			if slices.Contains(q.Tables, table) {
-				qgs = append(qgs, qg)
+				qrs = append(qrs, qr)
 				break
 			}
 		}
 	}
-	fmt.Fprintf(w, "  %s\t: %d\n", color.MagentaString("queries"), len(qgs))
+	fmt.Fprintf(w, "  %s\t: %d\n", color.MagentaString("queries"), len(qrs))
 
 	p := internalio.NewSimplePrinter(w, tablewriter.MAX_ROW_WIDTH*5, true)
 	p.SetHeader([]string{"", "#", "file", "function", "t", "query"})
-	for i, qg := range qgs {
-		for _, q := range qg.List {
+	for i, qr := range qrs {
+		for _, q := range qr.Queries() {
 			k := "?"
 			if q.Kind > query.Unknown {
 				k = q.Kind.Color(q.Kind.String()[:1])
 			}
-			p.AddRow([]string{"   ", strconv.Itoa(i + 1), analysisutil.FLC(q.Position()), q.Func.Name(), k, q.Raw})
+			p.AddRow([]string{"   ", strconv.Itoa(i + 1), analysisutil.FLC(qr.Meta.Position()), qr.Meta.Func.Name(), k, q.Raw})
 		}
 	}
 	p.Print()

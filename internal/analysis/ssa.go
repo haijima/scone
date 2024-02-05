@@ -11,20 +11,60 @@ import (
 	"strconv"
 	"strings"
 
+	mapset "github.com/deckarep/golang-set/v2"
 	"github.com/haijima/scone/internal/analysis/analysisutil"
 	"github.com/haijima/scone/internal/query"
 	"golang.org/x/tools/go/analysis/passes/buildssa"
 	"golang.org/x/tools/go/ssa"
 )
 
+type QueryResult struct {
+	QueryGroup *query.QueryGroup
+	Meta       *Meta
+}
+
+func (qr *QueryResult) Queries() []*query.Query {
+	if qr.QueryGroup == nil {
+		qr.QueryGroup = query.NewQueryGroup()
+	} else if qr.QueryGroup.List == nil {
+		qr.QueryGroup.List = mapset.NewSet[*query.Query]()
+	}
+	s := qr.QueryGroup.List.ToSlice()
+	slices.SortFunc(s, func(a, b *query.Query) int { return strings.Compare(a.Raw, b.Raw) })
+	return s
+}
+
+func (qr *QueryResult) Append(qs ...*query.Query) {
+	if qr.QueryGroup == nil {
+		qr.QueryGroup = query.NewQueryGroup()
+	} else if qr.QueryGroup.List == nil {
+		qr.QueryGroup.List = mapset.NewSet[*query.Query]()
+	}
+	qr.QueryGroup.List.Append(qs...)
+}
+
+type Meta struct {
+	Package *ssa.Package
+	Func    *ssa.Function
+	Pos     []token.Pos
+}
+
+func NewMeta(pkg *ssa.Package, fn *ssa.Function, pos token.Pos, fallbackPos ...token.Pos) *Meta {
+	return &Meta{Package: pkg, Func: fn, Pos: append([]token.Pos{pos}, fallbackPos...)}
+}
+
+func (m *Meta) Position() token.Position {
+	return analysisutil.GetPosition(m.Package, m.Pos)
+}
+
 // ExtractQuery extracts queries from the given package.
-func ExtractQuery(ssaProg *buildssa.SSA, files []*ast.File, opt *Option) ([]*query.QueryGroup, error) {
-	foundQueryGroups := make([]*query.QueryGroup, 0)
+func ExtractQuery(ssaProg *buildssa.SSA, files []*ast.File, opt *Option) ([]*QueryResult, error) {
+	foundQueryResults := make([]*QueryResult, 0)
 	opt.QueryCommentPositions = make([]token.Pos, 0)
 	opt.IsIgnoredFunc = func(pos token.Pos) bool { return false }
 
 	// Get queries from comments
-	foundQueryGroups = append(foundQueryGroups, GetQueryGroupsInComment(ssaProg, files, opt)...)
+	foundQueryResults = append(foundQueryResults, GetQueryResultsInComment(ssaProg, files, opt)...)
 
 	//ignoreCommentPrefix := "// scone:ignore"
 	for _, file := range files {
@@ -49,88 +89,83 @@ func ExtractQuery(ssaProg *buildssa.SSA, files []*ast.File, opt *Option) ([]*que
 	for _, member := range ssaProg.SrcFuncs {
 		switch opt.Mode {
 		case SsaMethod:
-			foundQueryGroups = append(foundQueryGroups, AnalyzeFuncBySsaMethod(ssaProg.Pkg, member, []token.Pos{}, opt)...)
+			foundQueryResults = append(foundQueryResults, AnalyzeFuncBySsaMethod(ssaProg.Pkg, member, []token.Pos{}, opt)...)
 		case SsaConst:
-			foundQueryGroups = append(foundQueryGroups, AnalyzeFuncBySsaConst(ssaProg.Pkg, member, []token.Pos{}, opt)...)
+			foundQueryResults = append(foundQueryResults, AnalyzeFuncBySsaConst(ssaProg.Pkg, member, []token.Pos{}, opt)...)
 		case Ast:
-			foundQueryGroups = append(foundQueryGroups, AnalyzeFuncByAst(ssaProg.Pkg, member, []token.Pos{}, opt)...)
+			foundQueryResults = append(foundQueryResults, AnalyzeFuncByAst(ssaProg.Pkg, member, []token.Pos{}, opt)...)
 		}
 	}
 
-	slices.SortFunc(foundQueryGroups, func(a, b *query.QueryGroup) int {
-		if a.List[0].Position().Offset != b.List[0].Position().Offset {
-			return a.List[0].Position().Offset - b.List[0].Position().Offset
+	slices.SortFunc(foundQueryResults, func(a, b *QueryResult) int {
+		if a.Meta.Position().Offset != b.Meta.Position().Offset {
+			return a.Meta.Position().Offset - b.Meta.Position().Offset
 		}
-		return strings.Compare(a.List[0].Raw, b.List[0].Raw)
+		return strings.Compare(a.Queries()[0].Raw, b.Queries()[0].Raw)
 	})
-	foundQueryGroups = slices.CompactFunc(foundQueryGroups, func(a, b *query.QueryGroup) bool {
-		return a.List[0].Raw == b.List[0].Raw && a.List[0].Position().Offset == b.List[0].Position().Offset
+	foundQueryResults = slices.CompactFunc(foundQueryResults, func(a, b *QueryResult) bool {
+		return a.Queries()[0].Sha() == b.Queries()[0].Sha() && a.Meta.Position().Offset == b.Meta.Position().Offset
 	})
-	return foundQueryGroups, nil
+	return foundQueryResults, nil
 }
 
-func GetQueryGroupsInComment(ssaProg *buildssa.SSA, files []*ast.File, opt *Option) []*query.QueryGroup {
-	foundQueryGroups := make([]*query.QueryGroup, 0)
+func GetQueryResultsInComment(ssaProg *buildssa.SSA, files []*ast.File, opt *Option) []*QueryResult {
+	foundQueryResults := make([]*QueryResult, 0)
 
 	commentPrefix := "// scone:sql"
 	for _, file := range files {
 		for _, cg := range file.Comments {
+			qr := &QueryResult{Meta: NewMeta(ssaProg.Pkg, &ssa.Function{}, cg.Pos())}
+			for _, member := range ssaProg.SrcFuncs {
+				if member.Syntax().Pos() <= cg.Pos() && cg.End() <= member.Syntax().End() {
+					qr.Meta.Func = member
+					qr.Meta.Pos = append(qr.Meta.Pos, member.Pos())
+					break
+				}
+			}
 			for _, comment := range cg.List {
-				qg := &query.QueryGroup{}
 				if strings.HasPrefix(comment.Text, commentPrefix) {
 					if q, ok := query.ToSqlQuery(strings.TrimPrefix(comment.Text, commentPrefix)); ok {
-						q.Func = &ssa.Function{}
-						for _, member := range ssaProg.SrcFuncs {
-							if member.Syntax().Pos() <= comment.Pos() && comment.End() <= member.Syntax().End() {
-								q.Func = member
-								break
-							}
-						}
-						q.Pos = append([]token.Pos{comment.Pos()})
-						if q.Func != nil {
-							q.Pos = append(q.Pos, q.Func.Pos())
-						}
-						q.Package = ssaProg.Pkg
-						if opt.Filter(q) {
-							qg.List = append(qg.List, q)
+						if opt.Filter(q, qr.Meta) {
+							qr.Append(q)
 							opt.QueryCommentPositions = append(opt.QueryCommentPositions, comment.Pos())
 						}
 					}
 				}
-				if len(qg.List) > 0 {
-					foundQueryGroups = append(foundQueryGroups, qg)
-				}
+			}
+			if len(qr.Queries()) > 0 {
+				foundQueryResults = append(foundQueryResults, qr)
 			}
 		}
 	}
-	return foundQueryGroups
+	return foundQueryResults
 }
 
-func AnalyzeFuncBySsaConst(pkg *ssa.Package, fn *ssa.Function, pos []token.Pos, opt *Option) []*query.QueryGroup {
-	foundQueryGroups := make([]*query.QueryGroup, 0)
+func AnalyzeFuncBySsaConst(pkg *ssa.Package, fn *ssa.Function, pos []token.Pos, opt *Option) []*QueryResult {
+	foundQueryResults := make([]*QueryResult, 0)
 	for _, block := range fn.Blocks {
 		for _, instr := range block.Instrs {
-			foundQueryGroups = append(foundQueryGroups, instructionToQueryGroups(pkg, instr, append([]token.Pos{fn.Pos()}, pos...), opt)...)
+			foundQueryResults = append(foundQueryResults, instructionToQueryGroups(pkg, instr, append([]token.Pos{fn.Pos()}, pos...), opt)...)
 		}
 	}
 	for _, anon := range fn.AnonFuncs {
-		foundQueryGroups = append(foundQueryGroups, AnalyzeFuncBySsaConst(pkg, anon, append([]token.Pos{anon.Pos(), fn.Pos()}, pos...), opt)...)
+		foundQueryResults = append(foundQueryResults, AnalyzeFuncBySsaConst(pkg, anon, append([]token.Pos{anon.Pos(), fn.Pos()}, pos...), opt)...)
 	}
-	return foundQueryGroups
+	return foundQueryResults
 }
 
-func instructionToQueryGroups(pkg *ssa.Package, instr ssa.Instruction, pos []token.Pos, opt *Option) []*query.QueryGroup {
+func instructionToQueryGroups(pkg *ssa.Package, instr ssa.Instruction, pos []token.Pos, opt *Option) []*QueryResult {
 	switch i := instr.(type) {
 	case *ssa.Call:
 		return callToQueryGroups(pkg, i, instr.Parent(), pos, opt)
 	case *ssa.Phi:
-		return []*query.QueryGroup{phiToQueryGroup(pkg, i, instr.Parent(), pos, opt)}
+		return []*QueryResult{phiToQueryGroup(pkg, i, instr.Parent(), pos, opt)}
 	}
-	return []*query.QueryGroup{}
+	return []*QueryResult{}
 }
 
-func callToQueryGroups(pkg *ssa.Package, i *ssa.Call, fn *ssa.Function, pos []token.Pos, opt *Option) []*query.QueryGroup {
-	res := make([]*query.QueryGroup, 0)
+func callToQueryGroups(pkg *ssa.Package, i *ssa.Call, fn *ssa.Function, pos []token.Pos, opt *Option) []*QueryResult {
+	res := make([]*QueryResult, 0)
 	pos = append([]token.Pos{i.Pos()}, pos...)
 	for _, arg := range i.Common().Args {
 		switch a := arg.(type) {
@@ -145,27 +180,25 @@ func callToQueryGroups(pkg *ssa.Package, i *ssa.Call, fn *ssa.Function, pos []to
 	return res
 }
 
-func phiToQueryGroup(pkg *ssa.Package, a *ssa.Phi, fn *ssa.Function, pos []token.Pos, opt *Option) *query.QueryGroup {
-	qg := &query.QueryGroup{}
+func phiToQueryGroup(pkg *ssa.Package, a *ssa.Phi, fn *ssa.Function, pos []token.Pos, opt *Option) *QueryResult {
+	queryResult := &QueryResult{Meta: NewMeta(pkg, fn, a.Pos(), pos...)}
 	for _, edge := range a.Edges {
 		switch e := edge.(type) {
 		case *ssa.Const:
-			if qg, ok := constToQueryGroup(pkg, e, fn, append([]token.Pos{a.Pos()}, pos...), opt); ok {
-				qg.List = append(qg.List, qg.List...)
+			if qr, ok := constToQueryGroup(pkg, e, fn, append([]token.Pos{a.Pos()}, pos...), opt); ok {
+				queryResult.Append(qr.Queries()...)
 			}
 		}
 	}
-	return qg
+	return queryResult
 }
 
-func constToQueryGroup(pkg *ssa.Package, a *ssa.Const, fn *ssa.Function, pos []token.Pos, opt *Option) (*query.QueryGroup, bool) {
+func constToQueryGroup(pkg *ssa.Package, a *ssa.Const, fn *ssa.Function, pos []token.Pos, opt *Option) (*QueryResult, bool) {
 	if a.Value != nil && a.Value.Kind() == constant.String {
 		if q, ok := query.ToSqlQuery(a.Value.ExactString()); ok {
-			q.Func = fn
-			q.Pos = append([]token.Pos{a.Pos()}, pos...)
-			q.Package = pkg
-			if opt.Filter(q) {
-				return &query.QueryGroup{List: []*query.Query{q}}, true
+			qr := &QueryResult{QueryGroup: query.NewQueryGroupFrom(q), Meta: NewMeta(pkg, fn, a.Pos(), pos...)}
+			if opt.Filter(q, qr.Meta) {
+				return qr, true
 			}
 		}
 	}
@@ -209,7 +242,7 @@ var targetMethods = []methodArg{
 	{Package: "github.com/jmoiron/sqlx", Method: "In", ArgIndex: -1},
 }
 
-func AnalyzeFuncBySsaMethod(pkg *ssa.Package, fn *ssa.Function, pos []token.Pos, opt *Option) []*query.QueryGroup {
+func AnalyzeFuncBySsaMethod(pkg *ssa.Package, fn *ssa.Function, pos []token.Pos, opt *Option) []*QueryResult {
 	tms := make([]methodArg, len(targetMethods))
 	copy(tms, targetMethods)
 	if opt.AdditionalFuncs != nil || len(opt.AdditionalFuncs) > 0 {
@@ -228,7 +261,7 @@ func AnalyzeFuncBySsaMethod(pkg *ssa.Package, fn *ssa.Function, pos []token.Pos,
 		}
 	}
 
-	foundQueryGroups := make([]*query.QueryGroup, 0)
+	foundQueryResults := make([]*QueryResult, 0)
 	for _, block := range fn.Blocks {
 		for _, instr := range block.Instrs {
 			if c, ok := instr.(*ssa.Call); ok {
@@ -244,11 +277,11 @@ func AnalyzeFuncBySsaMethod(pkg *ssa.Package, fn *ssa.Function, pos []token.Pos,
 							if phi, ok := arg.(*ssa.Phi); ok {
 								for _, edge := range phi.Edges {
 									if qg, ok := constLikeStringValueToQueryGroup(pkg, edge, fn, append([]token.Pos{arg.Pos(), c.Pos(), fn.Pos()}, pos...), opt); ok {
-										foundQueryGroups = append(foundQueryGroups, qg)
+										foundQueryResults = append(foundQueryResults, qg)
 									}
 								}
 							} else if qg, ok := constLikeStringValueToQueryGroup(pkg, arg, fn, append([]token.Pos{c.Pos(), fn.Pos()}, pos...), opt); ok {
-								foundQueryGroups = append(foundQueryGroups, qg)
+								foundQueryResults = append(foundQueryResults, qg)
 							}
 							break // Found target method
 						}
@@ -259,26 +292,23 @@ func AnalyzeFuncBySsaMethod(pkg *ssa.Package, fn *ssa.Function, pos []token.Pos,
 	}
 
 	for _, anon := range fn.AnonFuncs {
-		foundQueryGroups = append(foundQueryGroups, AnalyzeFuncBySsaMethod(pkg, anon, append([]token.Pos{anon.Pos(), fn.Pos()}, pos...), opt)...)
+		foundQueryResults = append(foundQueryResults, AnalyzeFuncBySsaMethod(pkg, anon, append([]token.Pos{anon.Pos(), fn.Pos()}, pos...), opt)...)
 	}
 
-	return foundQueryGroups
+	return foundQueryResults
 }
 
-func constLikeStringValueToQueryGroup(pkg *ssa.Package, v ssa.Value, fn *ssa.Function, pos []token.Pos, opt *Option) (*query.QueryGroup, bool) {
+func constLikeStringValueToQueryGroup(pkg *ssa.Package, v ssa.Value, fn *ssa.Function, pos []token.Pos, opt *Option) (*QueryResult, bool) {
 	file := analysisutil.FLC(analysisutil.GetPosition(pkg, append([]token.Pos{v.Pos()}, pos...)))
 	if as, ok := analysisutil.ConstLikeStringValues(v); ok {
-		qg := &query.QueryGroup{}
+		qr := &QueryResult{Meta: NewMeta(pkg, fn, v.Pos(), pos...)}
 		for _, a := range as {
 			if q, ok := query.ToSqlQuery(a); ok {
-				q.Func = fn
-				q.Pos = append([]token.Pos{v.Pos()}, pos...)
-				q.Package = pkg
-				if opt.Filter(q) {
-					qg.List = append(qg.List, q)
+				if opt.Filter(q, qr.Meta) {
+					qr.Append(q)
 				} else {
 					slog.Debug("filtered", "SQL", v, "package", pkg.Pkg.Path(), "file", file)
-					return &query.QueryGroup{}, false
+					return &QueryResult{}, false
 				}
 			} else {
 				level := slog.LevelWarn
@@ -291,10 +321,8 @@ func constLikeStringValueToQueryGroup(pkg *ssa.Package, v ssa.Value, fn *ssa.Fun
 				slog.Log(context.Background(), level, "Cannot parse as SQL", "SQL", a, "package", pkg.Pkg.Path(), "file", file, "function", fn.Name())
 			}
 		}
-		if len(qg.List) > 0 {
-			slices.SortFunc(qg.List, func(a, b *query.Query) int { return strings.Compare(a.Raw, b.Raw) })
-			qg.List = slices.CompactFunc(qg.List, func(a, b *query.Query) bool { return a.Raw == b.Raw })
-			return qg, true
+		if len(qr.Queries()) > 0 {
+			return qr, true
 		}
 	} else {
 		if extract, ok := v.(*ssa.Extract); ok {
@@ -302,22 +330,23 @@ func constLikeStringValueToQueryGroup(pkg *ssa.Package, v ssa.Value, fn *ssa.Fun
 				if fn, ok := c.Common().Value.(*ssa.Function); ok {
 					if fn.Pkg != nil && fn.Pkg.Pkg.Path() == "github.com/jmoiron/sqlx" && fn.Name() == "In" {
 						// No need to warn if v is the result of sqlx.In()
-						return &query.QueryGroup{}, false
+						return &QueryResult{}, false
 					}
 				}
 			}
 		}
 		if IsCommented(pkg, append([]token.Pos{v.Pos()}, pos...), opt) {
 			slog.Debug("Can't parse value as string constant", "type", fmt.Sprintf("%T", v), "value", fmt.Sprintf("%v", v), "package", pkg.Pkg.Path(), "file", file, "function", fn.Name())
-			return &query.QueryGroup{}, false
+			return &QueryResult{}, false
 		}
 		slog.Warn("Can't parse value as string constant", "type", fmt.Sprintf("%T", v), "value", fmt.Sprintf("%v", v), "package", pkg.Pkg.Path(), "file", file, "function", fn.Name())
 	}
-	q := &query.Query{Kind: query.Unknown, Func: fn, Pos: append([]token.Pos{v.Pos()}, pos...), Package: pkg}
-	if opt.Filter(q) {
-		return &query.QueryGroup{List: []*query.Query{q}}, true
+	q := &query.Query{Kind: query.Unknown}
+	qr := &QueryResult{QueryGroup: query.NewQueryGroupFrom(q), Meta: NewMeta(pkg, fn, v.Pos(), pos...)}
+	if opt.Filter(q, qr.Meta) {
+		return qr, true
 	}
-	return &query.QueryGroup{}, false
+	return &QueryResult{}, false
 }
 
 func IsCommented(pkg *ssa.Package, pos []token.Pos, opt *Option) bool {

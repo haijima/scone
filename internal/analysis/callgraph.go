@@ -5,7 +5,6 @@ import (
 	"go/types"
 
 	"github.com/haijima/scone/internal/query"
-	"golang.org/x/tools/go/analysis/passes/buildssa"
 	"golang.org/x/tools/go/callgraph/static"
 	"golang.org/x/tools/go/ssa"
 )
@@ -126,12 +125,12 @@ func Walk(cg *CallGraph, in *Node, fn func(node *Node) bool) {
 	}
 }
 
-func BuildCallGraph(ssaProg *buildssa.SSA, qrs []*QueryResult) (*CallGraph, error) {
+func BuildCallGraph(pkg *ssa.Package, qrs []*QueryResult) (*CallGraph, error) {
 	result := &CallGraph{
-		Package: ssaProg.Pkg.Pkg,
+		Package: pkg.Pkg,
 		Nodes:   make(map[string]*Node),
 	}
-	cg := static.CallGraph(ssaProg.Pkg.Prog)
+	cg := static.CallGraph(pkg.Prog)
 	callerFuncs := make([]*ssa.Function, 0, len(qrs))
 	queryEdgeMemo := make(map[string]bool)
 	for _, qr := range qrs {

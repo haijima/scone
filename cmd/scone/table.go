@@ -51,7 +51,7 @@ func runTable(cmd *cobra.Command, v *viper.Viper) error {
 
 type PrintTableOption struct{ SummarizeOnly bool }
 
-func printResult(w io.Writer, queryResults []*analysis.QueryResult, tables mapset.Set[string], cgs []*analysis.CallGraph, opt PrintTableOption) error {
+func printResult(w io.Writer, queryResults []*analysis.QueryResult, tables mapset.Set[string], cgs map[string]*analysis.CallGraph, opt PrintTableOption) error {
 	filterColumns := util.NewSetMap[string, string]()
 	kindsMap := util.NewSetMap[string, query.QueryKind]()
 	for _, qr := range queryResults {
@@ -75,7 +75,7 @@ func printResult(w io.Writer, queryResults []*analysis.QueryResult, tables mapse
 	return nil
 }
 
-func clusterize(tables mapset.Set[string], queryResults []*analysis.QueryResult, cgs []*analysis.CallGraph) ([]mapset.Set[string], map[string]mapset.Set[string]) {
+func clusterize(tables mapset.Set[string], queryResults []*analysis.QueryResult, cgs map[string]*analysis.CallGraph) ([]mapset.Set[string], map[string]mapset.Set[string]) {
 	g := internal.NewGraph(tables.ToSlice()...) // Create a graph with tables as nodes
 
 	// Extract tables updated in the same transaction

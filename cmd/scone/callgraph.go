@@ -43,12 +43,11 @@ func runCallgraph(cmd *cobra.Command, v *viper.Viper) error {
 	return printGraphviz(cmd.OutOrStdout(), cgs)
 }
 
-func printGraphviz(w io.Writer, cgs []*analysis.CallGraph) error {
+func printGraphviz(w io.Writer, cgs map[string]*analysis.CallGraph) error {
 	//c := &DotCluster{ID: "callgraph", Clusters: make(map[string]*DotCluster), Nodes: make([]*DotNode, 0), Attrs: make(DotAttrs)}
 	g := &internal.DotGraph{Nodes: make([]*internal.DotNode, 0), Edges: make([]*internal.DotEdge, 0)}
 
-	for _, cg := range cgs {
-		pkg := cg.Package.Path()
+	for pkg, cg := range cgs {
 		for _, node := range cg.Nodes {
 			// Print edges
 			for _, edge := range node.Out {
@@ -88,7 +87,7 @@ func printGraphviz(w io.Writer, cgs []*analysis.CallGraph) error {
 
 	// Print cacheable func and table node styles
 	selectOnlyNodes := make(map[string]query.QueryKind)
-	for _, cg := range cgs {
+	for pkg, cg := range cgs {
 		for _, node := range analysis.TopologicalSort(cg.Nodes) {
 			// table node
 			if node.Func == nil {
@@ -124,7 +123,7 @@ func printGraphviz(w io.Writer, cgs []*analysis.CallGraph) error {
 		}
 
 		for n, k := range selectOnlyNodes {
-			name := fmt.Sprintf("%s.%s", cg.Package.Path(), n)
+			name := fmt.Sprintf("%s.%s", pkg, n)
 			attr := make(internal.DotAttrs)
 			if k == query.Select {
 				attr["color"] = "blue"
@@ -154,12 +153,12 @@ func printGraphviz(w io.Writer, cgs []*analysis.CallGraph) error {
 	// Print node positions
 	minNodeNames := make(map[string]bool)
 	maxNodeNames := make(map[string]bool)
-	for _, cg := range cgs {
+	for pkg, cg := range cgs {
 		for _, node := range cg.Nodes {
 			if node.Func == nil {
 				maxNodeNames[node.Name] = true
 			} else if len(node.In) == 0 {
-				minNodeNames[fmt.Sprintf("%s.%s", cg.Package.Path(), node.Name)] = true
+				minNodeNames[fmt.Sprintf("%s.%s", pkg, node.Name)] = true
 			}
 		}
 	}

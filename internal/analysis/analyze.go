@@ -6,7 +6,7 @@ import (
 	"golang.org/x/tools/go/ssa"
 )
 
-func Analyze(dir, pattern string, opt *Option) ([]*QueryResult, mapset.Set[string], []*CallGraph, error) {
+func Analyze(dir, pattern string, opt *Option) ([]*QueryResult, mapset.Set[string], map[string]*CallGraph, error) {
 	results, err := analyzeSSA(dir, pattern, opt)
 	if err != nil {
 		return nil, nil, nil, err
@@ -21,13 +21,13 @@ func Analyze(dir, pattern string, opt *Option) ([]*QueryResult, mapset.Set[strin
 		}
 		qrsByPkg[qr.Meta.Package] = append(qrsByPkg[qr.Meta.Package], qr)
 	}
-	cgs := make([]*CallGraph, 0, len(results))
+	cgs := make(map[string]*CallGraph)
 	for pkg, qrs := range qrsByPkg {
 		cg, err := BuildCallGraph(pkg, qrs)
 		if err != nil {
 			return nil, nil, nil, err
 		}
-		cgs = append(cgs, cg)
+		cgs[pkg.Pkg.Path()] = cg
 	}
 	return results, tables, cgs, nil
 }

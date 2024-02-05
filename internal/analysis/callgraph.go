@@ -1,8 +1,7 @@
 package analysis
 
 import (
-	"fmt"
-	"go/types"
+	"slices"
 
 	"github.com/haijima/scone/internal/query"
 	"golang.org/x/tools/go/callgraph/static"
@@ -10,8 +9,7 @@ import (
 )
 
 type CallGraph struct {
-	Package *types.Package
-	Nodes   map[string]*Node
+	Nodes map[string]*Node
 }
 
 func (r *CallGraph) AddNode(n *Node) {
@@ -39,8 +37,16 @@ func (r *CallGraph) add(caller, callee *Node, edge *Edge) {
 	edge.Caller = caller.Name
 	edge.Callee = callee.Name
 
-	r.Nodes[caller.Name].Out = append(r.Nodes[caller.Name].Out, edge)
-	r.Nodes[callee.Name].In = append(r.Nodes[callee.Name].In, edge)
+	contains := slices.ContainsFunc(r.Nodes[caller.Name].Out, func(e *Edge) bool {
+		if e.Callee != callee.Name {
+			return false
+		}
+		return (e.IsFuncCall() && edge.IsFuncCall()) || (e.IsQuery() && edge.IsQuery() && e.SqlValue.Kind == edge.SqlValue.Kind)
+	})
+	if !contains {
+		r.Nodes[caller.Name].Out = append(r.Nodes[caller.Name].Out, edge)
+		r.Nodes[callee.Name].In = append(r.Nodes[callee.Name].In, edge)
+	}
 }
 
 func TopologicalSort(nodes map[string]*Node) []*Node {
@@ -126,32 +132,18 @@ func Walk(cg *CallGraph, in *Node, fn func(node *Node) bool) {
 }
 
 func BuildCallGraph(pkg *ssa.Package, qrs []*QueryResult) (*CallGraph, error) {
-	result := &CallGraph{
-		Package: pkg.Pkg,
-		Nodes:   make(map[string]*Node),
-	}
-	cg := static.CallGraph(pkg.Prog)
+	result := &CallGraph{Nodes: make(map[string]*Node)}
 	callerFuncs := make([]*ssa.Function, 0, len(qrs))
-	queryEdgeMemo := make(map[string]bool)
 	for _, qr := range qrs {
+		callerFuncs = append(callerFuncs, qr.Meta.Func)
 		for _, q := range qr.Queries() {
 			for _, t := range q.Tables {
-				k := fmt.Sprintf("%s#%s#%s", qr.Meta.Func.Name(), q.Kind, t)
-				if queryEdgeMemo[k] {
-					continue
-				}
-				queryEdgeMemo[k] = true
-
-				if qr.Meta.Func.Name() == "main" || qr.Meta.Func.Name() == "init" {
-					continue
-				}
 				result.AddQueryEdge(qr.Meta.Func, t, &SqlValue{Kind: q.Kind, RawSQL: q.Raw})
-
-				callerFuncs = append(callerFuncs, qr.Meta.Func)
 			}
 		}
 	}
 
+	cg := static.CallGraph(pkg.Prog)
 	seen := make(map[*ssa.Function]bool)
 	for len(callerFuncs) > 0 {
 		fn := callerFuncs[0]

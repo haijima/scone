@@ -16,7 +16,7 @@ var CallgraphAnalyzer = &toolsAnalysis.Analyzer{
 	Doc:  doc,
 	Run: func(pass *toolsAnalysis.Pass) (interface{}, error) {
 		ssaProg := pass.ResultOf[buildssa.Analyzer].(*buildssa.SSA)
-		qgs := pass.ResultOf[QueryAnalyzer].([]*analysis.QueryResult)
+		qgs := pass.ResultOf[QueryAnalyzer].(analysis.QueryResults)
 		return analysis.BuildCallGraph(ssaProg.Pkg, qgs)
 	},
 	Requires: []*toolsAnalysis.Analyzer{

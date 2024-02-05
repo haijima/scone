@@ -11,9 +11,8 @@ import (
 	"github.com/haijima/scone/internal"
 	"github.com/haijima/scone/internal/analysis"
 	"github.com/haijima/scone/internal/analysis/analysisutil"
-	"github.com/haijima/scone/internal/analysis/callgraph"
-	"github.com/haijima/scone/internal/analysis/query"
 	internalio "github.com/haijima/scone/internal/io"
+	"github.com/haijima/scone/internal/query"
 	"github.com/haijima/scone/internal/util"
 	"github.com/olekukonko/tablewriter"
 	"github.com/spf13/afero"
@@ -52,7 +51,7 @@ func runTable(cmd *cobra.Command, v *viper.Viper) error {
 
 type PrintTableOption struct{ SummarizeOnly bool }
 
-func printResult(w io.Writer, queryGroups []*query.QueryGroup, tables mapset.Set[string], cgs []*callgraph.CallGraph, opt PrintTableOption) error {
+func printResult(w io.Writer, queryGroups []*query.QueryGroup, tables mapset.Set[string], cgs []*analysis.CallGraph, opt PrintTableOption) error {
 	filterColumns := util.NewSetMap[string, string]()
 	kindsMap := util.NewSetMap[string, query.QueryKind]()
 	for _, qg := range queryGroups {
@@ -76,7 +75,7 @@ func printResult(w io.Writer, queryGroups []*query.QueryGroup, tables mapset.Set
 	return nil
 }
 
-func clusterize(tables mapset.Set[string], queryGroups []*query.QueryGroup, cgs []*callgraph.CallGraph) ([]mapset.Set[string], map[string]mapset.Set[string]) {
+func clusterize(tables mapset.Set[string], queryGroups []*query.QueryGroup, cgs []*analysis.CallGraph) ([]mapset.Set[string], map[string]mapset.Set[string]) {
 	g := internal.NewGraph(tables.ToSlice()...) // Create a graph with tables as nodes
 
 	// Extract tables updated in the same transaction
@@ -87,7 +86,7 @@ func clusterize(tables mapset.Set[string], queryGroups []*query.QueryGroup, cgs 
 			}
 			// walk from the root nodes
 			tablesInTx := make([]string, 0)
-			callgraph.Walk(cg, r, func(n *callgraph.Node) bool {
+			analysis.Walk(cg, r, func(n *analysis.Node) bool {
 				for _, edge := range n.Out {
 					if edge.IsQuery() && edge.SqlValue.Kind != query.Select {
 						tablesInTx = append(tablesInTx, edge.Callee)

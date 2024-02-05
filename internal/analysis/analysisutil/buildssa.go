@@ -1,4 +1,4 @@
-package analysis
+package analysisutil
 
 import (
 	"go/ast"

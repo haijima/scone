@@ -2,7 +2,7 @@ package main
 
 import (
 	"github.com/cockroachdb/errors"
-	"github.com/haijima/scone/internal/analysis/query"
+	"github.com/haijima/scone/internal/analysis"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -29,7 +29,7 @@ func SetQueryOptionFlags(cmd *cobra.Command) {
 	_ = cmd.MarkFlagDirname("dir")
 }
 
-func QueryOptionFromViper(v *viper.Viper) (*query.Option, error) {
+func QueryOptionFromViper(v *viper.Viper) (*analysis.Option, error) {
 	excludeQueries := v.GetStringSlice("exclude-queries")
 	excludePackages := v.GetStringSlice("exclude-packages")
 	excludePackagePaths := v.GetStringSlice("exclude-package-paths")
@@ -47,18 +47,18 @@ func QueryOptionFromViper(v *viper.Viper) (*query.Option, error) {
 	modeFlg := v.GetString("mode")
 	additionalFuncs := v.GetStringSlice("analyze-funcs")
 
-	var mode query.AnalyzeMode
+	var mode analysis.AnalyzeMode
 	if modeFlg == "ssa-method" {
-		mode = query.SsaMethod
+		mode = analysis.SsaMethod
 	} else if modeFlg == "ssa-const" {
-		mode = query.SsaConst
+		mode = analysis.SsaConst
 	} else if modeFlg == "ast" {
-		mode = query.Ast
+		mode = analysis.Ast
 	} else {
 		return nil, errors.Newf("unknown mode: %s", modeFlg)
 	}
 
-	return &query.Option{
+	return &analysis.Option{
 		Mode:                mode,
 		ExcludeQueries:      excludeQueries,
 		ExcludePackages:     excludePackages,

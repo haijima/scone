@@ -1,9 +1,11 @@
-package query
+package analysis
 
 import (
 	"go/token"
 	"slices"
 	"strings"
+
+	"github.com/haijima/scone/internal/query"
 )
 
 type AnalyzeMode int
@@ -32,11 +34,11 @@ type Option struct {
 	FilterTables        []string
 	AdditionalFuncs     []string
 
-	queryCommentPositions []token.Pos
-	isIgnoredFunc         func(pos token.Pos) bool
+	QueryCommentPositions []token.Pos
+	IsIgnoredFunc         func(pos token.Pos) bool
 }
 
-func (o *Option) Filter(q *Query) bool {
+func (o *Option) Filter(q *query.Query) bool {
 	pkgName := q.Package.Pkg.Name()
 	pkgPath := q.Package.Pkg.Path()
 	file := q.Position().Filename
@@ -48,7 +50,7 @@ func (o *Option) Filter(q *Query) bool {
 	commented := false
 	for _, p := range q.Pos {
 		if p.IsValid() {
-			commented = commented || o.isIgnoredFunc(p)
+			commented = commented || o.IsIgnoredFunc(p)
 		}
 	}
 

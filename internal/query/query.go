@@ -107,8 +107,8 @@ func (k QueryKind) Color(str string) string {
 	}
 }
 
-func toSqlQuery(str string) (*Query, bool) {
-	str, err := normalize(str)
+func ToSqlQuery(str string) (*Query, bool) {
+	str, err := Normalize(str)
 	if err != nil {
 		return nil, false
 	}
@@ -123,7 +123,7 @@ func toSqlQuery(str string) (*Query, bool) {
 var namedParameterRegexp = regexp.MustCompile(`(?i):[a-z_]+`)
 var trailingCommentRegexp = regexp.MustCompile(`(?i)--.*\r?\n`)
 
-func normalize(str string) (string, error) {
+func Normalize(str string) (string, error) {
 	str, err := analysisutil.Unquote(str)
 	if err != nil {
 		return str, err

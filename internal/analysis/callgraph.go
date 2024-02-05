@@ -1,9 +1,9 @@
-package callgraph
+package analysis
 
 import (
 	"go/types"
 
-	"github.com/haijima/scone/internal/analysis/query"
+	"github.com/haijima/scone/internal/query"
 	"golang.org/x/tools/go/ssa"
 )
 

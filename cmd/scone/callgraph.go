@@ -6,8 +6,7 @@ import (
 
 	"github.com/haijima/scone/internal"
 	"github.com/haijima/scone/internal/analysis"
-	"github.com/haijima/scone/internal/analysis/callgraph"
-	"github.com/haijima/scone/internal/analysis/query"
+	"github.com/haijima/scone/internal/query"
 	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -44,7 +43,7 @@ func runCallgraph(cmd *cobra.Command, v *viper.Viper) error {
 	return printGraphviz(cmd.OutOrStdout(), cgs)
 }
 
-func printGraphviz(w io.Writer, cgs []*callgraph.CallGraph) error {
+func printGraphviz(w io.Writer, cgs []*analysis.CallGraph) error {
 	//c := &DotCluster{ID: "callgraph", Clusters: make(map[string]*DotCluster), Nodes: make([]*DotNode, 0), Attrs: make(DotAttrs)}
 	g := &internal.DotGraph{Nodes: make([]*internal.DotNode, 0), Edges: make([]*internal.DotEdge, 0)}
 
@@ -90,7 +89,7 @@ func printGraphviz(w io.Writer, cgs []*callgraph.CallGraph) error {
 	// Print cacheable func and table node styles
 	selectOnlyNodes := make(map[string]query.QueryKind)
 	for _, cg := range cgs {
-		for _, node := range callgraph.TopologicalSort(cg.Nodes) {
+		for _, node := range analysis.TopologicalSort(cg.Nodes) {
 			// table node
 			if node.Func == nil {
 				kind := query.Select

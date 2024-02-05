@@ -8,7 +8,6 @@ import (
 
 	mapset "github.com/deckarep/golang-set/v2"
 	"github.com/fatih/color"
-	"github.com/haijima/scone/internal"
 	"github.com/haijima/scone/internal/analysis"
 	"github.com/haijima/scone/internal/analysis/analysisutil"
 	internalio "github.com/haijima/scone/internal/io"
@@ -76,7 +75,7 @@ func printResult(w io.Writer, queryResults []*analysis.QueryResult, tables mapse
 }
 
 func clusterize(tables mapset.Set[string], queryResults []*analysis.QueryResult, cgs map[string]*analysis.CallGraph) ([]mapset.Set[string], map[string]mapset.Set[string]) {
-	g := internal.NewGraph(tables.ToSlice()...) // Create a graph with tables as nodes
+	c := util.NewConnection(tables.ToSlice()...) // Create a graph with tables as nodes
 
 	// Extract tables updated in the same transaction
 	for _, cg := range cgs {
@@ -95,20 +94,20 @@ func clusterize(tables mapset.Set[string], queryResults []*analysis.QueryResult,
 				return false
 			})
 			// add edges between updated tables under the same root node
-			util.PairCombinateFunc(tablesInTx, g.AddEdge)
+			util.PairCombinateFunc(tablesInTx, c.Connect)
 		}
 	}
 
 	// extract tables used in the same query
 	for _, qr := range queryResults {
 		for _, q := range qr.Queries() {
-			util.PairCombinateFunc(q.Tables, g.AddEdge)
+			util.PairCombinateFunc(q.Tables, c.Connect)
 		}
 	}
 
 	// find connected components
 	connTables := make([]mapset.Set[string], 0)
-	for _, nodes := range g.FindConnectedComponents() {
+	for _, nodes := range c.GetClusters() {
 		ts := tables.Intersect(nodes)
 		if ts.Cardinality() > 0 {
 			connTables = append(connTables, ts)
@@ -119,10 +118,7 @@ func clusterize(tables mapset.Set[string], queryResults []*analysis.QueryResult,
 	// find collocation
 	collocationMap := util.NewSetMap[string, string]()
 	for _, t := range tables.ToSlice() {
-		collocationMap.Add(t, t)
-		for _, e := range g.Edges[t] {
-			collocationMap.Add(t, e)
-		}
+		collocationMap[t] = c.GetConnection(t, 1)
 	}
 
 	return connTables, collocationMap

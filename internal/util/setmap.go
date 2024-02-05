@@ -4,8 +4,12 @@ import mapset "github.com/deckarep/golang-set/v2"
 
 type SetMap[K, V comparable] map[K]mapset.Set[V]
 
-func NewSetMap[K, V comparable]() SetMap[K, V] {
-	return make(SetMap[K, V])
+func NewSetMap[K, V comparable](keys ...K) SetMap[K, V] {
+	m := make(SetMap[K, V])
+	for _, key := range keys {
+		m[key] = mapset.NewSet[V]()
+	}
+	return m
 }
 
 func (m SetMap[K, V]) Add(key K, value V) {

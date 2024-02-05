@@ -19,5 +19,5 @@ var QueryAnalyzer = &toolsAnalysis.Analyzer{
 	Requires: []*toolsAnalysis.Analyzer{
 		buildssa.Analyzer,
 	},
-	ResultType: reflect.TypeOf([]*analysis.QueryResult{}),
+	ResultType: reflect.TypeOf(analysis.QueryResults{}),
 }

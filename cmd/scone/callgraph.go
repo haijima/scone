@@ -35,7 +35,7 @@ func runCallgraph(cmd *cobra.Command, v *viper.Viper) error {
 		return err
 	}
 
-	_, _, cgs, err := analysis.Analyze(dir, pattern, opt)
+	_, cgs, err := analysis.Analyze(dir, pattern, opt)
 	if err != nil {
 		return err
 	}

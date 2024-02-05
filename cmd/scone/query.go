@@ -56,7 +56,7 @@ func runQuery(cmd *cobra.Command, v *viper.Viper) error {
 		return err
 	}
 
-	queryResults, _, _, err := analysis.Analyze(dir, pattern, opt)
+	queryResults, _, err := analysis.Analyze(dir, pattern, opt)
 	if err != nil {
 		return err
 	}

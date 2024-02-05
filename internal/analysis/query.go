@@ -14,9 +14,36 @@ import (
 	mapset "github.com/deckarep/golang-set/v2"
 	"github.com/haijima/scone/internal/analysis/analysisutil"
 	"github.com/haijima/scone/internal/sql"
+	"golang.org/x/exp/maps"
 	"golang.org/x/tools/go/analysis/passes/buildssa"
 	"golang.org/x/tools/go/ssa"
 )
+
+type QueryResults []*QueryResult
+
+func (qrs QueryResults) AllQueries() []*sql.Query {
+	qs := make([]*sql.Query, 0)
+	for _, qr := range qrs {
+		qs = append(qs, qr.Queries()...)
+	}
+	return qs
+}
+
+func (qrs QueryResults) AllTables() []*sql.Table {
+	return maps.Values(qrs.allTableMap())
+}
+
+func (qrs QueryResults) AllTableNames() []string {
+	return maps.Keys(qrs.allTableMap())
+}
+
+func (qrs QueryResults) allTableMap() map[string]*sql.Table {
+	qgs := make([]*sql.QueryGroup, 0)
+	for _, qr := range qrs {
+		qgs = append(qgs, qr.QueryGroup)
+	}
+	return sql.QueryGroups(qgs).AllTableMap()
+}
 
 type QueryResult struct {
 	QueryGroup *sql.QueryGroup
@@ -58,7 +85,7 @@ func (m *Meta) Position() token.Position {
 }
 
 // ExtractQuery extracts queries from the given package.
-func ExtractQuery(ssaProg *buildssa.SSA, files []*ast.File, opt *Option) ([]*QueryResult, error) {
+func ExtractQuery(ssaProg *buildssa.SSA, files []*ast.File, opt *Option) (QueryResults, error) {
 	foundQueryResults := make([]*QueryResult, 0)
 	opt.QueryCommentPositions = make([]token.Pos, 0)
 	opt.IsIgnoredFunc = func(pos token.Pos) bool { return false }
@@ -109,7 +136,7 @@ func ExtractQuery(ssaProg *buildssa.SSA, files []*ast.File, opt *Option) ([]*Que
 	return foundQueryResults, nil
 }
 
-func GetQueryResultsInComment(ssaProg *buildssa.SSA, files []*ast.File, opt *Option) []*QueryResult {
+func GetQueryResultsInComment(ssaProg *buildssa.SSA, files []*ast.File, opt *Option) QueryResults {
 	foundQueryResults := make([]*QueryResult, 0)
 
 	commentPrefix := "// scone:sql"
@@ -141,7 +168,7 @@ func GetQueryResultsInComment(ssaProg *buildssa.SSA, files []*ast.File, opt *Opt
 	return foundQueryResults
 }
 
-func AnalyzeFuncBySsaConst(pkg *ssa.Package, fn *ssa.Function, pos []token.Pos, opt *Option) []*QueryResult {
+func AnalyzeFuncBySsaConst(pkg *ssa.Package, fn *ssa.Function, pos []token.Pos, opt *Option) QueryResults {
 	foundQueryResults := make([]*QueryResult, 0)
 	for _, block := range fn.Blocks {
 		for _, instr := range block.Instrs {
@@ -154,17 +181,17 @@ func AnalyzeFuncBySsaConst(pkg *ssa.Package, fn *ssa.Function, pos []token.Pos, 
 	return foundQueryResults
 }
 
-func instructionToQueryGroups(pkg *ssa.Package, instr ssa.Instruction, pos []token.Pos, opt *Option) []*QueryResult {
+func instructionToQueryGroups(pkg *ssa.Package, instr ssa.Instruction, pos []token.Pos, opt *Option) QueryResults {
 	switch i := instr.(type) {
 	case *ssa.Call:
 		return callToQueryGroups(pkg, i, instr.Parent(), pos, opt)
 	case *ssa.Phi:
-		return []*QueryResult{phiToQueryGroup(pkg, i, instr.Parent(), pos, opt)}
+		return QueryResults{phiToQueryGroup(pkg, i, instr.Parent(), pos, opt)}
 	}
-	return []*QueryResult{}
+	return QueryResults{}
 }
 
-func callToQueryGroups(pkg *ssa.Package, i *ssa.Call, fn *ssa.Function, pos []token.Pos, opt *Option) []*QueryResult {
+func callToQueryGroups(pkg *ssa.Package, i *ssa.Call, fn *ssa.Function, pos []token.Pos, opt *Option) QueryResults {
 	res := make([]*QueryResult, 0)
 	pos = append([]token.Pos{i.Pos()}, pos...)
 	for _, arg := range i.Common().Args {
@@ -242,7 +269,7 @@ var targetMethods = []methodArg{
 	{Package: "github.com/jmoiron/sqlx", Method: "In", ArgIndex: -1},
 }
 
-func AnalyzeFuncBySsaMethod(pkg *ssa.Package, fn *ssa.Function, pos []token.Pos, opt *Option) []*QueryResult {
+func AnalyzeFuncBySsaMethod(pkg *ssa.Package, fn *ssa.Function, pos []token.Pos, opt *Option) QueryResults {
 	tms := make([]methodArg, len(targetMethods))
 	copy(tms, targetMethods)
 	if opt.AdditionalFuncs != nil || len(opt.AdditionalFuncs) > 0 {

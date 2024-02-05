@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"fmt"
 	"io"
 	"slices"
 	"strconv"
@@ -41,45 +42,33 @@ func runTable(cmd *cobra.Command, v *viper.Viper) error {
 		return err
 	}
 
-	queryResults, tables, cgs, err := analysis.Analyze(dir, pattern, opt)
+	queryResults, cgs, err := analysis.Analyze(dir, pattern, opt)
 	if err != nil {
 		return err
 	}
-	return printResult(cmd.OutOrStdout(), queryResults, tables, cgs, PrintTableOption{SummarizeOnly: summarizeOnly})
+	return printResult(cmd.OutOrStdout(), queryResults, cgs, PrintTableOption{SummarizeOnly: summarizeOnly})
 }
 
 type PrintTableOption struct{ SummarizeOnly bool }
 
-func printResult(w io.Writer, queryResults []*analysis.QueryResult, tables mapset.Set[string], cgs map[string]*analysis.CallGraph, opt PrintTableOption) error {
-	filterColumns := util.NewSetMap[string, string]()
-	kindsMap := util.NewSetMap[string, sql.QueryKind]()
-	for _, qr := range queryResults {
-		for _, q := range qr.Queries() {
-			for t, cols := range q.FilterColumnMap {
-				filterColumns.Intersect(t, cols)
-			}
-			for _, t := range q.Tables {
-				kindsMap.Add(t, q.Kind)
-			}
-		}
-	}
-	tableConn := clusterize(tables, queryResults, cgs)
-
-	if err := printSummary(w, tables, queryResults, tableConn, filterColumns, kindsMap); err != nil {
+func printResult(w io.Writer, queryResults analysis.QueryResults, cgs map[string]*analysis.CallGraph, opt PrintTableOption) error {
+	tableConn := clusterize(queryResults, cgs)
+	if err := printSummary(w, queryResults, tableConn); err != nil {
 		return err
 	}
 	if !opt.SummarizeOnly {
-		for _, t := range mapset.Sorted(tables) {
-			if err := printTableResult(w, t, queryResults, tableConn, filterColumns[t], kindsMap[t]); err != nil {
+		for _, t := range queryResults.AllTables() {
+			if err := printTableResult(w, t, queryResults, tableConn); err != nil {
 				return err
 			}
 		}
 	}
+	fmt.Fprintln(w)
 	return nil
 }
 
-func clusterize(tables mapset.Set[string], queryResults []*analysis.QueryResult, cgs map[string]*analysis.CallGraph) util.Connection {
-	c := util.NewConnection(tables.ToSlice()...) // Create a graph with tables as nodes
+func clusterize(queryResults analysis.QueryResults, cgs map[string]*analysis.CallGraph) util.Connection {
+	c := util.NewConnection(queryResults.AllTableNames()...) // Create a graph with tables as nodes
 
 	// Extract tables updated in the same transaction
 	for _, cg := range cgs {
@@ -103,10 +92,8 @@ func clusterize(tables mapset.Set[string], queryResults []*analysis.QueryResult,
 	}
 
 	// extract tables used in the same query
-	for _, qr := range queryResults {
-		for _, q := range qr.Queries() {
-			util.PairCombinateFunc(q.Tables, c.Connect)
-		}
+	for _, q := range queryResults.AllQueries() {
+		util.PairCombinateFunc(q.Tables, c.Connect)
 	}
 	return c
 }
@@ -115,47 +102,39 @@ const tmplSummary = `{{title "Summary"}}
   {{key "queries"}}         : {{.queries}}
   {{key "tables"}}          : {{.tables}}
   {{key "cacheability"}}
-	hard coded    : {{len .hardcoded}}	{{printf "%q" .hardcoded}}
-	read-through  : {{len .readThrough}}	{{printf "%q" .readThrough}}
-	write-through : {{len .writeThrough}}	{{printf "%q" .writeThrough}}
+  {{- range $k, $v := .cacheability}}
+	{{colored $k}}	: {{len $v}}	{{printf "%q" $v}}
+  {{- end}}
   {{key "table clusters"}}  : {{len .clusters}}
   {{- range .clusters}}
 	{{printf "%q" .}}
   {{- end}}
   {{key "partition keys"}}  : found in {{len .partitionKeys}} table(s)
-  {{- range $key, $value := .partitionKeys}}
-	{{printf "%q for %q" $value $key}}
+  {{- range $k, $v := .partitionKeys}}
+	{{printf "%q for %q" $v $k}}
   {{- end}}
 `
 
-func printSummary(w io.Writer, tables mapset.Set[string], queryGroups []*analysis.QueryResult, tableConn util.Connection, filterColumns map[string]mapset.Set[string], kindsMap map[string]mapset.Set[sql.QueryKind]) error {
+func printSummary(w io.Writer, queryResults analysis.QueryResults, tableConn util.Connection) error {
 	data := make(map[string]any)
+	tables := queryResults.AllTables()
 
-	data["queries"] = len(queryGroups)
-	data["tables"] = tables.Cardinality()
-	var hardCoded, readThrough, writeThrough []string
-	for _, t := range mapset.Sorted(tables) {
-		switch slices.Max(kindsMap[t].ToSlice()) {
-		case sql.Select:
-			hardCoded = append(hardCoded, t)
-		case sql.Insert:
-			readThrough = append(readThrough, t)
-		case sql.Delete, sql.Replace, sql.Update:
-			writeThrough = append(writeThrough, t)
-		}
+	data["queries"] = len(queryResults)
+	data["tables"] = len(tables)
+	cacheability := make(map[sql.Cacheability][]string)
+	for _, t := range tables {
+		cacheability[t.Cacheability()] = append(cacheability[t.Cacheability()], t.Name)
 	}
-	data["hardcoded"] = hardCoded
-	data["readThrough"] = readThrough
-	data["writeThrough"] = writeThrough
+	data["cacheability"] = cacheability
 	clusters := make([][]string, 0, len(tableConn.GetClusters()))
 	for _, ts := range tableConn.GetClusters() {
 		clusters = append(clusters, mapset.Sorted(ts))
 	}
 	data["clusters"] = clusters
 	partitionKeys := make(map[string][]string)
-	for t, cols := range filterColumns {
-		if cols.Cardinality() > 0 {
-			partitionKeys[t] = mapset.Sorted(cols)
+	for _, t := range tables {
+		if len(t.PartitionKeys()) > 0 {
+			partitionKeys[t.Name] = t.PartitionKeys()
 		}
 	}
 	data["partitionKeys"] = partitionKeys
@@ -163,6 +142,7 @@ func printSummary(w io.Writer, tables mapset.Set[string], queryGroups []*analysi
 	funcs := make(map[string]interface{})
 	funcs["title"] = color.CyanString
 	funcs["key"] = color.MagentaString
+	funcs["colored"] = func(s interface{ ColoredString() string }) string { return s.ColoredString() }
 	t, err := template.New("summary").Funcs(funcs).Parse(tmplSummary)
 	if err != nil {
 		return err
@@ -177,8 +157,8 @@ func printSummary(w io.Writer, tables mapset.Set[string], queryGroups []*analysi
 
 var tmplTableResult = `
 {{title .table .maxKind}}
-  {{key "query types"}}	:{{range .kinds}} {{.}}{{end}}
-  {{key "cacheability"}}	: {{.cacheability}}
+  {{key "query types"}}	:{{range .kinds}} {{colored .}}{{end}}
+  {{key "cacheability"}}	: {{colored .cacheability}}
   {{key "collocation"}}	: {{printf "%q" .collocation}}
   {{key "cluster"}}	: {{printf "%q" .cluster}}
   {{- if .partitionKey}}
@@ -188,32 +168,19 @@ var tmplTableResult = `
 {{/* Show queries by TablePrinter */}}
 `
 
-func printTableResult(w io.Writer, table string, queryResults []*analysis.QueryResult, tableConn util.Connection, filterColumns mapset.Set[string], kinds mapset.Set[sql.QueryKind]) error {
+func printTableResult(w io.Writer, table *sql.Table, queryResults analysis.QueryResults, tableConn util.Connection) error {
 	data := make(map[string]any)
-	data["table"] = table
-	data["maxKind"] = slices.Max(kinds.ToSlice())
-	data["kinds"] = make([]string, 0, kinds.Cardinality())
-	for _, k := range mapset.Sorted(kinds) {
-		data["kinds"] = append(data["kinds"].([]string), k.Color(k.String()))
-	}
-	data["cacheability"] = slices.Max(kinds.ToSlice()).Color(slices.Max(kinds.ToSlice()).String())
-	switch maxKind := slices.Max(kinds.ToSlice()); maxKind {
-	case sql.Select:
-		data["cacheability"] = maxKind.Color("Hard coded")
-	case sql.Insert:
-		data["cacheability"] = maxKind.Color("Read-through")
-	case sql.Delete, sql.Replace, sql.Update:
-		data["cacheability"] = "Write-through"
-	case sql.Unknown:
-		data["cacheability"] = maxKind.Color("Unknown")
-	}
-	data["collocation"] = mapset.Sorted(tableConn.GetConnection(table, 1).Difference(mapset.NewSet(table)))
-	data["cluster"] = mapset.Sorted(tableConn.GetConnection(table, -1))
-	data["partitionKey"] = mapset.Sorted(filterColumns)
+	data["table"] = table.Name
+	data["maxKind"] = table.MaxKind()
+	data["kinds"] = table.Kinds()
+	data["cacheability"] = table.Cacheability()
+	data["collocation"] = mapset.Sorted(tableConn.GetConnection(table.Name, 1).Difference(mapset.NewSet(table.Name)))
+	data["cluster"] = mapset.Sorted(tableConn.GetConnection(table.Name, -1))
+	data["partitionKey"] = table.PartitionKeys()
 	qrs := make([]*analysis.QueryResult, 0)
 	for _, qr := range queryResults {
 		for _, q := range qr.Queries() {
-			if slices.Contains(q.Tables, table) {
+			if slices.Contains(q.Tables, table.Name) {
 				qrs = append(qrs, qr)
 				break
 			}
@@ -222,7 +189,6 @@ func printTableResult(w io.Writer, table string, queryResults []*analysis.QueryR
 	data["queries"] = qrs
 
 	funcs := make(map[string]interface{})
-	funcs["key"] = color.MagentaString
 	funcs["title"] = func(table string, kind sql.QueryKind) string {
 		c := color.New(color.FgBlack, color.BgWhite)
 		switch kind {
@@ -237,6 +203,8 @@ func printTableResult(w io.Writer, table string, queryResults []*analysis.QueryR
 		}
 		return c.Sprintf(" %s ", table)
 	}
+	funcs["key"] = color.MagentaString
+	funcs["colored"] = func(s interface{ ColoredString() string }) string { return s.ColoredString() }
 	t, err := template.New("tableResult").Funcs(funcs).Parse(tmplTableResult)
 	if err != nil {
 		return err

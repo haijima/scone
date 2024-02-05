@@ -13,6 +13,29 @@ import (
 	_ "github.com/pingcap/tidb/pkg/parser/test_driver"
 )
 
+type QueryGroups []*QueryGroup
+
+func (qgs QueryGroups) AllTableMap() map[string]*Table {
+	tables := map[string]*Table{}
+	for _, qg := range qgs {
+		for _, q := range qg.List.ToSlice() {
+			for _, t := range q.Tables {
+				if _, ok := tables[t]; !ok {
+					tables[t] = NewTable(t)
+				}
+				tables[t].kinds.Add(q.Kind)
+			}
+			for t, cols := range q.FilterColumnMap {
+				if _, ok := tables[t]; !ok {
+					tables[t] = NewTable(t)
+				}
+				tables[t].filterColumns = tables[t].filterColumns.Intersect(cols)
+			}
+		}
+	}
+	return tables
+}
+
 type QueryGroup struct {
 	List mapset.Set[*Query]
 }

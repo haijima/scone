@@ -109,7 +109,7 @@ func (k QueryKind) Color(str string) string {
 	}
 }
 
-func ToSqlQuery(str string) (*Query, bool) {
+func ParseString(str string) (*Query, bool) {
 	str, err := Normalize(str)
 	if err != nil {
 		return nil, false

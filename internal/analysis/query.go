@@ -125,7 +125,7 @@ func GetQueryResultsInComment(ssaProg *buildssa.SSA, files []*ast.File, opt *Opt
 			}
 			for _, comment := range cg.List {
 				if strings.HasPrefix(comment.Text, commentPrefix) {
-					if q, ok := query.ToSqlQuery(strings.TrimPrefix(comment.Text, commentPrefix)); ok {
+					if q, ok := query.ParseString(strings.TrimPrefix(comment.Text, commentPrefix)); ok {
 						if opt.Filter(q, qr.Meta) {
 							qr.Append(q)
 							opt.QueryCommentPositions = append(opt.QueryCommentPositions, comment.Pos())
@@ -195,7 +195,7 @@ func phiToQueryGroup(pkg *ssa.Package, a *ssa.Phi, fn *ssa.Function, pos []token
 
 func constToQueryGroup(pkg *ssa.Package, a *ssa.Const, fn *ssa.Function, pos []token.Pos, opt *Option) (*QueryResult, bool) {
 	if a.Value != nil && a.Value.Kind() == constant.String {
-		if q, ok := query.ToSqlQuery(a.Value.ExactString()); ok {
+		if q, ok := query.ParseString(a.Value.ExactString()); ok {
 			qr := &QueryResult{QueryGroup: query.NewQueryGroupFrom(q), Meta: NewMeta(pkg, fn, a.Pos(), pos...)}
 			if opt.Filter(q, qr.Meta) {
 				return qr, true
@@ -303,7 +303,7 @@ func constLikeStringValueToQueryGroup(pkg *ssa.Package, v ssa.Value, fn *ssa.Fun
 	if as, ok := analysisutil.ConstLikeStringValues(v); ok {
 		qr := &QueryResult{Meta: NewMeta(pkg, fn, v.Pos(), pos...)}
 		for _, a := range as {
-			if q, ok := query.ToSqlQuery(a); ok {
+			if q, ok := query.ParseString(a); ok {
 				if opt.Filter(q, qr.Meta) {
 					qr.Append(q)
 				} else {

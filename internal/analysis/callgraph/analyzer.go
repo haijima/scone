@@ -19,8 +19,8 @@ var Analyzer = &analysis.Analyzer{
 	Doc:  doc,
 	Run: func(pass *analysis.Pass) (interface{}, error) {
 		ssaProg := pass.ResultOf[buildssa.Analyzer].(*buildssa.SSA)
-		q := pass.ResultOf[query.Analyzer].(*query.Result)
-		return BuildCallGraph(ssaProg, q)
+		qgs := pass.ResultOf[query.Analyzer].([]*query.QueryGroup)
+		return BuildCallGraph(ssaProg, qgs)
 	},
 	Requires: []*analysis.Analyzer{
 		buildssa.Analyzer,
@@ -29,16 +29,15 @@ var Analyzer = &analysis.Analyzer{
 	ResultType: reflect.TypeOf(new(CallGraph)),
 }
 
-func BuildCallGraph(ssaProg *buildssa.SSA, q *query.Result) (*CallGraph, error) {
+func BuildCallGraph(ssaProg *buildssa.SSA, qgs []*query.QueryGroup) (*CallGraph, error) {
 	result := &CallGraph{
 		Package: ssaProg.Pkg.Pkg,
 		Nodes:   make(map[string]*Node),
 	}
-	foundQueryGroups := q.QueryGroups
 	cg := static.CallGraph(ssaProg.Pkg.Prog)
-	callerFuncs := make([]*ssa.Function, 0, len(foundQueryGroups))
+	callerFuncs := make([]*ssa.Function, 0, len(qgs))
 	queryEdgeMemo := make(map[string]bool)
-	for _, qg := range foundQueryGroups {
+	for _, qg := range qgs {
 		for _, q := range qg.List {
 			for _, t := range q.Tables {
 				k := fmt.Sprintf("%s#%s#%s", q.Func.Name(), q.Kind, t)

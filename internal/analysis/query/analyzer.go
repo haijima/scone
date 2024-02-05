@@ -22,15 +22,11 @@ var Analyzer = &analysis.Analyzer{
 	Requires: []*analysis.Analyzer{
 		buildssa.Analyzer,
 	},
-	ResultType: reflect.TypeOf(new(Result)),
-}
-
-type Result struct {
-	QueryGroups []*QueryGroup
+	ResultType: reflect.TypeOf([]*QueryGroup{}),
 }
 
 // ExtractQuery extracts queries from the given package.
-func ExtractQuery(ssaProg *buildssa.SSA, files []*ast.File, opt *Option) (*Result, error) {
+func ExtractQuery(ssaProg *buildssa.SSA, files []*ast.File, opt *Option) ([]*QueryGroup, error) {
 	foundQueryGroups := make([]*QueryGroup, 0)
 	opt.queryCommentPositions = make([]token.Pos, 0)
 	opt.isIgnoredFunc = func(pos token.Pos) bool { return false }
@@ -78,5 +74,5 @@ func ExtractQuery(ssaProg *buildssa.SSA, files []*ast.File, opt *Option) (*Resul
 	foundQueryGroups = slices.CompactFunc(foundQueryGroups, func(a, b *QueryGroup) bool {
 		return a.List[0].Raw == b.List[0].Raw && a.List[0].Position().Offset == b.List[0].Position().Offset
 	})
-	return &Result{QueryGroups: foundQueryGroups}, nil
+	return foundQueryGroups, nil
 }

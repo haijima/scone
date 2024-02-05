@@ -4,8 +4,9 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/haijima/scone/internal"
 	"github.com/haijima/scone/internal/analysis"
+
+	internalio "github.com/haijima/scone/internal/io"
 	"github.com/haijima/scone/internal/sql"
 	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
@@ -45,14 +46,14 @@ func runCallgraph(cmd *cobra.Command, v *viper.Viper) error {
 
 func printGraphviz(w io.Writer, cgs map[string]*analysis.CallGraph) error {
 	//c := &DotCluster{ID: "callgraph", Clusters: make(map[string]*DotCluster), Nodes: make([]*DotNode, 0), Attrs: make(DotAttrs)}
-	g := &internal.DotGraph{Nodes: make([]*internal.DotNode, 0), Edges: make([]*internal.DotEdge, 0)}
+	g := &internalio.DotGraph{Nodes: make([]*internalio.DotNode, 0), Edges: make([]*internalio.DotEdge, 0)}
 
 	for pkg, cg := range cgs {
 		for _, node := range cg.Nodes {
 			// Print edges
 			for _, edge := range node.Out {
 				if edge.SqlValue != nil {
-					attrs := make(internal.DotAttrs)
+					attrs := make(internalio.DotAttrs)
 					attrs["weight"] = "100"
 					switch edge.SqlValue.Kind {
 					case sql.Select:
@@ -66,15 +67,15 @@ func printGraphviz(w io.Writer, cgs map[string]*analysis.CallGraph) error {
 						attrs["color"] = "red"
 					default:
 					}
-					g.Edges = append(g.Edges, &internal.DotEdge{From: fmt.Sprintf("%s.%s", pkg, edge.Caller), To: edge.Callee, Attrs: attrs})
-					g.Nodes = append(g.Nodes, &internal.DotNode{ID: fmt.Sprintf("%s.%s", pkg, edge.Caller), Attrs: map[string]string{"label": edge.Caller}})
+					g.Edges = append(g.Edges, &internalio.DotEdge{From: fmt.Sprintf("%s.%s", pkg, edge.Caller), To: edge.Callee, Attrs: attrs})
+					g.Nodes = append(g.Nodes, &internalio.DotNode{ID: fmt.Sprintf("%s.%s", pkg, edge.Caller), Attrs: map[string]string{"label": edge.Caller}})
 				} else {
-					attrs := make(internal.DotAttrs)
+					attrs := make(internalio.DotAttrs)
 					attrs["style"] = "dashed"
 					attrs["weight"] = "100"
-					g.Edges = append(g.Edges, &internal.DotEdge{From: fmt.Sprintf("%s.%s", pkg, edge.Caller), To: fmt.Sprintf("%s.%s", pkg, edge.Callee), Attrs: attrs})
-					g.Nodes = append(g.Nodes, &internal.DotNode{ID: fmt.Sprintf("%s.%s", pkg, edge.Caller), Attrs: map[string]string{"label": edge.Caller}})
-					g.Nodes = append(g.Nodes, &internal.DotNode{ID: fmt.Sprintf("%s.%s", pkg, edge.Callee), Attrs: map[string]string{"label": edge.Callee}})
+					g.Edges = append(g.Edges, &internalio.DotEdge{From: fmt.Sprintf("%s.%s", pkg, edge.Caller), To: fmt.Sprintf("%s.%s", pkg, edge.Callee), Attrs: attrs})
+					g.Nodes = append(g.Nodes, &internalio.DotNode{ID: fmt.Sprintf("%s.%s", pkg, edge.Caller), Attrs: map[string]string{"label": edge.Caller}})
+					g.Nodes = append(g.Nodes, &internalio.DotNode{ID: fmt.Sprintf("%s.%s", pkg, edge.Callee), Attrs: map[string]string{"label": edge.Callee}})
 				}
 			}
 		}
@@ -124,7 +125,7 @@ func printGraphviz(w io.Writer, cgs map[string]*analysis.CallGraph) error {
 
 		for n, k := range selectOnlyNodes {
 			name := fmt.Sprintf("%s.%s", pkg, n)
-			attr := make(internal.DotAttrs)
+			attr := make(internalio.DotAttrs)
 			if k == sql.Select {
 				attr["color"] = "blue"
 				attr["fillcolor"] = "lightblue1"
@@ -141,7 +142,7 @@ func printGraphviz(w io.Writer, cgs map[string]*analysis.CallGraph) error {
 				attr["style"] = "bold"
 				attr["shape"] = "box"
 			}
-			g.Nodes = append(g.Nodes, &internal.DotNode{ID: name, Attrs: attr})
+			g.Nodes = append(g.Nodes, &internalio.DotNode{ID: name, Attrs: attr})
 		}
 
 		// Reset
@@ -162,10 +163,10 @@ func printGraphviz(w io.Writer, cgs map[string]*analysis.CallGraph) error {
 			}
 		}
 	}
-	g.Ranks = append(g.Ranks, &internal.DotRank{Name: "min", Nodes: maps.Keys(minNodeNames)})
-	g.Ranks = append(g.Ranks, &internal.DotRank{Name: "max", Nodes: maps.Keys(maxNodeNames)})
+	g.Ranks = append(g.Ranks, &internalio.DotRank{Name: "min", Nodes: maps.Keys(minNodeNames)})
+	g.Ranks = append(g.Ranks, &internalio.DotRank{Name: "max", Nodes: maps.Keys(maxNodeNames)})
 
-	return internal.WriteDotGraph(w, *g)
+	return internalio.WriteDotGraph(w, *g)
 }
 
 func showLegend(w io.Writer) {

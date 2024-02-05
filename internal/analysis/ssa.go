@@ -17,6 +17,58 @@ import (
 	"golang.org/x/tools/go/ssa"
 )
 
+// ExtractQuery extracts queries from the given package.
+func ExtractQuery(ssaProg *buildssa.SSA, files []*ast.File, opt *Option) ([]*query.QueryGroup, error) {
+	foundQueryGroups := make([]*query.QueryGroup, 0)
+	opt.QueryCommentPositions = make([]token.Pos, 0)
+	opt.IsIgnoredFunc = func(pos token.Pos) bool { return false }
+
+	// Get queries from comments
+	foundQueryGroups = append(foundQueryGroups, GetQueryGroupsInComment(ssaProg, files, opt)...)
+
+	//ignoreCommentPrefix := "// scone:ignore"
+	for _, file := range files {
+		cm := ast.NewCommentMap(ssaProg.Pkg.Prog.Fset, file, file.Comments)
+		for n, cgs := range cm {
+			for _, cg := range cgs {
+				for _, c := range strings.Split(cg.Text(), "\n") {
+					if strings.HasPrefix(c, "scone:ignore") {
+						old := opt.IsIgnoredFunc
+						start := n.Pos()
+						end := n.End()
+						opt.IsIgnoredFunc = func(pos token.Pos) bool {
+							return old(pos) || (start <= pos && pos < end)
+						}
+						break
+					}
+				}
+			}
+		}
+	}
+
+	for _, member := range ssaProg.SrcFuncs {
+		switch opt.Mode {
+		case SsaMethod:
+			foundQueryGroups = append(foundQueryGroups, AnalyzeFuncBySsaMethod(ssaProg.Pkg, member, []token.Pos{}, opt)...)
+		case SsaConst:
+			foundQueryGroups = append(foundQueryGroups, AnalyzeFuncBySsaConst(ssaProg.Pkg, member, []token.Pos{}, opt)...)
+		case Ast:
+			foundQueryGroups = append(foundQueryGroups, AnalyzeFuncByAst(ssaProg.Pkg, member, []token.Pos{}, opt)...)
+		}
+	}
+
+	slices.SortFunc(foundQueryGroups, func(a, b *query.QueryGroup) int {
+		if a.List[0].Position().Offset != b.List[0].Position().Offset {
+			return a.List[0].Position().Offset - b.List[0].Position().Offset
+		}
+		return strings.Compare(a.List[0].Raw, b.List[0].Raw)
+	})
+	foundQueryGroups = slices.CompactFunc(foundQueryGroups, func(a, b *query.QueryGroup) bool {
+		return a.List[0].Raw == b.List[0].Raw && a.List[0].Position().Offset == b.List[0].Position().Offset
+	})
+	return foundQueryGroups, nil
+}
+
 func GetQueryGroupsInComment(ssaProg *buildssa.SSA, files []*ast.File, opt *Option) []*query.QueryGroup {
 	foundQueryGroups := make([]*query.QueryGroup, 0)
 

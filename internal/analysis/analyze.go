@@ -40,12 +40,12 @@ func analyzeSSA(dir, pattern string, opt *Option) ([]*QueryResult, error) {
 
 	results := make([]*QueryResult, 0, len(pkgs))
 	for _, pkg := range pkgs {
-		ssa, err := analysisutil.BuildSSA(pkg)
+		ssaProg, err := analysisutil.BuildSSA(pkg)
 		if err != nil {
 			return nil, err
 		}
 
-		queryResults, err := ExtractQuery(ssa, pkg.Syntax, opt)
+		queryResults, err := ExtractQuery(ssaProg, pkg.Syntax, opt)
 		if err != nil {
 			return nil, err
 		}

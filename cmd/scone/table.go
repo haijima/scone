@@ -84,17 +84,17 @@ func clusterize(tables mapset.Set[string], queryResults []*analysis.QueryResult,
 				continue
 			}
 			// walk from the root nodes
-			tablesInTx := make([]string, 0)
+			tablesInTx := mapset.NewSet[string]()
 			analysis.Walk(cg, r, func(n *analysis.Node) bool {
 				for _, edge := range n.Out {
 					if edge.IsQuery() && edge.SqlValue.Kind != query.Select {
-						tablesInTx = append(tablesInTx, edge.Callee)
+						tablesInTx.Add(edge.Callee)
 					}
 				}
 				return false
 			})
-			// add edges between updated tables under the same root node
-			util.PairCombinateFunc(tablesInTx, c.Connect)
+			// connect updated tables under the same root node
+			util.PairCombinateFunc(tablesInTx.ToSlice(), c.Connect)
 		}
 	}
 
@@ -106,13 +106,7 @@ func clusterize(tables mapset.Set[string], queryResults []*analysis.QueryResult,
 	}
 
 	// find connected components
-	connTables := make([]mapset.Set[string], 0)
-	for _, nodes := range c.GetClusters() {
-		ts := tables.Intersect(nodes)
-		if ts.Cardinality() > 0 {
-			connTables = append(connTables, ts)
-		}
-	}
+	connTables := c.GetClusters()
 	slices.SortFunc(connTables, func(a, b mapset.Set[string]) int { return b.Cardinality() - a.Cardinality() })
 
 	// find collocation

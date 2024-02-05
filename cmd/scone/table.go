@@ -139,24 +139,11 @@ func printSummary(w io.Writer, queryResults analysis.QueryResults, tableConn uti
 	}
 	data["partitionKeys"] = partitionKeys
 
-	funcs := make(map[string]interface{})
-	funcs["title"] = color.CyanString
-	funcs["key"] = color.MagentaString
-	funcs["colored"] = func(s interface{ ColoredString() string }) string { return s.ColoredString() }
-	t, err := template.New("summary").Funcs(funcs).Parse(tmplSummary)
-	if err != nil {
-		return err
-	}
-	var buf bytes.Buffer
-	if err := t.Execute(&buf, data); err != nil {
-		return err
-	}
-	_, err = buf.WriteTo(w)
-	return err
+	return templateRender(w, "summary", tmplSummary, data)
 }
 
-var tmplTableResult = `
-{{title .table .maxKind}}
+const tmplTableResult = `
+{{labeled .table .maxKind}}
   {{key "query types"}}	:{{range .kinds}} {{colored .}}{{end}}
   {{key "cacheability"}}	: {{colored .cacheability}}
   {{key "collocation"}}	: {{printf "%q" .collocation}}
@@ -188,33 +175,7 @@ func printTableResult(w io.Writer, table *sql.Table, queryResults analysis.Query
 	}
 	data["queries"] = qrs
 
-	funcs := make(map[string]interface{})
-	funcs["title"] = func(table string, kind sql.QueryKind) string {
-		c := color.New(color.FgBlack, color.BgWhite)
-		switch kind {
-		case sql.Select:
-			c = color.New(color.FgBlack, color.BgBlue)
-		case sql.Insert:
-			c = color.New(color.FgBlack, color.BgGreen)
-		case sql.Delete:
-			c = color.New(color.FgBlack, color.BgRed)
-		case sql.Replace, sql.Update:
-			c = color.New(color.FgBlack, color.BgYellow)
-		}
-		return c.Sprintf(" %s ", table)
-	}
-	funcs["key"] = color.MagentaString
-	funcs["colored"] = func(s interface{ ColoredString() string }) string { return s.ColoredString() }
-	t, err := template.New("tableResult").Funcs(funcs).Parse(tmplTableResult)
-	if err != nil {
-		return err
-	}
-	var buf bytes.Buffer
-	if err := t.Execute(&buf, data); err != nil {
-		return err
-	}
-	_, err = buf.WriteTo(w)
-	if err != nil {
+	if err := templateRender(w, "tableResult", tmplTableResult, data); err != nil {
 		return err
 	}
 
@@ -231,4 +192,37 @@ func printTableResult(w io.Writer, table *sql.Table, queryResults analysis.Query
 		}
 	}
 	return p.Print()
+}
+
+var tmplFuncs = map[string]any{
+	"labeled": func(table string, kind sql.QueryKind) string {
+		c := color.New(color.FgBlack, color.BgWhite)
+		switch kind {
+		case sql.Select:
+			c = color.New(color.FgBlack, color.BgBlue)
+		case sql.Insert:
+			c = color.New(color.FgBlack, color.BgGreen)
+		case sql.Delete:
+			c = color.New(color.FgBlack, color.BgRed)
+		case sql.Replace, sql.Update:
+			c = color.New(color.FgBlack, color.BgYellow)
+		}
+		return c.Sprintf(" %s ", table)
+	},
+	"title":   color.CyanString,
+	"key":     color.MagentaString,
+	"colored": func(s interface{ ColoredString() string }) string { return s.ColoredString() },
+}
+
+func templateRender(w io.Writer, name string, tmpl string, data map[string]any) error {
+	t, err := template.New(name).Funcs(tmplFuncs).Parse(tmpl)
+	if err != nil {
+		return err
+	}
+	var buf bytes.Buffer
+	if err = t.Execute(&buf, data); err != nil {
+		return err
+	}
+	_, err = buf.WriteTo(w)
+	return err
 }

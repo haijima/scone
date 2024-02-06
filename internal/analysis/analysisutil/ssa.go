@@ -13,11 +13,10 @@ import (
 )
 
 func GetPosition(pkg *ssa.Package, pos []token.Pos) token.Position {
-	i := slices.IndexFunc(pos, func(p token.Pos) bool { return p.IsValid() })
-	if i == -1 {
-		return pkg.Prog.Fset.Position(token.NoPos)
+	if i := slices.IndexFunc(pos, func(p token.Pos) bool { return p.IsValid() }); i > -1 {
+		return pkg.Prog.Fset.Position(pos[i])
 	}
-	return pkg.Prog.Fset.Position(pos[i])
+	return pkg.Prog.Fset.Position(token.NoPos)
 }
 
 func ConstLikeStringValues(v ssa.Value) ([]string, bool) {
@@ -65,8 +64,8 @@ func binOpToStrings(t *ssa.BinOp) ([]string, bool) {
 func phiToStrings(t *ssa.Phi) ([]string, bool) {
 	res := make([]string, 0, len(t.Edges))
 	for _, edge := range t.Edges {
-		if c, ok := ConstLikeStringValues(edge); ok {
-			res = append(res, c...)
+		if s, ok := ConstLikeStringValues(edge); ok {
+			res = append(res, s...)
 		}
 	}
 	return res, len(res) > 0
@@ -148,7 +147,7 @@ func stringsJoinToStrings(t *ssa.Call) ([]string, bool) {
 	if len(astArgs) > 0 {
 		return []string{strings.Join(astArgs, joiner[0])}, true
 	}
-	return nil, false
+	return []string{}, false
 }
 
 func Unquote(str string) (string, error) {

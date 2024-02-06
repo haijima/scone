@@ -92,8 +92,10 @@ func clusterize(queryResults analysis.QueryResults, cgs map[string]*analysis.Cal
 	}
 
 	// extract tables used in the same query
-	for _, q := range queryResults.AllQueries() {
-		util.PairCombinateFunc(q.Tables, c.Connect)
+	for _, qr := range queryResults {
+		for _, q := range qr.Queries() {
+			util.PairCombinateFunc(q.Tables, c.Connect)
+		}
 	}
 	return c
 }

@@ -21,14 +21,6 @@ import (
 
 type QueryResults []*QueryResult
 
-func (qrs QueryResults) AllQueries() []*sql.Query {
-	qs := make([]*sql.Query, 0)
-	for _, qr := range qrs {
-		qs = append(qs, qr.Queries()...)
-	}
-	return qs
-}
-
 func (qrs QueryResults) AllTables() []*sql.Table {
 	s := maps.Values(qrs.allTableMap())
 	slices.SortFunc(s, func(a, b *sql.Table) int { return strings.Compare(a.Name, b.Name) })
@@ -36,9 +28,7 @@ func (qrs QueryResults) AllTables() []*sql.Table {
 }
 
 func (qrs QueryResults) AllTableNames() []string {
-	s := maps.Keys(qrs.allTableMap())
-	slices.Sort(s)
-	return s
+	return mapset.Sorted(mapset.NewSetFromMapKeys(qrs.allTableMap()))
 }
 
 func (qrs QueryResults) allTableMap() map[string]*sql.Table {
@@ -50,17 +40,15 @@ func (qrs QueryResults) allTableMap() map[string]*sql.Table {
 }
 
 type QueryResult struct {
-	QueryGroup *sql.QueryGroup
-	Meta       *Meta
+	*sql.QueryGroup
+	Meta *Meta
 }
 
 func (qr *QueryResult) Queries() []*sql.Query {
-	if qr.QueryGroup == nil {
-		qr.QueryGroup = sql.NewQueryGroup()
-	} else if qr.QueryGroup.List == nil {
-		qr.QueryGroup.List = mapset.NewSet[*sql.Query]()
+	if qr.QueryGroup == nil || qr.List == nil {
+		return []*sql.Query{}
 	}
-	s := qr.QueryGroup.List.ToSlice()
+	s := qr.List.ToSlice()
 	slices.SortFunc(s, func(a, b *sql.Query) int { return strings.Compare(a.Raw, b.Raw) })
 	return s
 }
@@ -68,10 +56,10 @@ func (qr *QueryResult) Queries() []*sql.Query {
 func (qr *QueryResult) Append(qs ...*sql.Query) {
 	if qr.QueryGroup == nil {
 		qr.QueryGroup = sql.NewQueryGroup()
-	} else if qr.QueryGroup.List == nil {
-		qr.QueryGroup.List = mapset.NewSet[*sql.Query]()
+	} else if qr.List == nil {
+		qr.List = mapset.NewSet[*sql.Query]()
 	}
-	qr.QueryGroup.List.Append(qs...)
+	qr.List.Append(qs...)
 }
 
 type Meta struct {

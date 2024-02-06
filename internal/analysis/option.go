@@ -1,7 +1,9 @@
 package analysis
 
 import (
+	"go/ast"
 	"go/token"
+	"go/types"
 	"slices"
 	"strings"
 
@@ -34,8 +36,28 @@ type Option struct {
 	FilterTables        []string
 	AdditionalFuncs     []string
 
-	QueryCommentPositions []token.Pos
-	IsIgnoredFunc         func(pos token.Pos) bool
+	commentedNodes []*NodeWithPackage
+}
+
+type NodeWithPackage struct {
+	ast.Node
+	Package *types.Package
+}
+
+func (o *Option) IsCommented(pkg *types.Package, pos ...token.Pos) bool {
+	if pkg == nil || pkg.Path() == "" {
+		return false
+	}
+	for _, p := range pos {
+		if p.IsValid() {
+			for _, n := range o.commentedNodes {
+				if n.Package != nil && n.Node != nil && n.Pos() <= p && p < n.End() {
+					return true
+				}
+			}
+		}
+	}
+	return false
 }
 
 func (o *Option) Filter(q *sql.Query, meta *Meta) bool {
@@ -47,14 +69,7 @@ func (o *Option) Filter(q *sql.Query, meta *Meta) bool {
 	tables := q.Tables
 	hash := q.Sha()
 
-	commented := false
-	for _, p := range meta.Pos {
-		if p.IsValid() {
-			commented = commented || o.IsIgnoredFunc(p)
-		}
-	}
-
-	return !commented &&
+	return !o.IsCommented(meta.Package.Pkg, meta.Pos...) &&
 		(slices.Contains(o.FilterPackages, pkgName) || len(o.FilterPackages) == 0) &&
 		(!slices.Contains(o.ExcludePackages, pkgName) || len(o.ExcludePackages) == 0) &&
 		(slices.Contains(o.FilterPackagePaths, pkgPath) || len(o.FilterPackagePaths) == 0) &&

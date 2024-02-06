@@ -29,12 +29,10 @@ func ConstLikeStringValues(v ssa.Value) ([]string, bool) {
 	case *ssa.Phi:
 		return phiToStrings(t)
 	case *ssa.Call:
-		if cvFn, ok := t.Common().Value.(*ssa.Function); ok {
-			if cvFn.Pkg != nil && cvFn.Pkg.Pkg.Path() == "fmt" && cvFn.Name() == "Sprintf" {
-				return fmtSprintfToStrings(t)
-			} else if cvFn.Pkg != nil && cvFn.Pkg.Pkg.Path() == "strings" && cvFn.Name() == "Join" {
-				return stringsJoinToStrings(t)
-			}
+		if IsFunc(t.Common(), "fmt", "Sprintf") {
+			return fmtSprintfToStrings(t)
+		} else if IsFunc(t.Common(), "strings", "Join") {
+			return stringsJoinToStrings(t)
 		}
 	}
 	return []string{}, false
@@ -166,6 +164,13 @@ func Unquote(str string) (string, error) {
 		}
 	}
 	return str, nil
+}
+
+func IsFunc(common *ssa.CallCommon, pkgPath, funcName string) bool {
+	if path, name, ok := GetFuncInfo(common); ok {
+		return path == pkgPath && name == funcName
+	}
+	return false
 }
 
 func GetFuncInfo(common *ssa.CallCommon) (pkgPath, funcName string, ok bool) {

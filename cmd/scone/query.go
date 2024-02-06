@@ -13,7 +13,6 @@ import (
 	"github.com/haijima/scone/internal/analysis/analysisutil"
 	internalio "github.com/haijima/scone/internal/io"
 	"github.com/haijima/scone/internal/sql"
-	"github.com/haijima/scone/internal/util"
 	"github.com/olekukonko/tablewriter"
 	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
@@ -55,17 +54,16 @@ func runQuery(cmd *cobra.Command, v *viper.Viper) error {
 	if err != nil {
 		return err
 	}
-
-	queryResults, _, err := analysis.Analyze(dir, pattern, opt)
-	if err != nil {
-		return err
-	}
-
 	if !mapset.NewSet(sortKeys...).IsSubset(mapset.NewSet("file", "function", "type", "table", "sha1")) {
 		return errors.Newf("unknown sort key: %s", mapset.NewSet(sortKeys...).Difference(mapset.NewSet("file", "function", "type", "table", "sha1")).ToSlice())
 	}
 	if !slices.Contains(sortKeys, "file") {
 		sortKeys = append(sortKeys, "file")
+	}
+
+	queryResults, _, err := analysis.Analyze(dir, pattern, opt)
+	if err != nil {
+		return err
 	}
 	slices.SortFunc(queryResults, sortQuery(sortKeys))
 
@@ -84,7 +82,6 @@ func runQuery(cmd *cobra.Command, v *viper.Viper) error {
 	for _, qr := range queryResults {
 		pkgs.Add(qr.Meta.Package.Pkg.Path())
 	}
-	printOpt.pkgBasePath = util.FindCommonPrefix(pkgs.ToSlice())
 
 	var p internalio.TablePrinter
 	if format == "table" {
@@ -164,17 +161,15 @@ type PrintQueryOption struct {
 	NoRowNum            bool
 	ExpandQueryGroup    bool
 	ShowFullPackagePath bool
-	pkgBasePath         string
 }
 
 var pathDirRegex = regexp.MustCompile(`([^/]+)/`)
 
-func (opt *PrintQueryOption) ShortenPackagePath(path string) string {
-	if !opt.ShowFullPackagePath && opt.pkgBasePath != "" && strings.HasPrefix(path, opt.pkgBasePath) {
-		path = strings.TrimPrefix(path, opt.pkgBasePath)
-		return fmt.Sprintf("%s%s", pathDirRegex.ReplaceAllStringFunc(opt.pkgBasePath, func(m string) string { return m[:1] + "/" }), path)
+func (opt *PrintQueryOption) AbbreviatePackagePath(path string) string {
+	if opt.ShowFullPackagePath {
+		return path
 	}
-	return path
+	return pathDirRegex.ReplaceAllStringFunc(path, func(m string) string { return m[:1] + "/" })
 }
 
 func makeHeader(opt *PrintQueryOption) []string {
@@ -197,7 +192,7 @@ func row(q *sql.Query, meta *analysis.Meta, opt *PrintQueryOption) []string {
 
 	fullRow := []string{
 		meta.Package.Pkg.Name(),
-		opt.ShortenPackagePath(meta.Package.Pkg.Path()),
+		opt.AbbreviatePackagePath(meta.Package.Pkg.Path()),
 		analysisutil.FLC(meta.Position()),
 		meta.Func.Name(),
 		q.Kind.ColoredString(),

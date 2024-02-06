@@ -178,7 +178,9 @@ func instructionToQueryGroups(pkg *ssa.Package, instr ssa.Instruction, pos []tok
 	case *ssa.Call:
 		return callToQueryGroups(pkg, i, instr.Parent(), pos, opt)
 	case *ssa.Phi:
-		return QueryResults{phiToQueryGroup(pkg, i, instr.Parent(), pos, opt)}
+		if q, ok := phiToQueryGroup(pkg, i, instr.Parent(), pos, opt); ok {
+			return QueryResults{q}
+		}
 	}
 	return QueryResults{}
 }
@@ -189,7 +191,9 @@ func callToQueryGroups(pkg *ssa.Package, i *ssa.Call, fn *ssa.Function, pos []to
 	for _, arg := range i.Common().Args {
 		switch a := arg.(type) {
 		case *ssa.Phi:
-			res = append(res, phiToQueryGroup(pkg, a, fn, pos, opt))
+			if q, ok := phiToQueryGroup(pkg, a, fn, pos, opt); ok {
+				res = append(res, q)
+			}
 		case *ssa.Const:
 			if q, ok := constToQueryGroup(pkg, a, fn, pos, opt); ok {
 				res = append(res, q)
@@ -199,7 +203,7 @@ func callToQueryGroups(pkg *ssa.Package, i *ssa.Call, fn *ssa.Function, pos []to
 	return res
 }
 
-func phiToQueryGroup(pkg *ssa.Package, a *ssa.Phi, fn *ssa.Function, pos []token.Pos, opt *Option) *QueryResult {
+func phiToQueryGroup(pkg *ssa.Package, a *ssa.Phi, fn *ssa.Function, pos []token.Pos, opt *Option) (*QueryResult, bool) {
 	queryResult := &QueryResult{Meta: NewMeta(pkg, fn, a.Pos(), pos...)}
 	for _, edge := range a.Edges {
 		switch e := edge.(type) {
@@ -209,7 +213,10 @@ func phiToQueryGroup(pkg *ssa.Package, a *ssa.Phi, fn *ssa.Function, pos []token
 			}
 		}
 	}
-	return queryResult
+	if len(queryResult.Queries()) > 0 {
+		return queryResult, true
+	}
+	return &QueryResult{}, false
 }
 
 func constToQueryGroup(pkg *ssa.Package, a *ssa.Const, fn *ssa.Function, pos []token.Pos, opt *Option) (*QueryResult, bool) {

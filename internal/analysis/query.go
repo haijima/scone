@@ -244,7 +244,7 @@ func constLikeStringValueToQueryGroup(pkg *ssa.Package, v ssa.Value, fn *ssa.Fun
 				if opt.Filter(q, meta) {
 					qr.Append(q)
 				} else {
-					slog.Debug("filtered out: sql", "SQL", q.String(), "package", pkg.Pkg.Path(), "file", analysisutil.FLC(meta.Position()))
+					slog.Debug("filtered out: sql", "SQL", q.String(), "package", pkg.Pkg.Path(), "file", analysisutil.FLC(meta.Position()), "function", fn.Name())
 				}
 			} else {
 				if norm, err := sql.Normalize(a); err == nil {

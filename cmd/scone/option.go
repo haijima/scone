@@ -1,7 +1,6 @@
 package main
 
 import (
-	"github.com/cockroachdb/errors"
 	"github.com/haijima/scone/internal/analysis"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -25,7 +24,6 @@ func SetQueryOptionFlags(cmd *cobra.Command) {
 	cmd.Flags().StringSlice("filter-query-types", []string{}, "The `types` of queries to filter {select|insert|update|delete}")
 	cmd.Flags().StringSlice("filter-tables", []string{}, "The `names` of tables to filter")
 	cmd.Flags().StringSlice("analyze-funcs", []string{}, "The names of functions to analyze additionally. format: `<package>#<function>#<argument index>`")
-	cmd.Flags().String("mode", "ssa-method", "The query analyze `mode` {ssa-method|ssa-const|ast}")
 	_ = cmd.MarkFlagDirname("dir")
 }
 
@@ -44,22 +42,9 @@ func QueryOptionFromViper(v *viper.Viper) (*analysis.Option, error) {
 	filterFunctions := v.GetStringSlice("filter-functions")
 	filterQueryTypes := v.GetStringSlice("filter-query-types")
 	filterTables := v.GetStringSlice("filter-tables")
-	modeFlg := v.GetString("mode")
 	additionalFuncs := v.GetStringSlice("analyze-funcs")
 
-	var mode analysis.AnalyzeMode
-	if modeFlg == "ssa-method" {
-		mode = analysis.SsaMethod
-	} else if modeFlg == "ssa-const" {
-		mode = analysis.SsaConst
-	} else if modeFlg == "ast" {
-		mode = analysis.Ast
-	} else {
-		return nil, errors.Newf("unknown mode: %s", modeFlg)
-	}
-
 	return &analysis.Option{
-		Mode:                mode,
 		ExcludeQueries:      excludeQueries,
 		ExcludePackages:     excludePackages,
 		ExcludePackagePaths: excludePackagePaths,

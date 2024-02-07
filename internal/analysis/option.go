@@ -12,14 +12,7 @@ import (
 
 type AnalyzeMode int
 
-const (
-	SsaMethod AnalyzeMode = iota
-	SsaConst
-	Ast
-)
-
 type Option struct {
-	Mode                AnalyzeMode
 	ExcludeQueries      []string
 	ExcludePackages     []string
 	ExcludePackagePaths []string

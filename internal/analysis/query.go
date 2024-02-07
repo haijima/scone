@@ -3,7 +3,6 @@ package analysis
 import (
 	"fmt"
 	"go/ast"
-	"go/constant"
 	"go/token"
 	"log/slog"
 	"slices"
@@ -112,14 +111,7 @@ func ExtractQuery(ssaProg *buildssa.SSA, files []*ast.File, opt *Option) (QueryR
 	}
 
 	for _, member := range ssaProg.SrcFuncs {
-		switch opt.Mode {
-		case SsaMethod:
-			foundQueryResults = append(foundQueryResults, AnalyzeFuncBySsaMethod(ssaProg.Pkg, member, []token.Pos{}, opt)...)
-		case SsaConst:
-			foundQueryResults = append(foundQueryResults, AnalyzeFuncBySsaConst(ssaProg.Pkg, member, []token.Pos{}, opt)...)
-		case Ast:
-			foundQueryResults = append(foundQueryResults, AnalyzeFuncByAst(ssaProg.Pkg, member, []token.Pos{}, opt)...)
-		}
+		foundQueryResults = append(foundQueryResults, AnalyzeFuncBySsaMethod(ssaProg.Pkg, member, []token.Pos{}, opt)...)
 	}
 
 	slices.SortFunc(foundQueryResults, func(a, b *QueryResult) int {
@@ -132,77 +124,6 @@ func ExtractQuery(ssaProg *buildssa.SSA, files []*ast.File, opt *Option) (QueryR
 		return a.Queries()[0].Sha() == b.Queries()[0].Sha() && a.Meta.Position().Offset == b.Meta.Position().Offset
 	})
 	return foundQueryResults, nil
-}
-
-func AnalyzeFuncBySsaConst(pkg *ssa.Package, fn *ssa.Function, pos []token.Pos, opt *Option) QueryResults {
-	foundQueryResults := make([]*QueryResult, 0)
-	for _, block := range fn.Blocks {
-		for _, instr := range block.Instrs {
-			foundQueryResults = append(foundQueryResults, instructionToQueryGroups(pkg, instr, append([]token.Pos{fn.Pos()}, pos...), opt)...)
-		}
-	}
-	for _, anon := range fn.AnonFuncs {
-		foundQueryResults = append(foundQueryResults, AnalyzeFuncBySsaConst(pkg, anon, append([]token.Pos{anon.Pos(), fn.Pos()}, pos...), opt)...)
-	}
-	return foundQueryResults
-}
-
-func instructionToQueryGroups(pkg *ssa.Package, instr ssa.Instruction, pos []token.Pos, opt *Option) QueryResults {
-	switch i := instr.(type) {
-	case *ssa.Call:
-		return callToQueryGroups(pkg, i, instr.Parent(), pos, opt)
-	case *ssa.Phi:
-		if q, ok := phiToQueryGroup(pkg, i, instr.Parent(), pos, opt); ok {
-			return QueryResults{q}
-		}
-	}
-	return QueryResults{}
-}
-
-func callToQueryGroups(pkg *ssa.Package, i *ssa.Call, fn *ssa.Function, pos []token.Pos, opt *Option) QueryResults {
-	res := make([]*QueryResult, 0)
-	pos = append([]token.Pos{i.Pos()}, pos...)
-	for _, arg := range i.Common().Args {
-		switch a := arg.(type) {
-		case *ssa.Phi:
-			if q, ok := phiToQueryGroup(pkg, a, fn, pos, opt); ok {
-				res = append(res, q)
-			}
-		case *ssa.Const:
-			if q, ok := constToQueryGroup(pkg, a, fn, pos, opt); ok {
-				res = append(res, q)
-			}
-		}
-	}
-	return res
-}
-
-func phiToQueryGroup(pkg *ssa.Package, a *ssa.Phi, fn *ssa.Function, pos []token.Pos, opt *Option) (*QueryResult, bool) {
-	queryResult := &QueryResult{Meta: NewMeta(pkg, fn, a.Pos(), pos...)}
-	for _, edge := range a.Edges {
-		switch e := edge.(type) {
-		case *ssa.Const:
-			if qr, ok := constToQueryGroup(pkg, e, fn, append([]token.Pos{a.Pos()}, pos...), opt); ok {
-				queryResult.Append(qr.Queries()...)
-			}
-		}
-	}
-	if len(queryResult.Queries()) > 0 {
-		return queryResult, true
-	}
-	return &QueryResult{}, false
-}
-
-func constToQueryGroup(pkg *ssa.Package, a *ssa.Const, fn *ssa.Function, pos []token.Pos, opt *Option) (*QueryResult, bool) {
-	if a.Value != nil && a.Value.Kind() == constant.String {
-		if q, ok := sql.ParseString(a.Value.ExactString()); ok {
-			qr := &QueryResult{QueryGroup: sql.NewQueryGroupFrom(q), Meta: NewMeta(pkg, fn, a.Pos(), pos...)}
-			if opt.Filter(q, qr.Meta) {
-				return qr, true
-			}
-		}
-	}
-	return nil, false
 }
 
 type methodArg struct {

@@ -162,15 +162,6 @@ type PrintQueryOption struct {
 	ShowFullPackagePath bool
 }
 
-var pathDirRegex = regexp.MustCompile(`([^/]+)/`)
-
-func (opt *PrintQueryOption) AbbreviatePackagePath(path string) string {
-	if opt.ShowFullPackagePath {
-		return path
-	}
-	return pathDirRegex.ReplaceAllStringFunc(path, func(m string) string { return m[:1] + "/" })
-}
-
 func makeHeader(opt *PrintQueryOption) []string {
 	header := make([]string, 0)
 	if !opt.NoRowNum {
@@ -186,7 +177,7 @@ func makeHeader(opt *PrintQueryOption) []string {
 func row(q *sql.Query, meta *analysis.Meta, opt *PrintQueryOption) []string {
 	fullRow := []string{
 		meta.Package.Pkg.Name(),
-		opt.AbbreviatePackagePath(meta.Package.Pkg.Path()),
+		abbreviatePackagePath(meta.Package.Pkg.Path(), opt),
 		analysisutil.FLC(meta.Position()),
 		meta.Func.Name(),
 		q.Kind.ColoredString(),
@@ -200,4 +191,13 @@ func row(q *sql.Query, meta *analysis.Meta, opt *PrintQueryOption) []string {
 		res = append(res, fullRow[col])
 	}
 	return res
+}
+
+var pathDirRegex = regexp.MustCompile(`([^/]+)/`)
+
+func abbreviatePackagePath(path string, opt *PrintQueryOption) string {
+	if opt.ShowFullPackagePath {
+		return path
+	}
+	return pathDirRegex.ReplaceAllStringFunc(path, func(m string) string { return m[:1] + "/" })
 }

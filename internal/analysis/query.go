@@ -42,15 +42,6 @@ type QueryResult struct {
 	Meta *Meta
 }
 
-func (qr *QueryResult) Queries() []*sql.Query {
-	if qr.QueryGroup == nil || qr.List == nil {
-		return []*sql.Query{}
-	}
-	s := qr.List.ToSlice()
-	slices.SortFunc(s, func(a, b *sql.Query) int { return strings.Compare(a.Raw, b.Raw) })
-	return s
-}
-
 func (qr *QueryResult) Append(qs ...*sql.Query) {
 	if qr.QueryGroup == nil {
 		qr.QueryGroup = sql.NewQueryGroup()
@@ -108,10 +99,8 @@ func ExtractQuery(ssaProg *buildssa.SSA, files []*ast.File, opt *Option) (QueryR
 				}
 				for _, comment := range cg.List {
 					if strings.HasPrefix(comment.Text, "// scone:sql") {
-						if q, ok := sql.ParseString(strings.TrimPrefix(comment.Text, "// scone:sql")); ok {
-							if opt.Filter(q, qr.Meta) {
-								qr.Append(q)
-							}
+						if q, ok := sql.ParseString(strings.TrimPrefix(comment.Text, "// scone:sql")); ok && opt.Filter(q, qr.Meta) {
+							qr.Append(q)
 						}
 					}
 					if strings.HasPrefix(comment.Text, "// scone:sql") || strings.HasPrefix(comment.Text, "// scone:ignore") {

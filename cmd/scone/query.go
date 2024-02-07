@@ -60,6 +60,9 @@ func runQuery(cmd *cobra.Command, v *viper.Viper) error {
 	if !slices.Contains(sortKeys, "file") {
 		sortKeys = append(sortKeys, "file")
 	}
+	if !mapset.NewSet(cols...).IsSubset(mapset.NewSet(headerColumns...)) {
+		return errors.Newf("unknown columns: %s", mapset.NewSet(cols...).Difference(mapset.NewSet(headerColumns...)).ToSlice())
+	}
 
 	queryResults, _, err := analysis.Analyze(dir, pattern, opt)
 	if err != nil {
@@ -71,16 +74,8 @@ func runQuery(cmd *cobra.Command, v *viper.Viper) error {
 	if len(cols) > 0 {
 		printOpt.Cols = make([]int, 0, len(cols))
 		for _, col := range cols {
-			i := slices.Index(headerColumns, col)
-			if i == -1 {
-				return errors.Newf("unknown columns: %s", col)
-			}
-			printOpt.Cols = append(printOpt.Cols, i)
+			printOpt.Cols = append(printOpt.Cols, slices.Index(headerColumns, col))
 		}
-	}
-	pkgs := mapset.NewSet[string]()
-	for _, qr := range queryResults {
-		pkgs.Add(qr.Meta.Package.Pkg.Path())
 	}
 
 	var p internalio.TablePrinter
@@ -103,16 +98,13 @@ func runQuery(cmd *cobra.Command, v *viper.Viper) error {
 		p.SetHeader(makeHeader(printOpt))
 	}
 	for i, qr := range queryResults {
-		phi := ""
 		for j, q := range qr.Queries() {
-			if len(qr.Queries()) > 1 {
-				if expandQueryGroup {
-					phi = fmt.Sprintf("P%d", j+1)
-				} else {
-					phi = "P"
-				}
+			r := append([]string{""}, row(q, qr.Meta, printOpt)...)
+			if len(qr.Queries()) > 1 && expandQueryGroup {
+				r[0] = fmt.Sprintf("P%d", j+1)
+			} else if len(qr.Queries()) > 1 {
+				r[0] = "P"
 			}
-			r := append([]string{phi}, row(q, qr.Meta, printOpt)...)
 			if !printOpt.NoRowNum {
 				r = append([]string{strconv.Itoa(i + 1)}, r...)
 			}
@@ -153,7 +145,7 @@ type PrintQueryOption struct {
 }
 
 func makeHeader(opt *PrintQueryOption) []string {
-	header := make([]string, 0)
+	header := make([]string, 0, len(opt.Cols)+2)
 	if !opt.NoRowNum {
 		header = append(header, "#")
 	}

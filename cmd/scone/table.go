@@ -36,7 +36,7 @@ func NewTableCommand(v *viper.Viper, _ afero.Fs) *cobra.Command {
 func runTable(cmd *cobra.Command, v *viper.Viper) error {
 	dir := v.GetString("dir")
 	pattern := v.GetString("pattern")
-	summarizeOnly := v.GetBool("summary")
+	summaryOnly := v.GetBool("summary")
 	opt, err := QueryOptionFromViper(v)
 	if err != nil {
 		return err
@@ -46,24 +46,19 @@ func runTable(cmd *cobra.Command, v *viper.Viper) error {
 	if err != nil {
 		return err
 	}
-	return printResult(cmd.OutOrStdout(), queryResults, cgs, PrintTableOption{SummarizeOnly: summarizeOnly})
-}
-
-type PrintTableOption struct{ SummarizeOnly bool }
-
-func printResult(w io.Writer, queryResults analysis.QueryResults, cgs map[string]*analysis.CallGraph, opt PrintTableOption) error {
 	tableConn := clusterize(queryResults, cgs)
-	if err := printSummary(w, queryResults, tableConn); err != nil {
+
+	if err := printSummary(cmd.OutOrStdout(), queryResults, tableConn); err != nil {
 		return err
 	}
-	if !opt.SummarizeOnly {
+	if !summaryOnly {
 		for _, t := range queryResults.AllTables() {
-			if err := printTableResult(w, t, queryResults, tableConn); err != nil {
+			if err := printTableResult(cmd.OutOrStdout(), t, queryResults, tableConn); err != nil {
 				return err
 			}
 		}
 	}
-	fmt.Fprintln(w)
+	fmt.Fprintln(cmd.OutOrStdout())
 	return nil
 }
 
@@ -73,21 +68,20 @@ func clusterize(queryResults analysis.QueryResults, cgs map[string]*analysis.Cal
 	// Extract tables updated in the same transaction
 	for _, cg := range cgs {
 		for _, r := range cg.Nodes {
-			if r.IsNotRoot() {
-				continue
-			}
-			// walk from the root nodes
-			tablesInTx := mapset.NewSet[string]()
-			analysis.Walk(cg, r, func(n *analysis.Node) bool {
-				for _, edge := range n.Out {
-					if edge.IsQuery() && edge.SqlValue.Kind != sql.Select {
-						tablesInTx.Add(edge.Callee)
+			if r.IsRoot() {
+				// walk from the root nodes
+				tablesInTx := mapset.NewSet[string]()
+				analysis.Walk(cg, r, func(n *analysis.Node) bool {
+					for _, edge := range n.Out {
+						if edge.IsQuery() && edge.SqlValue.Kind != sql.Select {
+							tablesInTx.Add(edge.Callee)
+						}
 					}
-				}
-				return false
-			})
-			// connect updated tables under the same root node
-			util.PairCombinateFunc(tablesInTx.ToSlice(), c.Connect)
+					return false
+				})
+				// connect updated tables under the same root node
+				util.PairCombinateFunc(tablesInTx.ToSlice(), c.Connect)
+			}
 		}
 	}
 
@@ -118,27 +112,25 @@ const tmplSummary = `{{title "Summary"}}
 `
 
 func printSummary(w io.Writer, queryResults analysis.QueryResults, tableConn util.Connection) error {
-	data := make(map[string]any)
 	tables := queryResults.AllTables()
-
-	data["queries"] = len(queryResults)
-	data["tables"] = len(tables)
 	cacheability := make(map[sql.Cacheability][]string)
-	for _, t := range tables {
-		cacheability[t.Cacheability()] = append(cacheability[t.Cacheability()], t.Name)
-	}
-	data["cacheability"] = cacheability
-	clusters := make([][]string, 0, len(tableConn.GetClusters()))
-	for _, ts := range tableConn.GetClusters() {
-		clusters = append(clusters, mapset.Sorted(ts))
-	}
-	data["clusters"] = clusters
 	partitionKeys := make(map[string][]string)
 	for _, t := range tables {
+		cacheability[t.Cacheability()] = append(cacheability[t.Cacheability()], t.Name)
 		if len(t.PartitionKeys()) > 0 {
 			partitionKeys[t.Name] = t.PartitionKeys()
 		}
 	}
+	clusters := make([][]string, 0, len(tableConn.GetClusters()))
+	for _, ts := range tableConn.GetClusters() {
+		clusters = append(clusters, mapset.Sorted(ts))
+	}
+
+	data := make(map[string]any)
+	data["queries"] = len(queryResults)
+	data["tables"] = len(tables)
+	data["cacheability"] = cacheability
+	data["clusters"] = clusters
 	data["partitionKeys"] = partitionKeys
 
 	return templateRender(w, "summary", tmplSummary, data)
@@ -158,6 +150,13 @@ const tmplTableResult = `
 `
 
 func printTableResult(w io.Writer, table *sql.Table, queryResults analysis.QueryResults, tableConn util.Connection) error {
+	qrs := make([]*analysis.QueryResult, 0)
+	for _, qr := range queryResults {
+		if slices.ContainsFunc(qr.Queries(), func(q *sql.Query) bool { return slices.Contains(q.Tables, table.Name) }) {
+			qrs = append(qrs, qr)
+		}
+	}
+
 	data := make(map[string]any)
 	data["table"] = table.Name
 	data["maxKind"] = table.MaxKind()
@@ -166,15 +165,6 @@ func printTableResult(w io.Writer, table *sql.Table, queryResults analysis.Query
 	data["collocation"] = mapset.Sorted(tableConn.GetConnection(table.Name, 1).Difference(mapset.NewSet(table.Name)))
 	data["cluster"] = mapset.Sorted(tableConn.GetConnection(table.Name, -1))
 	data["partitionKey"] = table.PartitionKeys()
-	qrs := make([]*analysis.QueryResult, 0)
-	for _, qr := range queryResults {
-		for _, q := range qr.Queries() {
-			if slices.Contains(q.Tables, table.Name) {
-				qrs = append(qrs, qr)
-				break
-			}
-		}
-	}
 	data["queries"] = qrs
 
 	if err := templateRender(w, "tableResult", tmplTableResult, data); err != nil {

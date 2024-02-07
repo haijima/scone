@@ -4,6 +4,7 @@ import (
 	"crypto/sha1"
 	"fmt"
 	"regexp"
+	"slices"
 	"strings"
 	"unicode"
 
@@ -38,6 +39,15 @@ func (qgs QueryGroups) AllTableMap() map[string]*Table {
 
 type QueryGroup struct {
 	List mapset.Set[*Query]
+}
+
+func (qg *QueryGroup) Queries() []*Query {
+	if qg == nil || qg.List == nil {
+		return []*Query{}
+	}
+	s := qg.List.ToSlice()
+	slices.SortFunc(s, func(a, b *Query) int { return strings.Compare(a.Raw, b.Raw) })
+	return s
 }
 
 func NewQueryGroup() *QueryGroup {

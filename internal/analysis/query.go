@@ -74,6 +74,21 @@ func (m *Meta) Position() token.Position {
 	return analysisutil.GetPosition(m.Package, m.Pos)
 }
 
+func (m *Meta) Compare(other *Meta) int {
+	if m.Package.Pkg.Path() != other.Package.Pkg.Path() {
+		return strings.Compare(m.Package.Pkg.Path(), other.Package.Pkg.Path())
+	} else if m.Position().Filename != other.Position().Filename {
+		return strings.Compare(m.Position().Filename, other.Position().Filename)
+	} else if m.Position().Offset != other.Position().Offset {
+		return m.Position().Offset - other.Position().Offset
+	}
+	return 0
+}
+
+func (m *Meta) Equal(other *Meta) bool {
+	return m.Compare(other) == 0
+}
+
 // ExtractQuery extracts queries from the given package.
 func ExtractQuery(ssaProg *buildssa.SSA, files []*ast.File, opt *Option) (QueryResults, error) {
 	foundQueryResults := make([]*QueryResult, 0)
@@ -115,13 +130,13 @@ func ExtractQuery(ssaProg *buildssa.SSA, files []*ast.File, opt *Option) (QueryR
 	}
 
 	slices.SortFunc(foundQueryResults, func(a, b *QueryResult) int {
-		if a.Meta.Position().Offset != b.Meta.Position().Offset {
-			return a.Meta.Position().Offset - b.Meta.Position().Offset
+		if !a.Meta.Equal(b.Meta) {
+			return a.Meta.Compare(b.Meta)
 		}
-		return strings.Compare(a.Queries()[0].Raw, b.Queries()[0].Raw)
+		return slices.CompareFunc(a.Queries(), b.Queries(), func(a, b *sql.Query) int { return strings.Compare(a.Sha(), b.Sha()) })
 	})
 	foundQueryResults = slices.CompactFunc(foundQueryResults, func(a, b *QueryResult) bool {
-		return a.Queries()[0].Sha() == b.Queries()[0].Sha() && a.Meta.Position().Offset == b.Meta.Position().Offset
+		return a.Meta.Equal(b.Meta) && slices.EqualFunc(a.Queries(), b.Queries(), func(a, b *sql.Query) bool { return a.Sha() == b.Sha() })
 	})
 	return foundQueryResults, nil
 }

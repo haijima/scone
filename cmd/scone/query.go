@@ -127,30 +127,20 @@ func runQuery(cmd *cobra.Command, v *viper.Viper) error {
 
 func sortQuery(sortKeys []string) func(a, b *analysis.QueryResult) int {
 	return func(aa, bb *analysis.QueryResult) int {
-		a := aa.Queries()[0]
-		b := bb.Queries()[0]
-		for _, sortKey := range sortKeys {
-			if sortKey == "type" && a.Kind != b.Kind {
-				return int(a.Kind) - int(b.Kind)
-			} else if sortKey == "table" && a.MainTable != b.MainTable {
-				return strings.Compare(a.MainTable, b.MainTable)
-			} else if sortKey == "sha1" && a.Sha() != b.Sha() {
-				return strings.Compare(a.Sha(), b.Sha())
-			} else if sortKey == "function" && aa.Meta.Func.Name() != bb.Meta.Func.Name() {
+		return slices.CompareFunc(sortKeys, sortKeys, func(k, _ string) int {
+			if k == "type" {
+				return int(aa.Queries()[0].Kind) - int(bb.Queries()[0].Kind)
+			} else if k == "table" {
+				return strings.Compare(aa.Queries()[0].MainTable, bb.Queries()[0].MainTable)
+			} else if k == "sha1" {
+				return strings.Compare(aa.Queries()[0].Sha(), bb.Queries()[0].Sha())
+			} else if k == "function" {
 				return strings.Compare(aa.Meta.Func.Name(), bb.Meta.Func.Name())
-			} else if sortKey == "file" {
-				if aa.Meta.Package.Pkg.Path() != bb.Meta.Package.Pkg.Path() {
-					return strings.Compare(aa.Meta.Package.Pkg.Path(), bb.Meta.Package.Pkg.Path())
-				} else if aa.Meta.Position().Filename != bb.Meta.Position().Filename {
-					return strings.Compare(aa.Meta.Position().Filename, bb.Meta.Position().Filename)
-				} else if aa.Meta.Position().Line != bb.Meta.Position().Line {
-					return aa.Meta.Position().Line - bb.Meta.Position().Line
-				} else if aa.Meta.Position().Column != bb.Meta.Position().Column {
-					return aa.Meta.Position().Column - bb.Meta.Position().Column
-				}
+			} else if k == "file" {
+				return aa.Meta.Compare(bb.Meta)
 			}
-		}
-		return 0
+			return 0
+		})
 	}
 }
 

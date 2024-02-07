@@ -111,24 +111,41 @@ func (k QueryKind) String() string {
 	}
 }
 
+func (k QueryKind) CRUD() string {
+	switch k {
+	case Insert:
+		return "C"
+	case Select:
+		return "R"
+	case Replace, Update:
+		return "U"
+	case Delete:
+		return "D"
+	default:
+		return "?"
+	}
+}
+
 func (k QueryKind) ColoredString() string {
 	return k.Color(k.String())
 }
 
-func (k QueryKind) Color(str string) string {
+func (k QueryKind) Color(format string, a ...interface{}) string {
+	return color.New(k.ColorAttribute()).Sprintf(format, a...)
+}
+
+func (k QueryKind) ColorAttribute() color.Attribute {
 	switch k {
 	case Select:
-		return color.BlueString(str)
+		return color.FgBlue
 	case Insert:
-		return color.GreenString(str)
+		return color.FgGreen
 	case Delete:
-		return color.RedString(str)
-	case Replace:
-		return color.YellowString(str)
-	case Update:
-		return color.YellowString(str)
+		return color.FgRed
+	case Replace, Update:
+		return color.FgYellow
 	default:
-		return color.HiBlackString(str)
+		return color.FgHiBlack
 	}
 }
 

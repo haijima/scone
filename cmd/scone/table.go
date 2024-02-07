@@ -186,14 +186,9 @@ func printTableResult(w io.Writer, table *sql.Table, queryResults analysis.Query
 	p.SetHeader([]string{"", "#", "file", "function", "t", "query"})
 	for i, qr := range qrs {
 		for _, q := range qr.Queries() {
-			if !slices.Contains(q.Tables, table.Name) {
-				continue
+			if slices.Contains(q.Tables, table.Name) {
+				p.AddRow([]string{"   ", strconv.Itoa(i + 1), analysisutil.FLC(qr.Meta.Position()), qr.Meta.Func.Name(), q.Kind.Color(q.Kind.CRUD()), q.Raw})
 			}
-			k := "?"
-			if q.Kind > sql.Unknown {
-				k = q.Kind.Color(q.Kind.String()[:1])
-			}
-			p.AddRow([]string{"   ", strconv.Itoa(i + 1), analysisutil.FLC(qr.Meta.Position()), qr.Meta.Func.Name(), k, q.Raw})
 		}
 	}
 	return p.Print()
@@ -201,18 +196,7 @@ func printTableResult(w io.Writer, table *sql.Table, queryResults analysis.Query
 
 var tmplFuncs = map[string]any{
 	"labeled": func(table string, kind sql.QueryKind) string {
-		c := color.New(color.FgBlack, color.BgWhite)
-		switch kind {
-		case sql.Select:
-			c = color.New(color.FgBlack, color.BgBlue)
-		case sql.Insert:
-			c = color.New(color.FgBlack, color.BgGreen)
-		case sql.Delete:
-			c = color.New(color.FgBlack, color.BgRed)
-		case sql.Replace, sql.Update:
-			c = color.New(color.FgBlack, color.BgYellow)
-		}
-		return c.Sprintf(" %s ", table)
+		return color.New(color.FgBlack, kind.ColorAttribute()+10).Sprintf(" %s ", table)
 	},
 	"title":   color.CyanString,
 	"key":     color.MagentaString,

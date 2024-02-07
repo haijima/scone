@@ -199,14 +199,14 @@ func AnalyzeFuncBySsaMethod(pkg *ssa.Package, fn *ssa.Function, pos []token.Pos,
 	foundQueryResults := make([]*QueryResult, 0)
 	for _, block := range fn.Blocks {
 		for _, instr := range block.Instrs {
-			if c, ok := instr.(*ssa.Call); ok {
+			if c, ok := toCallCommon(instr); ok {
 				for _, t := range tms {
-					if analysisutil.IsFunc(c.Common(), t.Package, t.Method) {
+					if analysisutil.IsFunc(c, t.Package, t.Method) {
 						idx := t.ArgIndex
-						if !c.Common().IsInvoke() {
+						if !c.IsInvoke() {
 							idx++ // Set first argument as receiver
 						}
-						arg := c.Common().Args[idx]
+						arg := c.Args[idx]
 						if phi, ok := arg.(*ssa.Phi); ok {
 							for _, edge := range phi.Edges {
 								if qg, ok := constLikeStringValueToQueryGroup(pkg, edge, fn, append([]token.Pos{arg.Pos(), c.Pos(), fn.Pos()}, pos...), opt); ok {
@@ -228,6 +228,22 @@ func AnalyzeFuncBySsaMethod(pkg *ssa.Package, fn *ssa.Function, pos []token.Pos,
 	}
 
 	return foundQueryResults
+}
+
+func toCallCommon(instr ssa.Instruction) (*ssa.CallCommon, bool) {
+	switch i := instr.(type) {
+	case *ssa.Call:
+		return i.Common(), true
+	case *ssa.Extract:
+		if call, ok := i.Tuple.(*ssa.Call); ok {
+			return call.Common(), true
+		}
+	case *ssa.Go:
+		return i.Common(), true
+	case *ssa.Defer:
+		return i.Common(), true
+	}
+	return nil, false
 }
 
 func constLikeStringValueToQueryGroup(pkg *ssa.Package, v ssa.Value, fn *ssa.Function, pos []token.Pos, opt *Option) (*QueryResult, bool) {

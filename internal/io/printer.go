@@ -35,11 +35,11 @@ type csvPrinter struct {
 }
 
 func (c *csvPrinter) SetHeader(header []string) {
-	c.writer.Write(header)
+	_ = c.writer.Write(header)
 }
 
 func (c *csvPrinter) AddRow(row []string) {
-	c.writer.Write(row)
+	_ = c.writer.Write(row)
 }
 
 func (c *csvPrinter) Print() error {

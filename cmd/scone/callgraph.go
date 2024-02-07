@@ -168,26 +168,3 @@ func printGraphviz(w io.Writer, cgs map[string]*analysis.CallGraph) error {
 
 	return internalio.WriteDotGraph(w, *g)
 }
-
-func showLegend(w io.Writer) {
-	fmt.Fprintln(w, "\tsubgraph cluster_legend {")
-	fmt.Fprintln(w, "\t\tlabel=\"Legend\"")
-	fmt.Fprintf(w, "\t\t\"legend_table2\"[label=\"Table\", shape=\"box\", color=\"blue\", fillcolor=\"lightblue1\", style=\"bold,filled\"]\n")
-	fmt.Fprintf(w, "\t\t\"legend_table3\"[label=\"Table\", shape=\"box\", color=\"green\", fillcolor=\"darkolivegreen1\", style=\"bold,filled\"]\n")
-	fmt.Fprintf(w, "\t\t\"legend_table4\"[label=\"Table\", shape=\"box\", color=\"orange\",style=\"solid\"]\n")
-	fmt.Fprintf(w, "\t\t\"legend_table5\"[label=\"Table\", shape=\"box\", color=\"red\", style=\"solid\"]\n")
-	fmt.Fprintf(w, "\t\t\"legend_func1\"[label=\"Func\"]\n")
-	fmt.Fprintf(w, "\t\t\"legend_func2\"[label=\"Func\"]\n")
-	fmt.Fprintf(w, "\t\t\"legend_func3\"[label=\"Func\"]\n")
-	fmt.Fprintf(w, "\t\t\"legend_func4\"[label=\"Func\"]\n")
-	fmt.Fprintf(w, "\t\t\"legend_func5\"[label=\"Func\"]\n")
-	fmt.Fprintf(w, "\t\t\"legend_func2\" -> \"legend_table2\"[label=\"SELECT\", style=\"dotted\"];\n")
-	fmt.Fprintf(w, "\t\t\"legend_func3\" -> \"legend_table3\"[label=\"INSERT\", color=\"green\"];\n")
-	fmt.Fprintf(w, "\t\t\"legend_func4\" -> \"legend_table4\"[label=\"UPDATE\", color=\"orange\"];\n")
-	fmt.Fprintf(w, "\t\t\"legend_func5\" -> \"legend_table5\"[label=\"DELETE\", color=\"red\"];\n")
-	fmt.Fprintf(w, "\t\t\"legend_func1\" -> \"legend_func2\"[label=\"Function Call\", style=\"dashed\"];\n")
-	fmt.Fprintf(w, "\t\t\"legend_func1\" -> \"legend_func3\"[label=\"Function Call\", style=\"dashed\"];\n")
-	fmt.Fprintf(w, "\t\t\"legend_func1\" -> \"legend_func4\"[label=\"Function Call\", style=\"dashed\"];\n")
-	fmt.Fprintf(w, "\t\t\"legend_func1\" -> \"legend_func5\"[label=\"Function Call\", style=\"dashed\"];\n")
-	fmt.Fprintln(w, "\t}")
-}

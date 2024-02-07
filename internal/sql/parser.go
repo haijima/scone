@@ -215,7 +215,7 @@ func parseStmt(tableRefs *ast.TableRefsClause, condition ast.ExprNode, wholeSQL 
 					for _, t := range jf.tableNames {
 						ts = append(ts, t.Source.(*ast.TableName).Name.L)
 					}
-					slog.Warn("ambiguous column name in (sub)query", "column", col.Name.L, "tables", ts, "SQL", wholeSQL)
+					slog.Debug("ambiguous column name in (sub)query", "column", col.Name.L, "tables", ts, "SQL", wholeSQL)
 
 					for a := range tableAliases {
 						ra.Add(a, col.Name.L)

@@ -37,8 +37,8 @@ func NewQueryCommand(v *viper.Viper, _ afero.Fs) *cobra.Command {
 	return cmd
 }
 
-var headerColumns = []string{"package", "package-path", "file", "function", "type", "table", "related-tables", "sha1", "query", "raw-query"}
-var defaultHeaderIndex = []int{0, 1, 2, 3, 4, 5, 6, 7, 8}
+var headerColumns = []string{"package", "package-path", "file", "function", "type", "tables", "sha1", "query", "raw-query"}
+var defaultHeaderIndex = []int{0, 1, 2, 3, 4, 5, 6, 7}
 
 func runQuery(cmd *cobra.Command, v *viper.Viper) error {
 	dir := v.GetString("dir")
@@ -184,19 +184,13 @@ func makeHeader(opt *PrintQueryOption) []string {
 }
 
 func row(q *sql.Query, meta *analysis.Meta, opt *PrintQueryOption) []string {
-	var tables string
-	if len(q.Tables) > 0 {
-		tables = strings.Join(q.Tables[1:], ", ")
-	}
-
 	fullRow := []string{
 		meta.Package.Pkg.Name(),
 		opt.AbbreviatePackagePath(meta.Package.Pkg.Path()),
 		analysisutil.FLC(meta.Position()),
 		meta.Func.Name(),
 		q.Kind.ColoredString(),
-		q.MainTable,
-		tables,
+		strings.Join(q.Tables, ", "),
 		q.Sha(),
 		q.String(),
 		q.Raw,

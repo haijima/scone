@@ -182,7 +182,7 @@ func printTableResult(w io.Writer, table *sql.Table, queryResults analysis.Query
 	}
 
 	// Print queries by TablePrinter
-	p := internalio.NewSimplePrinter(w, tablewriter.MAX_ROW_WIDTH*5, true)
+	p := internalio.NewSimplePrinter(w, internalio.WithColWidth(tablewriter.MAX_ROW_WIDTH*5), internalio.WithAutoWrapText(true))
 	p.SetHeader([]string{"", "#", "file", "function", "t", "query"})
 	for i, qr := range qrs {
 		for _, q := range qr.Queries() {

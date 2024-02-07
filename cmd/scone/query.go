@@ -85,13 +85,12 @@ func runQuery(cmd *cobra.Command, v *viper.Viper) error {
 
 	var p internalio.TablePrinter
 	if format == "table" {
-		maxWidth := tablewriter.MAX_ROW_WIDTH * 4
 		includeRawQuery := printOpt.Cols != nil && slices.Contains(printOpt.Cols, slices.Index(headerColumns, "raw-query"))
-		p = internalio.NewTablePrinter(cmd.OutOrStdout(), maxWidth, includeRawQuery)
+		p = internalio.NewTablePrinter(cmd.OutOrStdout(), internalio.WithColWidth(tablewriter.MAX_ROW_WIDTH*4), internalio.WithAutoWrapText(includeRawQuery))
 	} else if format == "md" {
 		p = internalio.NewMarkdownPrinter(cmd.OutOrStdout())
 	} else if format == "simple" {
-		p = internalio.NewSimplePrinter(cmd.OutOrStdout(), tablewriter.MAX_ROW_WIDTH, false)
+		p = internalio.NewSimplePrinter(cmd.OutOrStdout())
 	} else if format == "csv" {
 		p = internalio.NewCSVPrinter(cmd.OutOrStdout())
 	} else if format == "tsv" {

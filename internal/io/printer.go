@@ -47,25 +47,45 @@ func (c *csvPrinter) Print() error {
 	return nil
 }
 
-func NewTablePrinter(w io.Writer, rowWidth int, autoWrap bool) TablePrinter {
+type PrinterOpt interface {
+	apply(*tablewriter.Table)
+}
+
+type printerOptFunc func(*tablewriter.Table)
+
+func (f printerOptFunc) apply(t *tablewriter.Table) { f(t) }
+
+func WithAutoWrapText(b bool) PrinterOpt {
+	return printerOptFunc(func(t *tablewriter.Table) { t.SetAutoWrapText(b) })
+}
+
+func WithColWidth(w int) PrinterOpt {
+	return printerOptFunc(func(t *tablewriter.Table) { t.SetColWidth(w) })
+}
+
+func NewTablePrinter(w io.Writer, opts ...PrinterOpt) TablePrinter {
 	tw := tablewriter.NewWriter(w)
-	tw.SetColWidth(rowWidth)
-	tw.SetAutoWrapText(autoWrap)
+	tw.SetAutoWrapText(false)
+	for _, opt := range opts {
+		opt.apply(tw)
+	}
 	return &tablePrinter{writer: tw}
 }
 
-func NewMarkdownPrinter(w io.Writer) TablePrinter {
+func NewMarkdownPrinter(w io.Writer, opts ...PrinterOpt) TablePrinter {
 	tw := tablewriter.NewWriter(w)
 	tw.SetAutoWrapText(false)
 	tw.SetBorders(tablewriter.Border{Left: true, Top: false, Right: true, Bottom: false})
 	tw.SetCenterSeparator("|")
+	for _, opt := range opts {
+		opt.apply(tw)
+	}
 	return &tablePrinter{writer: tw}
 }
 
-func NewSimplePrinter(w io.Writer, rowWidth int, autoWrap bool) TablePrinter {
+func NewSimplePrinter(w io.Writer, opts ...PrinterOpt) TablePrinter {
 	tw := tablewriter.NewWriter(w)
-	tw.SetColWidth(rowWidth)
-	tw.SetAutoWrapText(autoWrap)
+	tw.SetAutoWrapText(false)
 	tw.SetAutoFormatHeaders(true)
 	tw.SetHeaderAlignment(tablewriter.ALIGN_LEFT)
 	tw.SetAlignment(tablewriter.ALIGN_LEFT)
@@ -76,6 +96,9 @@ func NewSimplePrinter(w io.Writer, rowWidth int, autoWrap bool) TablePrinter {
 	tw.SetBorder(false)
 	tw.SetTablePadding(" ")
 	tw.SetNoWhiteSpace(true)
+	for _, opt := range opts {
+		opt.apply(tw)
+	}
 	return &tablePrinter{writer: tw}
 }
 

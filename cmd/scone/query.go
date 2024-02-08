@@ -115,7 +115,8 @@ func runQuery(cmd *cobra.Command, v *viper.Viper) error {
 			}
 		}
 	}
-	return p.Print()
+	p.Print()
+	return nil
 }
 
 func sortQuery(sortKeys []string) func(a, b *analysis.QueryResult) int {

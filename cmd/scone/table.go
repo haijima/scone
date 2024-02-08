@@ -181,7 +181,8 @@ func printTableResult(w io.Writer, table *sql.Table, queryResults analysis.Query
 			}
 		}
 	}
-	return p.Print()
+	p.Print()
+	return nil
 }
 
 var tmplFuncs = map[string]any{

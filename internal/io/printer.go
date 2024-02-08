@@ -10,7 +10,7 @@ import (
 type TablePrinter interface {
 	SetHeader(header []string)
 	AddRow(row []string)
-	Print() error
+	Print()
 }
 
 type tablePrinter struct {
@@ -25,9 +25,8 @@ func (t *tablePrinter) AddRow(row []string) {
 	t.writer.Append(row)
 }
 
-func (t *tablePrinter) Print() error {
+func (t *tablePrinter) Print() {
 	t.writer.Render()
-	return nil
 }
 
 type csvPrinter struct {
@@ -42,9 +41,8 @@ func (c *csvPrinter) AddRow(row []string) {
 	_ = c.writer.Write(row)
 }
 
-func (c *csvPrinter) Print() error {
+func (c *csvPrinter) Print() {
 	c.writer.Flush()
-	return nil
 }
 
 type PrinterOpt interface {

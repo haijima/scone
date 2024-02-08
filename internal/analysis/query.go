@@ -188,7 +188,7 @@ func AnalyzeFuncBySsaMethod(pkg *ssa.Package, fn *ssa.Function, pos []token.Pos,
 	foundQueryResults := make([]*QueryResult, 0)
 	for _, block := range fn.Blocks {
 		for _, instr := range block.Instrs {
-			if c, ok := toCallCommon(instr); ok {
+			if c, ok := analysisutil.InstrToCallCommon(instr); ok {
 				for _, t := range tms {
 					if analysisutil.IsFunc(c, t.Package, t.Method) {
 						idx := t.ArgIndex
@@ -219,22 +219,6 @@ func AnalyzeFuncBySsaMethod(pkg *ssa.Package, fn *ssa.Function, pos []token.Pos,
 	return foundQueryResults
 }
 
-func toCallCommon(instr ssa.Instruction) (*ssa.CallCommon, bool) {
-	switch i := instr.(type) {
-	case *ssa.Call:
-		return i.Common(), true
-	case *ssa.Extract:
-		if call, ok := i.Tuple.(*ssa.Call); ok {
-			return call.Common(), true
-		}
-	case *ssa.Go:
-		return i.Common(), true
-	case *ssa.Defer:
-		return i.Common(), true
-	}
-	return nil, false
-}
-
 func constLikeStringValueToQueryGroup(pkg *ssa.Package, v ssa.Value, fn *ssa.Function, pos []token.Pos, opt *Option) (*QueryResult, bool) {
 	meta := NewMeta(pkg, fn, v.Pos(), pos...)
 	if as, ok := analysisutil.ConstLikeStringValues(v); ok {
@@ -258,13 +242,12 @@ func constLikeStringValueToQueryGroup(pkg *ssa.Package, v ssa.Value, fn *ssa.Fun
 		if len(qr.Queries()) > 0 {
 			return qr, true
 		}
-		return &QueryResult{}, false
 	} else {
 		if uq := unknownQueryIfNotSkipped(v, opt, meta, "Can't parse value as string constant", "value", fmt.Sprintf("%v", v)); uq != nil {
 			return &QueryResult{QueryGroup: sql.NewQueryGroupFrom(uq), Meta: NewMeta(pkg, fn, v.Pos(), pos...)}, true
 		}
-		return &QueryResult{}, false
 	}
+	return &QueryResult{}, false
 }
 
 func unknownQueryIfNotSkipped(v ssa.Value, opt *Option, meta *Meta, logMessage string, logArgs ...any) *sql.Query {
@@ -285,13 +268,10 @@ func skip(v ssa.Value, opt *Option, meta *Meta) (string, bool) {
 	} else if !opt.Filter(&sql.Query{Kind: sql.Unknown}, meta) {
 		return "No need to warn if v is filtered out", true
 	}
-	switch t := v.(type) {
-	case *ssa.Call:
-		if analysisutil.IsFunc(t.Common(), "github.com/jmoiron/sqlx", "Rebind") {
+	if c, ok := analysisutil.ValueToCallCommon(v); ok {
+		if analysisutil.IsFunc(c, "github.com/jmoiron/sqlx", "Rebind") {
 			return "No need to warn if v is the result of sqlx.Rebind()", true
-		}
-	case *ssa.Extract:
-		if c, ok := t.Tuple.(*ssa.Call); ok && analysisutil.IsFunc(c.Common(), "github.com/jmoiron/sqlx", "In") {
+		} else if analysisutil.IsFunc(c, "github.com/jmoiron/sqlx", "In") {
 			return "No need to warn if v is the result of sqlx.In()", true
 		}
 	}

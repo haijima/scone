@@ -219,3 +219,31 @@ func GetFuncInfo(common *ssa.CallCommon) (pkgPath, funcName string, ok bool) {
 	}
 	return "", "", false // Can't get package name of the function
 }
+
+func InstrToCallCommon(instr ssa.Instruction) (*ssa.CallCommon, bool) {
+	switch i := instr.(type) {
+	case *ssa.Call:
+		return i.Common(), true
+	case *ssa.Extract:
+		if call, ok := i.Tuple.(*ssa.Call); ok {
+			return call.Common(), true
+		}
+	case *ssa.Go:
+		return i.Common(), true
+	case *ssa.Defer:
+		return i.Common(), true
+	}
+	return nil, false
+}
+
+func ValueToCallCommon(value ssa.Value) (*ssa.CallCommon, bool) {
+	switch v := value.(type) {
+	case *ssa.Call:
+		return v.Common(), true
+	case *ssa.Extract:
+		if call, ok := v.Tuple.(*ssa.Call); ok {
+			return call.Common(), true
+		}
+	}
+	return nil, false
+}

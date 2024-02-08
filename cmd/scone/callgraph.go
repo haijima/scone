@@ -94,8 +94,7 @@ func printGraphviz(w io.Writer, cgs map[string]*analysis.CallGraph) error {
 			if node.Func == nil {
 				kind := sql.Select
 				for _, cg2 := range cgs {
-					n, ok := cg2.Nodes[node.Name]
-					if ok {
+					if n, ok := cg2.Nodes[node.Name]; ok {
 						for _, q := range n.In {
 							if q.SqlValue != nil {
 								kind = max(kind, q.SqlValue.Kind)

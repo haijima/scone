@@ -63,6 +63,9 @@ func runQuery(cmd *cobra.Command, v *viper.Viper) error {
 	if !mapset.NewSet(cols...).IsSubset(mapset.NewSet(headerColumns...)) {
 		return errors.Newf("unknown columns: %s", mapset.NewSet(cols...).Difference(mapset.NewSet(headerColumns...)).ToSlice())
 	}
+	if !slices.Contains([]string{"table", "md", "csv", "tsv", "simple"}, format) {
+		return errors.Newf("unknown format: %s", format)
+	}
 
 	queryResults, _, err := analysis.Analyze(dir, pattern, opt)
 	if err != nil {
@@ -90,8 +93,6 @@ func runQuery(cmd *cobra.Command, v *viper.Viper) error {
 		p = internalio.NewCSVPrinter(cmd.OutOrStdout())
 	} else if format == "tsv" {
 		p = internalio.NewTSVPrinter(cmd.OutOrStdout())
-	} else {
-		return errors.Newf("unknown format: %s", format)
 	}
 
 	if !printOpt.NoHeader {

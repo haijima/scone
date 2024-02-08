@@ -196,13 +196,7 @@ func AnalyzeFuncBySsaMethod(pkg *ssa.Package, fn *ssa.Function, pos []token.Pos,
 							idx++ // Set first argument as receiver
 						}
 						arg := c.Args[idx]
-						if phi, ok := arg.(*ssa.Phi); ok {
-							for _, edge := range phi.Edges {
-								if qg, ok := constLikeStringValueToQueryGroup(pkg, edge, fn, append([]token.Pos{arg.Pos(), c.Pos(), fn.Pos()}, pos...), opt); ok {
-									foundQueryResults = append(foundQueryResults, qg)
-								}
-							}
-						} else if qg, ok := constLikeStringValueToQueryGroup(pkg, arg, fn, append([]token.Pos{c.Pos(), fn.Pos()}, pos...), opt); ok {
+						if qg, ok := constLikeStringValueToQueryGroup(pkg, arg, fn, append([]token.Pos{c.Pos(), fn.Pos()}, pos...), opt); ok {
 							foundQueryResults = append(foundQueryResults, qg)
 						}
 						break // Found target method

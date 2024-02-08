@@ -9,125 +9,109 @@ import (
 	"strconv"
 	"strings"
 
-	mapset "github.com/deckarep/golang-set/v2"
 	"github.com/haijima/scone/internal/analysis/analysisutil"
 	"github.com/haijima/scone/internal/sql"
-	"golang.org/x/exp/maps"
 	"golang.org/x/tools/go/analysis/passes/buildssa"
 	"golang.org/x/tools/go/ssa"
 )
 
-type QueryResults []*QueryResult
-
-func (qrs QueryResults) AllTables() []*sql.Table {
-	s := maps.Values(qrs.allTableMap())
-	slices.SortFunc(s, func(a, b *sql.Table) int { return strings.Compare(a.Name, b.Name) })
-	return s
-}
-
-func (qrs QueryResults) AllTableNames() []string {
-	return mapset.Sorted(mapset.NewSetFromMapKeys(qrs.allTableMap()))
-}
-
-func (qrs QueryResults) allTableMap() map[string]*sql.Table {
-	qgs := make([]*sql.QueryGroup, 0)
-	for _, qr := range qrs {
-		qgs = append(qgs, qr.QueryGroup)
-	}
-	return sql.QueryGroups(qgs).AllTableMap()
-}
-
-type QueryResult struct {
-	*sql.QueryGroup
-	Meta *Meta
-}
-
-func (qr *QueryResult) Append(qs ...*sql.Query) {
-	if qr.QueryGroup == nil {
-		qr.QueryGroup = sql.NewQueryGroup()
-	} else if qr.List == nil {
-		qr.List = mapset.NewSet[*sql.Query]()
-	}
-	qr.List.Append(qs...)
-}
-
-type Meta struct {
-	Package *ssa.Package
-	Func    *ssa.Function
-	Pos     []token.Pos
-}
-
-func NewMeta(pkg *ssa.Package, fn *ssa.Function, pos token.Pos, fallbackPos ...token.Pos) *Meta {
-	return &Meta{Package: pkg, Func: fn, Pos: append([]token.Pos{pos}, fallbackPos...)}
-}
-
-func (m *Meta) Position() token.Position {
-	return analysisutil.GetPosition(m.Package, m.Pos)
-}
-
-func (m *Meta) Compare(other *Meta) int {
-	if m.Package.Pkg.Path() != other.Package.Pkg.Path() {
-		return strings.Compare(m.Package.Pkg.Path(), other.Package.Pkg.Path())
-	} else if m.Position().Filename != other.Position().Filename {
-		return strings.Compare(m.Position().Filename, other.Position().Filename)
-	} else if m.Position().Offset != other.Position().Offset {
-		return m.Position().Offset - other.Position().Offset
-	}
-	return 0
-}
-
-func (m *Meta) Equal(other *Meta) bool {
-	return m.Compare(other) == 0
-}
-
 // ExtractQuery extracts queries from the given package.
 func ExtractQuery(ssaProg *buildssa.SSA, files []*ast.File, opt *Option) (QueryResults, error) {
-	foundQueryResults := make([]*QueryResult, 0)
-
 	// Get queries from comments
-	for _, file := range files {
-		cm := ast.NewCommentMap(ssaProg.Pkg.Prog.Fset, file, file.Comments)
-		for n, cgs := range cm {
-			for _, cg := range cgs {
-				qr := &QueryResult{Meta: NewMeta(ssaProg.Pkg, &ssa.Function{}, cg.Pos())}
-				for _, fn := range ssaProg.SrcFuncs {
-					if fn.Syntax().Pos() <= n.Pos() && n.End() <= fn.Syntax().End() {
-						qr.Meta.Func = fn
-						qr.Meta.Pos = append(qr.Meta.Pos, fn.Pos())
-						break
-					}
+	foundQueryResults := handleComments(ssaProg, files, opt)
+
+	// Get queries from source code
+	for _, member := range ssaProg.SrcFuncs {
+		foundQueryResults = append(foundQueryResults, AnalyzeFunc(ssaProg.Pkg, member, []token.Pos{}, opt)...)
+	}
+
+	// Sort and compact
+	slices.SortFunc(foundQueryResults, func(a, b *QueryResult) int { return a.Compare(b) })
+	return slices.CompactFunc(foundQueryResults, func(a, b *QueryResult) bool { return a.Compare(b) == 0 }), nil
+}
+
+func handleComments(ssaProg *buildssa.SSA, files []*ast.File, opt *Option) []*QueryResult {
+	foundQueryResults := make([]*QueryResult, 0)
+	analysisutil.WalkCommentGroup(ssaProg.Pkg.Prog.Fset, files, func(n ast.Node, cg *ast.CommentGroup) bool {
+		qr := &QueryResult{Meta: NewMeta(ssaProg.Pkg, &ssa.Function{}, cg.Pos())}
+		if i := slices.IndexFunc(ssaProg.SrcFuncs, func(fn *ssa.Function) bool { return analysisutil.Include(fn.Syntax(), n) }); i >= 0 {
+			qr.Meta.Func = ssaProg.SrcFuncs[i]
+			qr.Meta.Pos = append(qr.Meta.Pos, ssaProg.SrcFuncs[i].Pos())
+		}
+		for _, comment := range cg.List {
+			if strings.HasPrefix(comment.Text, "// scone:sql") {
+				if q, ok := sql.ParseString(strings.TrimPrefix(comment.Text, "// scone:sql")); ok && opt.Filter(q, qr.Meta) {
+					qr.Append(q)
+					opt.commentedNodes = append(opt.commentedNodes, &NodeWithPackage{Node: n, Package: ssaProg.Pkg.Pkg})
 				}
-				for _, comment := range cg.List {
-					if strings.HasPrefix(comment.Text, "// scone:sql") {
-						if q, ok := sql.ParseString(strings.TrimPrefix(comment.Text, "// scone:sql")); ok && opt.Filter(q, qr.Meta) {
-							qr.Append(q)
-						}
-					}
-					if strings.HasPrefix(comment.Text, "// scone:sql") || strings.HasPrefix(comment.Text, "// scone:ignore") {
-						opt.commentedNodes = append(opt.commentedNodes, &NodeWithPackage{Node: n, Package: ssaProg.Pkg.Pkg})
-					}
-				}
-				if len(qr.Queries()) > 0 {
-					foundQueryResults = append(foundQueryResults, qr)
-				}
+			} else if strings.HasPrefix(comment.Text, "// scone:ignore") {
+				opt.commentedNodes = append(opt.commentedNodes, &NodeWithPackage{Node: n, Package: ssaProg.Pkg.Pkg})
 			}
 		}
+		foundQueryResults = append(foundQueryResults, qr)
+		return true
+	})
+	return slices.DeleteFunc(foundQueryResults, func(qr *QueryResult) bool { return len(qr.Queries()) == 0 })
+}
+
+func AnalyzeFunc(pkg *ssa.Package, fn *ssa.Function, pos []token.Pos, opt *Option) QueryResults {
+	foundQueryResults := make([]*QueryResult, 0)
+	// Analyze anonymous functions recursively
+	for _, anon := range fn.AnonFuncs {
+		foundQueryResults = append(foundQueryResults, AnalyzeFunc(pkg, anon, append([]token.Pos{anon.Pos(), fn.Pos()}, pos...), opt)...)
 	}
 
-	for _, member := range ssaProg.SrcFuncs {
-		foundQueryResults = append(foundQueryResults, AnalyzeFuncBySsaMethod(ssaProg.Pkg, member, []token.Pos{}, opt)...)
-	}
+	seen := map[*ssa.CallCommon]bool{}
+	for _, block := range fn.Blocks {
+		for _, instr := range block.Instrs {
+			// 1. Check if the instruction is a call
+			callCommon, ok := analysisutil.InstrToCallCommon(instr)
+			if !ok || seen[callCommon] {
+				continue
+			}
+			seen[callCommon] = true
 
-	slices.SortFunc(foundQueryResults, func(a, b *QueryResult) int {
-		if !a.Meta.Equal(b.Meta) {
-			return a.Meta.Compare(b.Meta)
+			// 2. Check if the call is a target function and extract the target argument
+			targetArg, ok := CheckIfTargetFunction(callCommon, opt)
+			if !ok {
+				continue
+			}
+
+			meta := NewMeta(pkg, fn, targetArg.Pos(), append([]token.Pos{callCommon.Pos(), instr.Pos(), fn.Pos()}, pos...)...)
+
+			// 3. ssa.Value to string constants.
+			// Returns a slice considering the case where the argument value is a Phi node.
+			strs, ok := analysisutil.ConstLikeStringValues(targetArg)
+			if !ok {
+				if q := unknownQueryIfNotSkipped(targetArg, opt, meta, "Failed to convert ssa.Value to string constants", "value", targetArg); q != nil {
+					foundQueryResults = append(foundQueryResults, &QueryResult{QueryGroup: sql.NewQueryGroupFrom(q), Meta: meta})
+				}
+				continue
+			}
+
+			qr := &QueryResult{Meta: meta}
+			for _, str := range strs {
+				// 4. Convert string constants to sql.Query
+				q, ok := sql.ParseString(str)
+				if !ok {
+					if q := unknownQueryIfNotSkipped(targetArg, opt, meta, "Failed to parse string as SQL", "value", str); q != nil {
+						qr.Append(q)
+					}
+					continue
+				}
+
+				// 5. Filter query
+				if !opt.Filter(q, meta) {
+					slog.Error("Filtered query out", "SQL", q.String(), meta.LogAttr())
+					continue
+				}
+				qr.Append(q)
+			}
+			foundQueryResults = append(foundQueryResults, qr)
 		}
-		return slices.CompareFunc(a.Queries(), b.Queries(), func(a, b *sql.Query) int { return strings.Compare(a.Sha(), b.Sha()) })
-	})
-	foundQueryResults = slices.CompactFunc(foundQueryResults, func(a, b *QueryResult) bool {
-		return a.Meta.Equal(b.Meta) && slices.EqualFunc(a.Queries(), b.Queries(), func(a, b *sql.Query) bool { return a.Sha() == b.Sha() })
-	})
-	return foundQueryResults, nil
+	}
+
+	return foundQueryResults
 }
 
 type methodArg struct {
@@ -167,7 +151,7 @@ var targetMethods = []methodArg{
 	{Package: "github.com/jmoiron/sqlx", Method: "In", ArgIndex: -1},
 }
 
-func AnalyzeFuncBySsaMethod(pkg *ssa.Package, fn *ssa.Function, pos []token.Pos, opt *Option) QueryResults {
+func CheckIfTargetFunction(c *ssa.CallCommon, opt *Option) (ssa.Value, bool) {
 	tms := make([]methodArg, len(targetMethods))
 	copy(tms, targetMethods)
 	if opt.AdditionalFuncs != nil || len(opt.AdditionalFuncs) > 0 {
@@ -175,99 +159,46 @@ func AnalyzeFuncBySsaMethod(pkg *ssa.Package, fn *ssa.Function, pos []token.Pos,
 			s := strings.Split(f, "#")
 			if len(s) != 3 {
 				slog.Warn(fmt.Sprintf("Invalid format of additional function: %s", f))
-				continue
-			}
-			if idx, err := strconv.Atoi(s[2]); err == nil {
+			} else if idx, err := strconv.Atoi(s[2]); err == nil {
 				tms = append(tms, methodArg{Package: s[0], Method: s[1], ArgIndex: idx})
-				continue
-			}
-			slog.Warn(fmt.Sprintf("Index of additional function should be integer: %s", f))
-		}
-	}
-
-	foundQueryResults := make([]*QueryResult, 0)
-	for _, block := range fn.Blocks {
-		for _, instr := range block.Instrs {
-			if c, ok := analysisutil.InstrToCallCommon(instr); ok {
-				for _, t := range tms {
-					if analysisutil.IsFunc(c, t.Package, t.Method) {
-						idx := t.ArgIndex
-						if !c.IsInvoke() {
-							idx++ // Set first argument as receiver
-						}
-						arg := c.Args[idx]
-						if qg, ok := constLikeStringValueToQueryGroup(pkg, arg, fn, append([]token.Pos{c.Pos(), fn.Pos()}, pos...), opt); ok {
-							foundQueryResults = append(foundQueryResults, qg)
-						}
-						break // Found target method
-					}
-				}
-			}
-		}
-	}
-
-	for _, anon := range fn.AnonFuncs {
-		foundQueryResults = append(foundQueryResults, AnalyzeFuncBySsaMethod(pkg, anon, append([]token.Pos{anon.Pos(), fn.Pos()}, pos...), opt)...)
-	}
-
-	return foundQueryResults
-}
-
-func constLikeStringValueToQueryGroup(pkg *ssa.Package, v ssa.Value, fn *ssa.Function, pos []token.Pos, opt *Option) (*QueryResult, bool) {
-	meta := NewMeta(pkg, fn, v.Pos(), pos...)
-	if as, ok := analysisutil.ConstLikeStringValues(v); ok {
-		qr := &QueryResult{Meta: meta}
-		for _, a := range as {
-			if q, ok := sql.ParseString(a); ok {
-				if opt.Filter(q, meta) {
-					qr.Append(q)
-				} else {
-					slog.Debug("filtered out: sql", "SQL", q.String(), "package", pkg.Pkg.Path(), "file", analysisutil.FLC(meta.Position()), "function", fn.Name())
-				}
 			} else {
-				if norm, err := sql.Normalize(a); err == nil {
-					a = norm
-				}
-				if uq := unknownQueryIfNotSkipped(v, opt, meta, "Can't parse string as SQL", "SQL", a); uq != nil {
-					qr.Append(uq)
-				}
+				slog.Warn(fmt.Sprintf("Index of additional function should be integer: %s", f))
 			}
 		}
-		if len(qr.Queries()) > 0 {
-			return qr, true
-		}
-	} else {
-		if uq := unknownQueryIfNotSkipped(v, opt, meta, "Can't parse value as string constant", "value", fmt.Sprintf("%v", v)); uq != nil {
-			return &QueryResult{QueryGroup: sql.NewQueryGroupFrom(uq), Meta: NewMeta(pkg, fn, v.Pos(), pos...)}, true
+	}
+
+	for _, t := range tms {
+		if analysisutil.IsFunc(c, t.Package, t.Method) {
+			idx := t.ArgIndex
+			if !c.IsInvoke() {
+				idx++ // Set first argument as receiver
+			}
+			return c.Args[idx], true
 		}
 	}
-	return &QueryResult{}, false
+	return nil, false
 }
 
 func unknownQueryIfNotSkipped(v ssa.Value, opt *Option, meta *Meta, logMessage string, logArgs ...any) *sql.Query {
-	logArgs = append(logArgs, "package", meta.Package.Pkg.Path(), "file", analysisutil.FLC(meta.Position()), "function", meta.Func.Name())
-	if reason, skipped := skip(v, opt, meta); skipped {
-		slog.Debug(fmt.Sprintf("%s: but warning is suppressed", logMessage), append([]any{"reason", reason}, logArgs...)...)
-		return nil
-	}
-	slog.Warn(logMessage, logArgs...)
-	return &sql.Query{Kind: sql.Unknown}
-}
+	logArgs = append(logArgs, meta.LogAttr())
 
-// skip returns the reason why the given value is skipped. If the value is skipped, the second return value should be true.
-// if skipped, warning should be suppressed and unknown query is not added to the result.
-func skip(v ssa.Value, opt *Option, meta *Meta) (string, bool) {
 	if opt.IsCommented(meta.Package.Pkg, meta.Pos...) {
-		return "No need to warn if v is commented by scone:sql or scone:ignore", true
+		slog.Debug(fmt.Sprintf("%s: but warning is suppressed", logMessage), append([]any{"reason", "No need to warn if v is commented by scone:sql or scone:ignore"}, logArgs...)...)
+		return nil
 	} else if !opt.Filter(&sql.Query{Kind: sql.Unknown}, meta) {
-		return "No need to warn if v is filtered out", true
+		slog.Debug(fmt.Sprintf("%s: but warning is suppressed", logMessage), append([]any{"reason", "No need to warn if v is filtered out"}, logArgs...)...)
+		return nil
 	}
 	if c, ok := analysisutil.ValueToCallCommon(v); ok {
 		if analysisutil.IsFunc(c, "github.com/jmoiron/sqlx", "Rebind") {
-			return "No need to warn if v is the result of sqlx.Rebind()", true
+			slog.Debug(fmt.Sprintf("%s: but warning is suppressed", logMessage), append([]any{"reason", "No need to warn if v is the result of sqlx.Rebind()"}, logArgs...)...)
+			return nil
 		} else if analysisutil.IsFunc(c, "github.com/jmoiron/sqlx", "In") {
-			return "No need to warn if v is the result of sqlx.In()", true
+			slog.Debug(fmt.Sprintf("%s: but warning is suppressed", logMessage), append([]any{"reason", "No need to warn if v is the result of sqlx.In()"}, logArgs...)...)
+			return nil
 		}
 	}
-	return "", false
+
+	slog.Warn(logMessage, logArgs...)
+	return &sql.Query{Kind: sql.Unknown}
 }

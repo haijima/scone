@@ -19,7 +19,7 @@ func GetPosition(pkg *ssa.Package, pos []token.Pos) token.Position {
 	return pkg.Prog.Fset.Position(token.NoPos)
 }
 
-func ConstLikeStringValues(v ssa.Value) ([]string, bool) {
+func ValueToStrings(v ssa.Value) ([]string, bool) {
 	switch t := v.(type) {
 	case *ssa.Const:
 		return constToStrings(t)
@@ -47,8 +47,8 @@ func constToStrings(t *ssa.Const) ([]string, bool) {
 }
 
 func binOpToStrings(t *ssa.BinOp) ([]string, bool) {
-	x, xok := ConstLikeStringValues(t.X)
-	y, yok := ConstLikeStringValues(t.Y)
+	x, xok := ValueToStrings(t.X)
+	y, yok := ValueToStrings(t.Y)
 	if xok && yok && len(x) > 0 && len(y) > 0 && t.Op == token.ADD {
 		res := make([]string, 0, len(x)*len(y))
 		for _, xx := range x {
@@ -64,7 +64,7 @@ func binOpToStrings(t *ssa.BinOp) ([]string, bool) {
 func phiToStrings(t *ssa.Phi) ([]string, bool) {
 	res := make([]string, 0, len(t.Edges))
 	for _, edge := range t.Edges {
-		if s, ok := ConstLikeStringValues(edge); ok {
+		if s, ok := ValueToStrings(edge); ok {
 			res = append(res, s...)
 		}
 	}
@@ -75,7 +75,7 @@ var fmtVerbRegexp = regexp.MustCompile(`(^|[^%]|(?:%%)+)(%(?:-?\d+|\+|#)?)(\w)`)
 
 // fmtSprintfToStrings returns the possible string values of fmt.Sprintf.
 func fmtSprintfToStrings(t *ssa.Call) ([]string, bool) {
-	fs, ok := ConstLikeStringValues(t.Call.Args[0])
+	fs, ok := ValueToStrings(t.Call.Args[0])
 	if !ok && len(fs) == 1 {
 		return []string{}, false
 	}
@@ -118,7 +118,7 @@ func fmtSprintfToStrings(t *ssa.Call) ([]string, bool) {
 // stringsJoinToStrings returns the possible string values of strings.Join.
 func stringsJoinToStrings(t *ssa.Call) ([]string, bool) {
 	// strings.Join
-	joiner, ok := ConstLikeStringValues(t.Call.Args[1])
+	joiner, ok := ValueToStrings(t.Call.Args[1])
 	if !ok || len(joiner) != 1 {
 		return []string{}, false
 	}

@@ -81,7 +81,7 @@ func AnalyzeFunc(pkg *ssa.Package, fn *ssa.Function, pos []token.Pos, opt *Optio
 
 			// 3. ssa.Value to string constants.
 			// Returns a slice considering the case where the argument value is a Phi node.
-			strs, ok := analysisutil.ConstLikeStringValues(targetArg)
+			strs, ok := analysisutil.ValueToStrings(targetArg)
 			if !ok {
 				if q := unknownQueryIfNotSkipped(targetArg, opt, meta, "Failed to convert ssa.Value to string constants", "value", targetArg); q != nil {
 					foundQueryResults = append(foundQueryResults, &QueryResult{QueryGroup: sql.NewQueryGroupFrom(q), Meta: meta})

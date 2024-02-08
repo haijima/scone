@@ -8,6 +8,7 @@ import (
 	"strings"
 	"unicode"
 
+	"github.com/cockroachdb/errors"
 	mapset "github.com/deckarep/golang-set/v2"
 	"github.com/fatih/color"
 	"github.com/haijima/scone/internal/analysis/analysisutil"
@@ -178,7 +179,7 @@ var trailingCommentRegexp = regexp.MustCompile(`(?i)--.*\r?\n`)
 func Normalize(str string) (string, error) {
 	str, err := analysisutil.Unquote(str)
 	if err != nil {
-		return str, err
+		return str, errors.Wrap(err, "failed to unquote")
 	}
 	str = namedParameterRegexp.ReplaceAllString(str, "?")  // replace named parameters with parameter of prepared statement
 	str = trailingCommentRegexp.ReplaceAllString(str, " ") // remove comments and join lines

@@ -151,14 +151,8 @@ func stringsJoinToStrings(t *ssa.Call) ([]string, bool) {
 }
 
 func Unquote(str string) (string, error) {
-	if len(str) >= 2 {
-		if str[0] == '"' && str[len(str)-1] == '"' {
-			return strconv.Unquote(str)
-		}
-		if str[0] == '\'' && str[len(str)-1] == '\'' {
-			return strconv.Unquote(str)
-		}
-		if str[0] == '`' && str[len(str)-1] == '`' {
+	for _, c := range []uint8{'`', '"', '\''} {
+		if len(str) >= 2 && str[0] == c && str[len(str)-1] == c {
 			return strconv.Unquote(str)
 		}
 	}

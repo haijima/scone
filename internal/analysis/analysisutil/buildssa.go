@@ -9,7 +9,7 @@ import (
 	"golang.org/x/tools/go/ssa"
 )
 
-// See: buildssa.Analyzer
+// BuildSSA See: buildssa.Analyzer
 func BuildSSA(pkg *packages.Package) (*buildssa.SSA, error) {
 	prog := ssa.NewProgram(pkg.Fset, ssa.BuilderMode(0))
 

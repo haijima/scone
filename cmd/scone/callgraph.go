@@ -5,7 +5,6 @@ import (
 	"io"
 
 	"github.com/haijima/scone/internal/analysis"
-
 	internalio "github.com/haijima/scone/internal/io"
 	"github.com/haijima/scone/internal/sql"
 	"github.com/spf13/afero"

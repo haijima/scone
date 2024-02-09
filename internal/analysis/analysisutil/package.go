@@ -5,7 +5,7 @@ import (
 	"golang.org/x/tools/go/packages"
 )
 
-// https://github.com/golang/tools/blob/master/go/analysis/analysistest/analysistest.go
+// LoadPackages https://github.com/golang/tools/blob/master/go/analysis/analysistest/analysistest.go
 func LoadPackages(dir string, patterns ...string) ([]*packages.Package, error) {
 	mode := packages.NeedName | packages.NeedFiles | packages.NeedCompiledGoFiles | packages.NeedImports |
 		packages.NeedTypes | packages.NeedTypesSizes | packages.NeedSyntax | packages.NeedTypesInfo |

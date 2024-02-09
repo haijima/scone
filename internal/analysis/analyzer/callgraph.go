@@ -10,7 +10,7 @@ import (
 
 const doc = "callgraph is ..."
 
-// Analyzer is ...
+// CallgraphAnalyzer is ...
 var CallgraphAnalyzer = &toolsAnalysis.Analyzer{
 	Name: "callgraph",
 	Doc:  doc,

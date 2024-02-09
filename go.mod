@@ -1,6 +1,6 @@
 module github.com/haijima/scone
 
-go 1.21.5
+go 1.22.0
 
 require (
 	github.com/cockroachdb/errors v1.11.1

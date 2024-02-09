@@ -5,18 +5,18 @@ go 1.22.0
 require (
 	github.com/cockroachdb/errors v1.11.1
 	github.com/deckarep/golang-set/v2 v2.6.0
-	github.com/fatih/color v1.15.0
+	github.com/fatih/color v1.16.0
 	github.com/haijima/cobrax v0.1.5
 	github.com/lmittmann/tint v1.0.4
 	github.com/mattn/go-colorable v0.1.13
 	github.com/olekukonko/tablewriter v0.0.5
-	github.com/pingcap/tidb/pkg/parser v0.0.0-20231124053542-069631e2ecfe
+	github.com/pingcap/tidb/pkg/parser v0.0.0-20240209025345-a29bbb5ca180
 	github.com/spf13/afero v1.11.0
 	github.com/spf13/cobra v1.8.0
 	github.com/spf13/viper v1.18.2
 	github.com/stretchr/testify v1.8.4
-	golang.org/x/exp v0.0.0-20230905200255-921286631fa9
-	golang.org/x/tools v0.16.1
+	golang.org/x/exp v0.0.0-20240205201215-2c58cdc269a3
+	golang.org/x/tools v0.17.0
 )
 
 require (
@@ -32,7 +32,7 @@ require (
 	github.com/kr/pretty v0.3.1 // indirect
 	github.com/kr/text v0.2.0 // indirect
 	github.com/magiconair/properties v1.8.7 // indirect
-	github.com/mattn/go-isatty v0.0.18 // indirect
+	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/mattn/go-runewidth v0.0.14 // indirect
 	github.com/mitchellh/mapstructure v1.5.0 // indirect
 	github.com/pelletier/go-toml/v2 v2.1.0 // indirect

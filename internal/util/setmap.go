@@ -21,7 +21,7 @@ func (m SetMap[K, V]) Add(key K, value V) {
 
 func (m SetMap[K, V]) Intersect(key K, other mapset.Set[V]) {
 	if _, ok := m[key]; !ok {
-		m[key] = other.Clone().(mapset.Set[V])
+		m[key] = other.Clone()
 	}
 	m[key] = m[key].Intersect(other)
 }

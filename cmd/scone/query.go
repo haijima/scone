@@ -23,7 +23,7 @@ func NewQueryCommand(v *viper.Viper, _ afero.Fs) *cobra.Command {
 	cmd := &cobra.Command{}
 	cmd.Use = "query"
 	cmd.Short = "List SQL queries"
-	cmd.RunE = func(cmd *cobra.Command, args []string) error { return runQuery(cmd, v) }
+	cmd.RunE = func(cmd *cobra.Command, _ []string) error { return runQuery(cmd, v) }
 
 	cmd.Flags().String("format", "table", "The output format {table|md|csv|tsv|simple}")
 	cmd.Flags().StringSlice("sort", []string{"file"}, "The sort `keys` {file|function|type|table|sha1}")

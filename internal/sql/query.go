@@ -183,7 +183,7 @@ func Normalize(str string) (string, error) {
 	}
 	str = namedParameterRegexp.ReplaceAllString(str, "?")  // replace named parameters with parameter of prepared statement
 	str = trailingCommentRegexp.ReplaceAllString(str, " ") // remove comments and join lines
-	str = strings.Replace(str, "\t", " ", -1)              // remove tabs
+	str = strings.ReplaceAll(str, "\t", " ")               // remove tabs
 	str = strings.Join(strings.Fields(str), " ")           // remove duplicate spaces
 	str = strings.TrimSpace(str)                           // remove leading and trailing spaces
 

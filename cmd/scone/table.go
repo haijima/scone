@@ -25,7 +25,7 @@ func NewTableCommand(v *viper.Viper, _ afero.Fs) *cobra.Command {
 	cmd := &cobra.Command{}
 	cmd.Use = "table"
 	cmd.Short = "List tables information from queries"
-	cmd.RunE = func(cmd *cobra.Command, args []string) error { return runTable(cmd, v) }
+	cmd.RunE = func(cmd *cobra.Command, _ []string) error { return runTable(cmd, v) }
 
 	cmd.Flags().Bool("summary", false, "Print summary only")
 	SetQueryOptionFlags(cmd)

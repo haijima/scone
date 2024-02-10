@@ -17,7 +17,7 @@ func NewCallgraphCommand(v *viper.Viper, _ afero.Fs) *cobra.Command {
 	cmd := &cobra.Command{}
 	cmd.Use = "callgraph"
 	cmd.Short = "Generate a call graph"
-	cmd.RunE = func(cmd *cobra.Command, args []string) error {
+	cmd.RunE = func(cmd *cobra.Command, _ []string) error {
 		return runCallgraph(cmd, v)
 	}
 
@@ -44,7 +44,6 @@ func runCallgraph(cmd *cobra.Command, v *viper.Viper) error {
 }
 
 func printGraphviz(w io.Writer, cgs map[string]*analysis.CallGraph) error {
-	//c := &DotCluster{ID: "callgraph", Clusters: make(map[string]*DotCluster), Nodes: make([]*DotNode, 0), Attrs: make(DotAttrs)}
 	g := &internalio.DotGraph{Nodes: make([]*internalio.DotNode, 0), Edges: make([]*internalio.DotEdge, 0)}
 
 	for pkg, cg := range cgs {
@@ -57,7 +56,6 @@ func printGraphviz(w io.Writer, cgs map[string]*analysis.CallGraph) error {
 					switch edge.SqlValue.Kind {
 					case sql.Select:
 						attrs["style"] = "dotted"
-						//attrs["weight"] = "1"
 					case sql.Insert:
 						attrs["color"] = "green"
 					case sql.Update:
@@ -80,7 +78,6 @@ func printGraphviz(w io.Writer, cgs map[string]*analysis.CallGraph) error {
 		}
 
 		fmt.Fprintln(w)
-
 	}
 
 	fmt.Fprintln(w)

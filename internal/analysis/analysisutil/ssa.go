@@ -170,29 +170,29 @@ func GetFuncInfo(common *ssa.CallCommon) (pkgPath, funcName string, ok bool) {
 	switch fn := common.Value.(type) {
 	case *ssa.Builtin:
 		// built-in function call
-		//fmt.Fprintf(os.Stderr, "built-in function call: %v\n", fn)
+		// fmt.Fprintf(os.Stderr, "built-in function call: %v\n", fn)
 	case *ssa.MakeClosure:
 		// static function closure call
-		//fmt.Fprintf(os.Stderr, "static function closure call: %v\n", fn)
+		// fmt.Fprintf(os.Stderr, "static function closure call: %v\n", fn)
 	case *ssa.Function:
 		if fn.Signature.Recv() != nil {
 			if fn.Signature.Recv().Pkg() != nil {
 				// static method call
-				//fmt.Fprintf(os.Stderr, "static method call: %v\n", fn)
+				// fmt.Fprintf(os.Stderr, "static method call: %v\n", fn)
 				return fn.Signature.Recv().Pkg().Path(), fn.Name(), true
 			} else {
 				// builtin?
-				//fmt.Fprintf(os.Stderr, "static method call(%s) should have package\n", fn.Name())
+				// fmt.Fprintf(os.Stderr, "static method call(%s) should have package\n", fn.Name())
 			}
 		} else {
 			if fn.Pkg != nil {
 				// static function call
-				//fmt.Fprintf(os.Stderr, "static function call: %v\n", fn)
+				// fmt.Fprintf(os.Stderr, "static function call: %v\n", fn)
 				return fn.Pkg.Pkg.Path(), fn.Name(), true
 			} else if fn.Origin() != nil && fn.Origin().Pkg != nil {
 				// generics?
 				// static function call
-				//fmt.Fprintf(os.Stderr, "static function call: %v\n", fn)
+				// fmt.Fprintf(os.Stderr, "static function call: %v\n", fn)
 				return fn.Origin().Pkg.Pkg.Path(), fn.Origin().Name(), true
 			}
 		}
@@ -200,15 +200,15 @@ func GetFuncInfo(common *ssa.CallCommon) (pkgPath, funcName string, ok bool) {
 		if common.IsInvoke() {
 			if common.Method.Pkg() != nil {
 				// dynamic method call
-				//fmt.Fprintf(os.Stderr, "dynamic method call: %v\n", common.Method)
+				// fmt.Fprintf(os.Stderr, "dynamic method call: %v\n", common.Method)
 				return common.Method.Pkg().Path(), common.Method.Name(), true
 			} else {
 				// builtin dynamic method call
-				//fmt.Fprintf(os.Stderr, "builtin dynamic method call: %v\n", common.Method)
+				// fmt.Fprintf(os.Stderr, "builtin dynamic method call: %v\n", common.Method)
 			}
 		} else {
 			// dynamic function call
-			//fmt.Fprintf(os.Stderr, "dynamic function call: %v\n", fn)
+			// fmt.Fprintf(os.Stderr, "dynamic function call: %v\n", fn)
 		}
 	}
 	return "", "", false // Can't get package name of the function

@@ -50,10 +50,7 @@ func runQuery(cmd *cobra.Command, v *viper.Viper) error {
 	sortKeys := v.GetStringSlice("sort")
 	expandQueryGroup := v.GetBool("expand-query-group")
 	showFullPackagePath := v.GetBool("full-package-path")
-	opt, err := QueryOptionFromViper(v)
-	if err != nil {
-		return err
-	}
+	opt := QueryOptionFromViper(v)
 	if !mapset.NewSet(sortKeys...).IsSubset(mapset.NewSet("file", "function", "type", "table", "sha1")) {
 		return errors.Newf("unknown sort key: %s", mapset.NewSet(sortKeys...).Difference(mapset.NewSet("file", "function", "type", "table", "sha1")).ToSlice())
 	}

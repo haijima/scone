@@ -30,10 +30,7 @@ func NewCallgraphCommand(v *viper.Viper, _ afero.Fs) *cobra.Command {
 func runCallgraph(cmd *cobra.Command, v *viper.Viper) error {
 	dir := v.GetString("dir")
 	pattern := v.GetString("pattern")
-	opt, err := QueryOptionFromViper(v)
-	if err != nil {
-		return err
-	}
+	opt := QueryOptionFromViper(v)
 
 	_, cgs, err := analysis.Analyze(dir, pattern, opt)
 	if err != nil {

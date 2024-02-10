@@ -27,7 +27,7 @@ func SetQueryOptionFlags(cmd *cobra.Command) {
 	_ = cmd.MarkFlagDirname("dir")
 }
 
-func QueryOptionFromViper(v *viper.Viper) (*analysis.Option, error) {
+func QueryOptionFromViper(v *viper.Viper) *analysis.Option {
 	excludeQueries := v.GetStringSlice("exclude-queries")
 	excludePackages := v.GetStringSlice("exclude-packages")
 	excludePackagePaths := v.GetStringSlice("exclude-package-paths")
@@ -60,5 +60,5 @@ func QueryOptionFromViper(v *viper.Viper) (*analysis.Option, error) {
 		FilterQueryTypes:    filterQueryTypes,
 		FilterTables:        filterTables,
 		AdditionalFuncs:     additionalFuncs,
-	}, nil
+	}
 }

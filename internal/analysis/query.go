@@ -1,6 +1,7 @@
 package analysis
 
 import (
+	"context"
 	"fmt"
 	"go/ast"
 	"go/token"
@@ -16,13 +17,13 @@ import (
 )
 
 // ExtractQuery extracts queries from the given package.
-func ExtractQuery(ssaProg *buildssa.SSA, files []*ast.File, opt *Option) (QueryResults, error) {
+func ExtractQuery(ctx context.Context, ssaProg *buildssa.SSA, files []*ast.File, opt *Option) (QueryResults, error) {
 	// Get queries from comments
 	foundQueryResults := handleComments(ssaProg, files, opt)
 
 	// Get queries from source code
 	for _, member := range ssaProg.SrcFuncs {
-		foundQueryResults = append(foundQueryResults, AnalyzeFunc(ssaProg.Pkg, member, []token.Pos{}, opt)...)
+		foundQueryResults = append(foundQueryResults, AnalyzeFunc(ctx, ssaProg.Pkg, member, []token.Pos{}, opt)...)
 	}
 
 	// Sort and compact
@@ -54,11 +55,11 @@ func handleComments(ssaProg *buildssa.SSA, files []*ast.File, opt *Option) []*Qu
 	return slices.DeleteFunc(foundQueryResults, func(qr *QueryResult) bool { return len(qr.Queries()) == 0 })
 }
 
-func AnalyzeFunc(pkg *ssa.Package, fn *ssa.Function, pos []token.Pos, opt *Option) QueryResults {
+func AnalyzeFunc(ctx context.Context, pkg *ssa.Package, fn *ssa.Function, pos []token.Pos, opt *Option) QueryResults {
 	foundQueryResults := make([]*QueryResult, 0)
 	// Analyze anonymous functions recursively
 	for _, anon := range fn.AnonFuncs {
-		foundQueryResults = append(foundQueryResults, AnalyzeFunc(pkg, anon, append([]token.Pos{anon.Pos(), fn.Pos()}, pos...), opt)...)
+		foundQueryResults = append(foundQueryResults, AnalyzeFunc(ctx, pkg, anon, append([]token.Pos{anon.Pos(), fn.Pos()}, pos...), opt)...)
 	}
 
 	seen := map[*ssa.CallCommon]bool{}
@@ -72,7 +73,7 @@ func AnalyzeFunc(pkg *ssa.Package, fn *ssa.Function, pos []token.Pos, opt *Optio
 			seen[callCommon] = true
 
 			// 2. Check if the call is a target function and extract the target argument
-			targetArg, ok := CheckIfTargetFunction(callCommon, opt)
+			targetArg, ok := CheckIfTargetFunction(ctx, callCommon, opt)
 			if !ok {
 				continue
 			}
@@ -151,7 +152,7 @@ var targetMethods = []methodArg{
 	{Package: "github.com/jmoiron/sqlx", Method: "In", ArgIndex: -1},
 }
 
-func CheckIfTargetFunction(c *ssa.CallCommon, opt *Option) (ssa.Value, bool) {
+func CheckIfTargetFunction(ctx context.Context, c *ssa.CallCommon, opt *Option) (ssa.Value, bool) {
 	tms := make([]methodArg, len(targetMethods))
 	copy(tms, targetMethods)
 	if opt.AdditionalFuncs != nil || len(opt.AdditionalFuncs) > 0 {

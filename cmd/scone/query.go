@@ -64,7 +64,7 @@ func runQuery(cmd *cobra.Command, v *viper.Viper) error {
 		return errors.Newf("unknown format: %s", format)
 	}
 
-	queryResults, _, err := analysis.Analyze(dir, pattern, opt)
+	queryResults, _, err := analysis.Analyze(cmd.Context(), dir, pattern, opt)
 	if err != nil {
 		return err
 	}

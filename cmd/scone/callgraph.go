@@ -32,7 +32,7 @@ func runCallgraph(cmd *cobra.Command, v *viper.Viper) error {
 	pattern := v.GetString("pattern")
 	opt := QueryOptionFromViper(v)
 
-	_, cgs, err := analysis.Analyze(dir, pattern, opt)
+	_, cgs, err := analysis.Analyze(cmd.Context(), dir, pattern, opt)
 	if err != nil {
 		return err
 	}

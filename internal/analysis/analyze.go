@@ -1,12 +1,14 @@
 package analysis
 
 import (
+	"context"
+
 	"github.com/haijima/scone/internal/analysis/analysisutil"
 	"golang.org/x/tools/go/ssa"
 )
 
-func Analyze(dir, pattern string, opt *Option) (QueryResults, map[string]*CallGraph, error) {
-	results, err := analyzeSSA(dir, pattern, opt)
+func Analyze(ctx context.Context, dir, pattern string, opt *Option) (QueryResults, map[string]*CallGraph, error) {
+	results, err := analyzeSSA(ctx, dir, pattern, opt)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -25,7 +27,7 @@ func Analyze(dir, pattern string, opt *Option) (QueryResults, map[string]*CallGr
 	return results, cgs, nil
 }
 
-func analyzeSSA(dir, pattern string, opt *Option) (QueryResults, error) {
+func analyzeSSA(ctx context.Context, dir, pattern string, opt *Option) (QueryResults, error) {
 	pkgs, err := analysisutil.LoadPackages(dir, pattern)
 	if err != nil {
 		return nil, err
@@ -38,7 +40,7 @@ func analyzeSSA(dir, pattern string, opt *Option) (QueryResults, error) {
 			return nil, err
 		}
 
-		queryResults, err := ExtractQuery(ssaProg, pkg.Syntax, opt)
+		queryResults, err := ExtractQuery(ctx, ssaProg, pkg.Syntax, opt)
 		if err != nil {
 			return nil, err
 		}

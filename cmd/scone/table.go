@@ -39,7 +39,7 @@ func runTable(cmd *cobra.Command, v *viper.Viper) error {
 	summaryOnly := v.GetBool("summary")
 	opt := QueryOptionFromViper(v)
 
-	queryResults, cgs, err := analysis.Analyze(dir, pattern, opt)
+	queryResults, cgs, err := analysis.Analyze(cmd.Context(), dir, pattern, opt)
 	if err != nil {
 		return err
 	}

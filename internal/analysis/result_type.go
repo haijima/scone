@@ -38,6 +38,10 @@ type QueryResult struct {
 	Meta *Meta
 }
 
+func NewQueryResult(meta *Meta) *QueryResult {
+	return &QueryResult{QueryGroup: sql.NewQueryGroup(), Meta: meta}
+}
+
 func (qr *QueryResult) Append(qs ...*sql.Query) {
 	if qr.QueryGroup == nil {
 		qr.QueryGroup = sql.NewQueryGroup()

@@ -34,7 +34,7 @@ func ExtractQuery(ctx context.Context, ssaProg *buildssa.SSA, files []*ast.File,
 func handleComments(ssaProg *buildssa.SSA, files []*ast.File, opt *Option) []*QueryResult {
 	foundQueryResults := make([]*QueryResult, 0)
 	analysisutil.WalkCommentGroup(ssaProg.Pkg.Prog.Fset, files, func(n ast.Node, cg *ast.CommentGroup) bool {
-		qr := &QueryResult{Meta: NewMeta(ssaProg.Pkg, &ssa.Function{}, cg.Pos())}
+		qr := NewQueryResult(NewMeta(ssaProg.Pkg, &ssa.Function{}, cg.Pos()))
 		if i := slices.IndexFunc(ssaProg.SrcFuncs, func(fn *ssa.Function) bool { return analysisutil.Include(fn.Syntax(), n) }); i >= 0 {
 			qr.Meta.Func = ssaProg.SrcFuncs[i]
 			qr.Meta.Pos = append(qr.Meta.Pos, ssaProg.SrcFuncs[i].Pos())
@@ -78,41 +78,49 @@ func AnalyzeFunc(ctx context.Context, pkg *ssa.Package, fn *ssa.Function, pos []
 				continue
 			}
 
-			meta := NewMeta(pkg, fn, targetArg.Pos(), append([]token.Pos{callCommon.Pos(), instr.Pos(), fn.Pos()}, pos...)...)
-
-			// 3. ssa.Value to string constants.
-			// Returns a slice considering the case where the argument value is a Phi node.
-			strs, ok := analysisutil.ValueToStrings(targetArg)
-			if !ok {
-				if q := unknownQueryIfNotSkipped(targetArg, opt, meta, "Failed to convert ssa.Value to string constants", "value", targetArg); q != nil {
-					foundQueryResults = append(foundQueryResults, &QueryResult{QueryGroup: sql.NewQueryGroupFrom(q), Meta: meta})
-				}
-				continue
+			// 3. ssa.Value to filtered sql.Query
+			qr := valueToValidQuery(ctx, targetArg, pkg, fn, append([]token.Pos{callCommon.Pos(), instr.Pos(), fn.Pos()}, pos...), opt)
+			if qr != nil && len(qr.Queries()) > 0 {
+				foundQueryResults = append(foundQueryResults, qr)
 			}
-
-			qr := &QueryResult{Meta: meta}
-			for _, str := range strs {
-				// 4. Convert string constants to sql.Query
-				q, ok := sql.ParseString(str)
-				if !ok {
-					if q := unknownQueryIfNotSkipped(targetArg, opt, meta, "Failed to parse string as SQL", "value", str); q != nil {
-						qr.Append(q)
-					}
-					continue
-				}
-
-				// 5. Filter query
-				if !opt.Filter(q, meta) {
-					slog.Error("Filtered query out", "SQL", q.String(), meta.LogAttr())
-					continue
-				}
-				qr.Append(q)
-			}
-			foundQueryResults = append(foundQueryResults, qr)
 		}
 	}
 
 	return foundQueryResults
+}
+
+func valueToValidQuery(ctx context.Context, v ssa.Value, pkg *ssa.Package, fn *ssa.Function, pos []token.Pos, opt *Option) *QueryResult {
+	meta := NewMeta(pkg, fn, v.Pos(), pos...)
+
+	// 3-1. ssa.Value to string constants.
+	// Returns a slice considering the case where the argument value is a Phi node.
+	strs, ok := analysisutil.ValueToStrings(v)
+	if !ok {
+		if q := unknownQueryIfNotSkipped(ctx, v, opt, meta, "Failed to convert ssa.Value to string constants", "value", v); q != nil {
+			return &QueryResult{QueryGroup: sql.NewQueryGroupFrom(q), Meta: meta}
+		}
+		return nil
+	}
+
+	qr := NewQueryResult(meta)
+	for _, str := range strs {
+		// 3-2. Convert string constants to sql.Query
+		q, ok := sql.ParseString(str)
+		if !ok {
+			if q := unknownQueryIfNotSkipped(ctx, v, opt, meta, "Failed to parse string as SQL", "value", str); q != nil {
+				qr.Append(q)
+			}
+			continue
+		}
+
+		// 3-3. Filter query
+		if !opt.Filter(q, meta) {
+			slog.Error("Filtered query out", slog.String("SQL", q.String()), meta.LogAttr())
+			continue
+		}
+		qr.Append(q)
+	}
+	return qr
 }
 
 type methodArg struct {
@@ -180,7 +188,7 @@ func CheckIfTargetFunction(ctx context.Context, c *ssa.CallCommon, opt *Option) 
 	return nil, false
 }
 
-func unknownQueryIfNotSkipped(v ssa.Value, opt *Option, meta *Meta, logMessage string, logArgs ...any) *sql.Query {
+func unknownQueryIfNotSkipped(ctx context.Context, v ssa.Value, opt *Option, meta *Meta, logMessage string, logArgs ...any) *sql.Query {
 	logArgs = append(logArgs, meta.LogAttr())
 
 	if opt.IsCommented(meta.Package.Pkg, meta.Pos...) {

@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"flag"
 	"fmt"
 	"log/slog"
 	"os"
@@ -33,20 +32,19 @@ func init() {
 }
 
 func main() {
-	flag.Parse()
-	flag.CommandLine.PrintDefaults()
-	slog.SetDefault(slog.New(tint.NewHandler(colorable.NewColorableStderr(), &tint.Options{Level: slog.LevelError, NoColor: color.NoColor, TimeFormat: time.Kitchen})))
+	slog.SetLogLoggerLevel(slog.LevelError)
 	v = viper.NewWithOptions(viper.WithLogger(slog.Default()))
 	fs := afero.NewOsFs()
 	v.SetFs(fs)
 	rootCmd = NewRootCmd(v, fs)
 	rootCmd.SetOut(colorable.NewColorableStdout())
 	rootCmd.SetErr(colorable.NewColorableStderr())
+	rootCmd.SetContext(context.Background())
 	if err := rootCmd.Execute(); err != nil {
-		if slog.Default().Enabled(context.Background(), slog.LevelInfo) {
+		if slog.Default().Enabled(rootCmd.Context(), slog.LevelDebug) {
 			slog.Error(fmt.Sprintf("%+v", err))
 		} else {
-			slog.Error("Error: ", tint.Err(err))
+			slog.Error(err.Error())
 		}
 		os.Exit(1)
 	}

@@ -7,22 +7,22 @@ import (
 
 type Pair[T any] struct{ L, R T }
 
-func PairCombinate[T cmp.Ordered](a []T) []Pair[T] {
-	slices.Sort(a)
-	a = slices.Compact(a)
+func PairCombinate[S ~[]E, E cmp.Ordered](x S) []Pair[E] {
+	slices.Sort(x)
+	x = slices.Compact(x)
 
-	r := make([]Pair[T], 0, len(a)*(len(a)-1)/2)
-	for i, a1 := range a {
-		for j, a2 := range a {
+	pairs := make([]Pair[E], 0, len(x)*(len(x)-1)/2)
+	for i, x1 := range x {
+		for j, x2 := range x {
 			if i < j {
-				r = append(r, Pair[T]{a1, a2})
+				pairs = append(pairs, Pair[E]{x1, x2})
 			}
 		}
 	}
-	return r
+	return pairs
 }
 
-func PairCombinateFunc[T cmp.Ordered](a []T, fn func(a, b T)) {
+func PairCombinateFunc[S ~[]E, E cmp.Ordered](a S, fn func(a, b E)) {
 	for _, p := range PairCombinate(a) {
 		fn(p.L, p.R)
 	}

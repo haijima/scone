@@ -11,7 +11,6 @@ import (
 	mapset "github.com/deckarep/golang-set/v2"
 	"github.com/fatih/color"
 	"github.com/haijima/scone/internal/analysis"
-	"github.com/haijima/scone/internal/analysis/analysisutil"
 	internalio "github.com/haijima/scone/internal/io"
 	"github.com/haijima/scone/internal/sql"
 	"github.com/haijima/scone/internal/util"
@@ -174,7 +173,7 @@ func printTableResult(w io.Writer, table *sql.Table, queryResults analysis.Query
 	for i, qr := range qrs {
 		for _, q := range qr.Queries() {
 			if slices.Contains(q.Tables, table.Name) {
-				p.AddRow([]string{"   ", strconv.Itoa(i + 1), analysisutil.FLC(qr.Meta.Position()), qr.Meta.Func.Name(), q.Kind.Color(q.Kind.CRUD()), q.Raw})
+				p.AddRow([]string{"   ", strconv.Itoa(i + 1), qr.Meta.FLC(), qr.Meta.Func.Name(), q.Kind.Color(q.Kind.CRUD()), q.Raw})
 			}
 		}
 	}

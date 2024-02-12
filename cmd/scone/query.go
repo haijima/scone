@@ -10,7 +10,6 @@ import (
 	"github.com/cockroachdb/errors"
 	mapset "github.com/deckarep/golang-set/v2"
 	"github.com/haijima/scone/internal/analysis"
-	"github.com/haijima/scone/internal/analysis/analysisutil"
 	internalio "github.com/haijima/scone/internal/io"
 	"github.com/haijima/scone/internal/sql"
 	"github.com/olekukonko/tablewriter"
@@ -159,7 +158,7 @@ func row(q *sql.Query, meta *analysis.Meta, opt *PrintQueryOption) []string {
 	fullRow := []string{
 		meta.Package().Name(),
 		abbreviatePackagePath(meta.Package().Path(), opt),
-		analysisutil.FLC(meta.Position()),
+		meta.FLC(),
 		meta.Func.Name(),
 		q.Kind.ColoredString(),
 		strings.Join(q.Tables, ", "),

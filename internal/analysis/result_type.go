@@ -84,6 +84,10 @@ func (m *Meta) Position() token.Position {
 	return analysisutil.GetPosition(m.Func.Pkg, m.Pos)
 }
 
+func (m *Meta) FLC() string {
+	return analysisutil.FLC(m.Position())
+}
+
 func (m *Meta) Compare(other *Meta) int {
 	if m.Package().Path() != other.Package().Path() {
 		return strings.Compare(m.Package().Path(), other.Package().Path())
@@ -102,7 +106,7 @@ func (m *Meta) Equal(other *Meta) bool {
 func (m *Meta) LogValue() slog.Value {
 	return slog.GroupValue(
 		slog.String("package", m.Package().Path()),
-		slog.String("file", analysisutil.FLC(m.Position())),
+		slog.String("file", m.FLC()),
 		slog.String("function", m.Func.Name()),
 	)
 }

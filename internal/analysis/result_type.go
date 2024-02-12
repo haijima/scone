@@ -70,6 +70,7 @@ func NewMeta(fn *ssa.Function, pos ...token.Pos) *Meta {
 
 func (m *Meta) Package() *types.Package {
 	//return m.pkg.Pkg
+
 	if m.Func == nil || m.Func.Pkg == nil {
 		return &types.Package{}
 	}
@@ -98,6 +99,10 @@ func (m *Meta) Equal(other *Meta) bool {
 	return m.Compare(other) == 0
 }
 
-func (m *Meta) LogAttr() slog.Attr {
-	return slog.Group("ctx", slog.String("package", m.Package().Path()), slog.String("file", analysisutil.FLC(m.Position())), slog.String("function", m.Func.Name()))
+func (m *Meta) LogValue() slog.Value {
+	return slog.GroupValue(
+		slog.String("package", m.Package().Path()),
+		slog.String("file", analysisutil.FLC(m.Position())),
+		slog.String("function", m.Func.Name()),
+	)
 }

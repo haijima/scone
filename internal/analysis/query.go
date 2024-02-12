@@ -2,7 +2,6 @@ package analysis
 
 import (
 	"context"
-	"fmt"
 	"go/ast"
 	"log/slog"
 	"slices"
@@ -94,10 +93,12 @@ func valueToValidQuery(ctx context.Context, v ssa.Value, opt *Option, meta *Meta
 	// Returns a slice considering the case where the argument value is a Phi node.
 	strs, ok := analysisutil.ValueToStrings(v)
 	if !ok {
-		if q := unknownQueryIfNotSkipped(ctx, v, opt, meta, "Failed to convert ssa.Value to string constants", "value", v); q != nil {
-			return &QueryResult{QueryGroup: sql.NewQueryGroupFrom(q), Meta: meta}
+		if reason := unknownQueryIfNotSkipped(v, opt, meta); reason != "" {
+			slog.InfoContext(ctx, "Failed to convert ssa.Value to string constants: but warning is suppressed", slog.String("reason", string(reason)), slog.Any("value", v), slog.Any("analysis", meta))
+			return nil
 		}
-		return nil
+		slog.WarnContext(ctx, "Failed to convert ssa.Value to string constants", slog.Any("value", v), slog.Any("analysis", meta))
+		return &QueryResult{QueryGroup: sql.NewQueryGroupFrom(&sql.Query{Kind: sql.Unknown}), Meta: meta}
 	}
 
 	qr := NewQueryResult(meta)
@@ -105,15 +106,18 @@ func valueToValidQuery(ctx context.Context, v ssa.Value, opt *Option, meta *Meta
 		// 3-2. Convert string constants to sql.Query
 		q, ok := sql.ParseString(str)
 		if !ok {
-			if q := unknownQueryIfNotSkipped(ctx, v, opt, meta, "Failed to parse string as SQL", "string", str); q != nil {
-				qr.Append(q)
+			if reason := unknownQueryIfNotSkipped(v, opt, meta); reason != "" {
+				slog.InfoContext(ctx, "Failed to parse string as SQL: but warning is suppressed", slog.String("reason", string(reason)), slog.Any("string", str), slog.Any("analysis", meta))
+			} else {
+				slog.WarnContext(ctx, "Failed to parse string as SQL", slog.Any("string", str), slog.Any("analysis", meta))
+				qr.Append(&sql.Query{Kind: sql.Unknown})
 			}
 			continue
 		}
 
 		// 3-3. Filter query
 		if !opt.Filter(q, meta) {
-			slog.InfoContext(ctx, "Filtered query out", slog.String("SQL", q.String()), meta.LogAttr())
+			slog.InfoContext(ctx, "Filtered query out", slog.Any("SQL", q), slog.Any("analysis", meta))
 			continue
 		}
 		qr.Append(q)
@@ -170,25 +174,20 @@ func CheckIfTargetFunction(_ context.Context, c *ssa.CallCommon, opt *Option) (s
 	return nil, false
 }
 
-func unknownQueryIfNotSkipped(ctx context.Context, v ssa.Value, opt *Option, meta *Meta, logMessage string, logArgs ...any) *sql.Query {
-	suppressedLogMessage := fmt.Sprintf("%s: but warning is suppressed", logMessage)
+type skipReason string
+
+func unknownQueryIfNotSkipped(v ssa.Value, opt *Option, meta *Meta) skipReason {
 	if opt.IsCommented(meta.Package(), meta.Pos...) {
-		slog.InfoContext(ctx, suppressedLogMessage, append([]any{"reason", "No need to warn if v is commented by scone:sql or scone:ignore"}, logArgs...)...)
-		return nil
+		return "No need to warn if v is commented by scone:sql or scone:ignore"
 	} else if !opt.Filter(&sql.Query{Kind: sql.Unknown}, meta) {
-		slog.InfoContext(ctx, suppressedLogMessage, append([]any{"reason", "No need to warn if v is filtered out"}, logArgs...)...)
-		return nil
+		return "No need to warn if v is filtered out"
 	}
 	if c, ok := analysisutil.ValueToCallCommon(v); ok {
 		if analysisutil.IsFunc(c, "github.com/jmoiron/sqlx", "Rebind") {
-			slog.InfoContext(ctx, suppressedLogMessage, append([]any{"reason", "No need to warn if v is the result of sqlx.Rebind()"}, logArgs...)...)
-			return nil
+			return "No need to warn if v is the result of sqlx.Rebind()"
 		} else if analysisutil.IsFunc(c, "github.com/jmoiron/sqlx", "In") {
-			slog.InfoContext(ctx, suppressedLogMessage, append([]any{"reason", "No need to warn if v is the result of sqlx.In()"}, logArgs...)...)
-			return nil
+			return "No need to warn if v is the result of sqlx.In()"
 		}
 	}
-
-	slog.WarnContext(ctx, logMessage, logArgs...)
-	return &sql.Query{Kind: sql.Unknown}
+	return ""
 }

@@ -7,7 +7,6 @@ import (
 	"go/token"
 	"log/slog"
 	"slices"
-	"strconv"
 	"strings"
 
 	"github.com/haijima/scone/internal/analysis/analysisutil"
@@ -160,29 +159,13 @@ var targetMethods = []methodArg{
 	{Package: "github.com/jmoiron/sqlx", Method: "In", ArgIndex: -1},
 }
 
-func CheckIfTargetFunction(ctx context.Context, c *ssa.CallCommon, opt *Option) (ssa.Value, bool) {
-	tms := make([]methodArg, len(targetMethods))
-	copy(tms, targetMethods)
-	if opt.AdditionalFuncs != nil || len(opt.AdditionalFuncs) > 0 {
-		for _, f := range opt.AdditionalFuncs {
-			s := strings.Split(f, "#")
-			if len(s) != 3 {
-				slog.Warn(fmt.Sprintf("Invalid format of additional function: %s", f))
-			} else if idx, err := strconv.Atoi(s[2]); err == nil {
-				tms = append(tms, methodArg{Package: s[0], Method: s[1], ArgIndex: idx})
-			} else {
-				slog.Warn(fmt.Sprintf("Index of additional function should be integer: %s", f))
-			}
-		}
-	}
-
-	for _, t := range tms {
+func CheckIfTargetFunction(_ context.Context, c *ssa.CallCommon, opt *Option) (ssa.Value, bool) {
+	for _, t := range append(targetMethods, opt.AdditionalFuncSlice()...) {
 		if analysisutil.IsFunc(c, t.Package, t.Method) {
-			idx := t.ArgIndex
-			if !c.IsInvoke() {
-				idx++ // Set first argument as receiver
+			if c.IsInvoke() {
+				return c.Args[t.ArgIndex], true
 			}
-			return c.Args[idx], true
+			return c.Args[t.ArgIndex+1], true // Set first argument as receiver
 		}
 	}
 	return nil, false

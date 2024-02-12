@@ -107,7 +107,7 @@ func valueToValidQuery(ctx context.Context, v ssa.Value, pkg *ssa.Package, fn *s
 		// 3-2. Convert string constants to sql.Query
 		q, ok := sql.ParseString(str)
 		if !ok {
-			if q := unknownQueryIfNotSkipped(ctx, v, opt, meta, "Failed to parse string as SQL", "value", str); q != nil {
+			if q := unknownQueryIfNotSkipped(ctx, v, opt, meta, "Failed to parse string as SQL", "string", str); q != nil {
 				qr.Append(q)
 			}
 			continue

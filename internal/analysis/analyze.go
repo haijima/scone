@@ -14,7 +14,7 @@ func Analyze(ctx context.Context, dir, pattern string, opt *Option) (QueryResult
 	}
 	qrsByPkg := make(map[*ssa.Package]QueryResults)
 	for _, qr := range results {
-		qrsByPkg[qr.Meta.Package] = append(qrsByPkg[qr.Meta.Package], qr)
+		qrsByPkg[qr.Meta.Func.Pkg] = append(qrsByPkg[qr.Meta.Func.Pkg], qr)
 	}
 	cgs := make(map[string]*CallGraph)
 	for pkg, qrs := range qrsByPkg {

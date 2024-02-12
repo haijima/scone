@@ -2,6 +2,7 @@ package analysis
 
 import (
 	"go/token"
+	"go/types"
 	"log/slog"
 	"slices"
 	"strings"
@@ -59,22 +60,32 @@ func (qr *QueryResult) Compare(other *QueryResult) int {
 }
 
 type Meta struct {
-	Package *ssa.Package
-	Func    *ssa.Function
-	Pos     []token.Pos
+	Func *ssa.Function
+	Pos  []token.Pos
 }
 
-func NewMeta(pkg *ssa.Package, fn *ssa.Function, pos token.Pos, fallbackPos ...token.Pos) *Meta {
-	return &Meta{Package: pkg, Func: fn, Pos: append([]token.Pos{pos}, fallbackPos...)}
+func NewMeta(fn *ssa.Function, pos token.Pos, fallbackPos ...token.Pos) *Meta {
+	return &Meta{Func: fn, Pos: append([]token.Pos{pos}, fallbackPos...)}
+}
+
+func (m *Meta) Package() *types.Package {
+	//return m.pkg.Pkg
+	if m.Func == nil || m.Func.Pkg == nil {
+		return &types.Package{}
+	}
+	return m.Func.Pkg.Pkg
 }
 
 func (m *Meta) Position() token.Position {
-	return analysisutil.GetPosition(m.Package, m.Pos)
+	if m.Func == nil {
+		return token.Position{}
+	}
+	return analysisutil.GetPosition(m.Func.Pkg, m.Pos)
 }
 
 func (m *Meta) Compare(other *Meta) int {
-	if m.Package.Pkg.Path() != other.Package.Pkg.Path() {
-		return strings.Compare(m.Package.Pkg.Path(), other.Package.Pkg.Path())
+	if m.Package().Path() != other.Package().Path() {
+		return strings.Compare(m.Package().Path(), other.Package().Path())
 	} else if m.Position().Filename != other.Position().Filename {
 		return strings.Compare(m.Position().Filename, other.Position().Filename)
 	} else if m.Position().Offset != other.Position().Offset {
@@ -88,5 +99,5 @@ func (m *Meta) Equal(other *Meta) bool {
 }
 
 func (m *Meta) LogAttr() slog.Attr {
-	return slog.Group("ctx", slog.String("package", m.Package.Pkg.Path()), slog.String("file", analysisutil.FLC(m.Position())), slog.String("function", m.Func.Name()))
+	return slog.Group("ctx", slog.String("package", m.Package().Path()), slog.String("file", analysisutil.FLC(m.Position())), slog.String("function", m.Func.Name()))
 }

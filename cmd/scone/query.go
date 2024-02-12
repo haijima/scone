@@ -157,8 +157,8 @@ func makeHeader(opt *PrintQueryOption) []string {
 
 func row(q *sql.Query, meta *analysis.Meta, opt *PrintQueryOption) []string {
 	fullRow := []string{
-		meta.Package.Pkg.Name(),
-		abbreviatePackagePath(meta.Package.Pkg.Path(), opt),
+		meta.Package().Name(),
+		abbreviatePackagePath(meta.Package().Path(), opt),
 		analysisutil.FLC(meta.Position()),
 		meta.Func.Name(),
 		q.Kind.ColoredString(),

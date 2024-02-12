@@ -54,15 +54,15 @@ func (o *Option) IsCommented(pkg *types.Package, pos ...token.Pos) bool {
 }
 
 func (o *Option) Filter(q *sql.Query, meta *Meta) bool {
-	pkgName := meta.Package.Pkg.Name()
-	pkgPath := meta.Package.Pkg.Path()
+	pkgName := meta.Package().Name()
+	pkgPath := meta.Package().Path()
 	file := meta.Position().Filename
 	funcName := meta.Func.Name()
 	queryType := q.Kind.String()
 	tables := q.Tables
 	hash := q.Sha()
 
-	return !o.IsCommented(meta.Package.Pkg, meta.Pos...) &&
+	return !o.IsCommented(meta.Package(), meta.Pos...) &&
 		(slices.Contains(o.FilterPackages, pkgName) || len(o.FilterPackages) == 0) &&
 		(!slices.Contains(o.ExcludePackages, pkgName) || len(o.ExcludePackages) == 0) &&
 		(slices.Contains(o.FilterPackagePaths, pkgPath) || len(o.FilterPackagePaths) == 0) &&

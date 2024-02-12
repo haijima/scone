@@ -34,7 +34,7 @@ func ExtractQuery(ctx context.Context, ssaProg *buildssa.SSA, files []*ast.File,
 func handleComments(ssaProg *buildssa.SSA, files []*ast.File, opt *Option) []*QueryResult {
 	foundQueryResults := make([]*QueryResult, 0)
 	analysisutil.WalkCommentGroup(ssaProg.Pkg.Prog.Fset, files, func(n ast.Node, cg *ast.CommentGroup) bool {
-		qr := NewQueryResult(NewMeta(ssaProg.Pkg, &ssa.Function{}, cg.Pos()))
+		qr := NewQueryResult(NewMeta(&ssa.Function{}, cg.Pos()))
 		if i := slices.IndexFunc(ssaProg.SrcFuncs, func(fn *ssa.Function) bool { return analysisutil.Include(fn.Syntax(), n) }); i >= 0 {
 			qr.Meta.Func = ssaProg.SrcFuncs[i]
 			qr.Meta.Pos = append(qr.Meta.Pos, ssaProg.SrcFuncs[i].Pos())
@@ -90,7 +90,7 @@ func AnalyzeFunc(ctx context.Context, pkg *ssa.Package, fn *ssa.Function, pos []
 }
 
 func valueToValidQuery(ctx context.Context, v ssa.Value, pkg *ssa.Package, fn *ssa.Function, pos []token.Pos, opt *Option) *QueryResult {
-	meta := NewMeta(pkg, fn, v.Pos(), pos...)
+	meta := NewMeta(fn, v.Pos(), pos...)
 
 	// 3-1. ssa.Value to string constants.
 	// Returns a slice considering the case where the argument value is a Phi node.
@@ -191,7 +191,7 @@ func CheckIfTargetFunction(ctx context.Context, c *ssa.CallCommon, opt *Option) 
 func unknownQueryIfNotSkipped(ctx context.Context, v ssa.Value, opt *Option, meta *Meta, logMessage string, logArgs ...any) *sql.Query {
 	logArgs = append(logArgs, meta.LogAttr())
 
-	if opt.IsCommented(meta.Package.Pkg, meta.Pos...) {
+	if opt.IsCommented(meta.Package(), meta.Pos...) {
 		slog.Debug(fmt.Sprintf("%s: but warning is suppressed", logMessage), append([]any{"reason", "No need to warn if v is commented by scone:sql or scone:ignore"}, logArgs...)...)
 		return nil
 	} else if !opt.Filter(&sql.Query{Kind: sql.Unknown}, meta) {

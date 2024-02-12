@@ -114,7 +114,7 @@ func valueToValidQuery(ctx context.Context, v ssa.Value, pkg *ssa.Package, fn *s
 
 		// 3-3. Filter query
 		if !opt.Filter(q, meta) {
-			slog.Error("Filtered query out", slog.String("SQL", q.String()), meta.LogAttr())
+			slog.InfoContext(ctx, "Filtered query out", slog.String("SQL", q.String()), meta.LogAttr())
 			continue
 		}
 		qr.Append(q)
@@ -172,25 +172,24 @@ func CheckIfTargetFunction(_ context.Context, c *ssa.CallCommon, opt *Option) (s
 }
 
 func unknownQueryIfNotSkipped(ctx context.Context, v ssa.Value, opt *Option, meta *Meta, logMessage string, logArgs ...any) *sql.Query {
-	logArgs = append(logArgs, meta.LogAttr())
-
+	suppressedLogMessage := fmt.Sprintf("%s: but warning is suppressed", logMessage)
 	if opt.IsCommented(meta.Package(), meta.Pos...) {
-		slog.Debug(fmt.Sprintf("%s: but warning is suppressed", logMessage), append([]any{"reason", "No need to warn if v is commented by scone:sql or scone:ignore"}, logArgs...)...)
+		slog.InfoContext(ctx, suppressedLogMessage, append([]any{"reason", "No need to warn if v is commented by scone:sql or scone:ignore"}, logArgs...)...)
 		return nil
 	} else if !opt.Filter(&sql.Query{Kind: sql.Unknown}, meta) {
-		slog.Debug(fmt.Sprintf("%s: but warning is suppressed", logMessage), append([]any{"reason", "No need to warn if v is filtered out"}, logArgs...)...)
+		slog.InfoContext(ctx, suppressedLogMessage, append([]any{"reason", "No need to warn if v is filtered out"}, logArgs...)...)
 		return nil
 	}
 	if c, ok := analysisutil.ValueToCallCommon(v); ok {
 		if analysisutil.IsFunc(c, "github.com/jmoiron/sqlx", "Rebind") {
-			slog.Debug(fmt.Sprintf("%s: but warning is suppressed", logMessage), append([]any{"reason", "No need to warn if v is the result of sqlx.Rebind()"}, logArgs...)...)
+			slog.InfoContext(ctx, suppressedLogMessage, append([]any{"reason", "No need to warn if v is the result of sqlx.Rebind()"}, logArgs...)...)
 			return nil
 		} else if analysisutil.IsFunc(c, "github.com/jmoiron/sqlx", "In") {
-			slog.Debug(fmt.Sprintf("%s: but warning is suppressed", logMessage), append([]any{"reason", "No need to warn if v is the result of sqlx.In()"}, logArgs...)...)
+			slog.InfoContext(ctx, suppressedLogMessage, append([]any{"reason", "No need to warn if v is the result of sqlx.In()"}, logArgs...)...)
 			return nil
 		}
 	}
 
-	slog.Warn(logMessage, logArgs...)
+	slog.WarnContext(ctx, logMessage, logArgs...)
 	return &sql.Query{Kind: sql.Unknown}
 }

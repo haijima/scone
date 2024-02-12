@@ -18,11 +18,11 @@ import (
 // ExtractQuery extracts queries from the given package.
 func ExtractQuery(ctx context.Context, ssaProg *buildssa.SSA, files []*ast.File, opt *Option) (QueryResults, error) {
 	// Get queries from comments
-	foundQueryResults := handleComments(ssaProg, files, opt)
+	foundQueryResults := handleComments(ctx, ssaProg, files, opt)
 
 	// Get queries from source code
 	for _, member := range ssaProg.SrcFuncs {
-		foundQueryResults = append(foundQueryResults, AnalyzeFunc(ctx, ssaProg.Pkg, member, []token.Pos{}, opt)...)
+		foundQueryResults = append(foundQueryResults, AnalyzeFunc(ctx, member, []token.Pos{}, opt)...)
 	}
 
 	// Sort and compact
@@ -30,7 +30,7 @@ func ExtractQuery(ctx context.Context, ssaProg *buildssa.SSA, files []*ast.File,
 	return slices.CompactFunc(foundQueryResults, func(a, b *QueryResult) bool { return a.Compare(b) == 0 }), nil
 }
 
-func handleComments(ssaProg *buildssa.SSA, files []*ast.File, opt *Option) []*QueryResult {
+func handleComments(ctx context.Context, ssaProg *buildssa.SSA, files []*ast.File, opt *Option) []*QueryResult {
 	foundQueryResults := make([]*QueryResult, 0)
 	analysisutil.WalkCommentGroup(ssaProg.Pkg.Prog.Fset, files, func(n ast.Node, cg *ast.CommentGroup) bool {
 		qr := NewQueryResult(NewMeta(&ssa.Function{}, cg.Pos()))
@@ -54,11 +54,11 @@ func handleComments(ssaProg *buildssa.SSA, files []*ast.File, opt *Option) []*Qu
 	return slices.DeleteFunc(foundQueryResults, func(qr *QueryResult) bool { return len(qr.Queries()) == 0 })
 }
 
-func AnalyzeFunc(ctx context.Context, pkg *ssa.Package, fn *ssa.Function, pos []token.Pos, opt *Option) QueryResults {
+func AnalyzeFunc(ctx context.Context, fn *ssa.Function, pos []token.Pos, opt *Option) QueryResults {
 	foundQueryResults := make([]*QueryResult, 0)
 	// Analyze anonymous functions recursively
 	for _, anon := range fn.AnonFuncs {
-		foundQueryResults = append(foundQueryResults, AnalyzeFunc(ctx, pkg, anon, append([]token.Pos{anon.Pos(), fn.Pos()}, pos...), opt)...)
+		foundQueryResults = append(foundQueryResults, AnalyzeFunc(ctx, anon, append([]token.Pos{anon.Pos(), fn.Pos()}, pos...), opt)...)
 	}
 
 	seen := map[*ssa.CallCommon]bool{}
@@ -78,7 +78,7 @@ func AnalyzeFunc(ctx context.Context, pkg *ssa.Package, fn *ssa.Function, pos []
 			}
 
 			// 3. ssa.Value to filtered sql.Query
-			qr := valueToValidQuery(ctx, targetArg, pkg, fn, append([]token.Pos{callCommon.Pos(), instr.Pos(), fn.Pos()}, pos...), opt)
+			qr := valueToValidQuery(ctx, targetArg, fn, append([]token.Pos{callCommon.Pos(), instr.Pos(), fn.Pos()}, pos...), opt)
 			if qr != nil && len(qr.Queries()) > 0 {
 				foundQueryResults = append(foundQueryResults, qr)
 			}
@@ -88,7 +88,7 @@ func AnalyzeFunc(ctx context.Context, pkg *ssa.Package, fn *ssa.Function, pos []
 	return foundQueryResults
 }
 
-func valueToValidQuery(ctx context.Context, v ssa.Value, pkg *ssa.Package, fn *ssa.Function, pos []token.Pos, opt *Option) *QueryResult {
+func valueToValidQuery(ctx context.Context, v ssa.Value, fn *ssa.Function, pos []token.Pos, opt *Option) *QueryResult {
 	meta := NewMeta(fn, v.Pos(), pos...)
 
 	// 3-1. ssa.Value to string constants.

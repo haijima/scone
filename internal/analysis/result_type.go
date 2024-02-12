@@ -64,8 +64,8 @@ type Meta struct {
 	Pos  []token.Pos
 }
 
-func NewMeta(fn *ssa.Function, pos token.Pos, fallbackPos ...token.Pos) *Meta {
-	return &Meta{Func: fn, Pos: append([]token.Pos{pos}, fallbackPos...)}
+func NewMeta(fn *ssa.Function, pos ...token.Pos) *Meta {
+	return &Meta{Func: fn, Pos: pos}
 }
 
 func (m *Meta) Package() *types.Package {

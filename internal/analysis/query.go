@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"go/ast"
-	"go/token"
 	"log/slog"
 	"slices"
 	"strings"
@@ -22,7 +21,7 @@ func ExtractQuery(ctx context.Context, ssaProg *buildssa.SSA, files []*ast.File,
 
 	// Get queries from source code
 	for _, member := range ssaProg.SrcFuncs {
-		foundQueryResults = append(foundQueryResults, AnalyzeFunc(ctx, member, []token.Pos{}, opt)...)
+		foundQueryResults = append(foundQueryResults, AnalyzeFunc(ctx, member, opt)...)
 	}
 
 	// Sort and compact
@@ -54,11 +53,11 @@ func handleComments(ctx context.Context, ssaProg *buildssa.SSA, files []*ast.Fil
 	return slices.DeleteFunc(foundQueryResults, func(qr *QueryResult) bool { return len(qr.Queries()) == 0 })
 }
 
-func AnalyzeFunc(ctx context.Context, fn *ssa.Function, pos []token.Pos, opt *Option) QueryResults {
+func AnalyzeFunc(ctx context.Context, fn *ssa.Function, opt *Option) QueryResults {
 	foundQueryResults := make([]*QueryResult, 0)
 	// Analyze anonymous functions recursively
 	for _, anon := range fn.AnonFuncs {
-		foundQueryResults = append(foundQueryResults, AnalyzeFunc(ctx, anon, append([]token.Pos{anon.Pos(), fn.Pos()}, pos...), opt)...)
+		foundQueryResults = append(foundQueryResults, AnalyzeFunc(ctx, anon, opt)...)
 	}
 
 	seen := map[*ssa.CallCommon]bool{}
@@ -78,7 +77,8 @@ func AnalyzeFunc(ctx context.Context, fn *ssa.Function, pos []token.Pos, opt *Op
 			}
 
 			// 3. ssa.Value to filtered sql.Query
-			qr := valueToValidQuery(ctx, targetArg, fn, append([]token.Pos{callCommon.Pos(), instr.Pos(), fn.Pos()}, pos...), opt)
+			meta := NewMeta(fn, targetArg.Pos(), callCommon.Pos(), instr.Pos(), fn.Pos())
+			qr := valueToValidQuery(ctx, targetArg, opt, meta)
 			if qr != nil && len(qr.Queries()) > 0 {
 				foundQueryResults = append(foundQueryResults, qr)
 			}
@@ -88,8 +88,7 @@ func AnalyzeFunc(ctx context.Context, fn *ssa.Function, pos []token.Pos, opt *Op
 	return foundQueryResults
 }
 
-func valueToValidQuery(ctx context.Context, v ssa.Value, fn *ssa.Function, pos []token.Pos, opt *Option) *QueryResult {
-	meta := NewMeta(fn, v.Pos(), pos...)
+func valueToValidQuery(ctx context.Context, v ssa.Value, opt *Option, meta *Meta) *QueryResult {
 
 	// 3-1. ssa.Value to string constants.
 	// Returns a slice considering the case where the argument value is a Phi node.

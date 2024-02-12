@@ -25,7 +25,7 @@ func NewQueryCommand(v *viper.Viper, _ afero.Fs) *cobra.Command {
 	cmd.RunE = func(cmd *cobra.Command, _ []string) error { return runQuery(cmd, v) }
 
 	cmd.Flags().String("format", "table", "The output format {table|md|csv|tsv|simple}")
-	cmd.Flags().StringSlice("sort", []string{"file"}, "The sort `keys` {file|function|type|table|sha1}")
+	cmd.Flags().StringSlice("sort", []string{"file"}, "The sort `keys` {"+strings.Join(sortableColumns, "|")+"}")
 	cmd.Flags().StringSlice("cols", []string{}, "The `columns` to show {"+strings.Join(headerColumns, "|")+"}")
 	cmd.Flags().Bool("no-header", false, "Hide header")
 	cmd.Flags().Bool("no-rownum", false, "Hide row number")
@@ -36,8 +36,9 @@ func NewQueryCommand(v *viper.Viper, _ afero.Fs) *cobra.Command {
 	return cmd
 }
 
-var headerColumns = []string{"package", "package-path", "file", "function", "type", "tables", "sha1", "query", "raw-query"}
+var headerColumns = []string{"package", "package-path", "file", "function", "type", "tables", "hash", "query", "raw-query"}
 var defaultHeaderIndex = []int{0, 1, 2, 3, 4, 5, 6, 7}
+var sortableColumns = []string{"file", "function", "type", "tables", "hash"}
 
 func runQuery(cmd *cobra.Command, v *viper.Viper) error {
 	dir := v.GetString("dir")
@@ -50,8 +51,8 @@ func runQuery(cmd *cobra.Command, v *viper.Viper) error {
 	expandQueryGroup := v.GetBool("expand-query-group")
 	showFullPackagePath := v.GetBool("full-package-path")
 	opt := QueryOptionFromViper(v)
-	if !mapset.NewSet(sortKeys...).IsSubset(mapset.NewSet("file", "function", "type", "table", "sha1")) {
-		return errors.Newf("unknown sort key: %s", mapset.NewSet(sortKeys...).Difference(mapset.NewSet("file", "function", "type", "table", "sha1")).ToSlice())
+	if !mapset.NewSet(sortKeys...).IsSubset(mapset.NewSet(sortableColumns...)) {
+		return errors.Newf("unknown sort key: %s", mapset.NewSet(sortKeys...).Difference(mapset.NewSet(sortableColumns...)).ToSlice())
 	}
 	if !slices.Contains(sortKeys, "file") {
 		sortKeys = append(sortKeys, "file")
@@ -120,10 +121,10 @@ func sortQuery(sortKeys []string) func(a, b *analysis.QueryResult) int {
 		return slices.CompareFunc(sortKeys, sortKeys, func(k, _ string) int {
 			if k == "type" {
 				return int(aa.Queries()[0].Kind) - int(bb.Queries()[0].Kind)
-			} else if k == "table" {
+			} else if k == "tables" {
 				return strings.Compare(aa.Queries()[0].MainTable, bb.Queries()[0].MainTable)
-			} else if k == "sha1" {
-				return strings.Compare(aa.Queries()[0].Sha(), bb.Queries()[0].Sha())
+			} else if k == "hash" {
+				return strings.Compare(aa.Queries()[0].Hash(), bb.Queries()[0].Hash())
 			} else if k == "function" {
 				return strings.Compare(aa.Meta.Func.Name(), bb.Meta.Func.Name())
 			} else if k == "file" {
@@ -162,7 +163,7 @@ func row(q *sql.Query, meta *analysis.Meta, opt *PrintQueryOption) []string {
 		meta.Func.Name(),
 		q.Kind.ColoredString(),
 		strings.Join(q.Tables, ", "),
-		q.Sha(),
+		q.Hash(),
 		q.String(),
 		q.Raw,
 	}

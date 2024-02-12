@@ -69,7 +69,7 @@ type Query struct {
 	FilterColumnMap map[string]mapset.Set[string]
 }
 
-func (q *Query) Sha() string {
+func (q *Query) Hash() string {
 	h := sha1.New()
 	h.Write([]byte(q.Raw))
 	return fmt.Sprintf("%x", h.Sum(nil))[:8]

@@ -63,7 +63,7 @@ func (o *Option) Filter(q *sql.Query, meta *Meta) bool {
 	funcName := meta.Func.Name()
 	queryType := q.Kind.String()
 	tables := q.Tables
-	hash := q.Sha()
+	hash := q.Hash()
 
 	return !o.IsCommented(meta.Package(), meta.Pos...) &&
 		(slices.Contains(o.FilterPackages, pkgName) || len(o.FilterPackages) == 0) &&

@@ -56,7 +56,7 @@ func (qr *QueryResult) Compare(other *QueryResult) int {
 	if !qr.Meta.Equal(other.Meta) {
 		return qr.Meta.Compare(other.Meta)
 	}
-	return slices.CompareFunc(qr.Queries(), other.Queries(), func(a, b *sql.Query) int { return strings.Compare(a.Sha(), b.Sha()) })
+	return slices.CompareFunc(qr.Queries(), other.Queries(), func(a, b *sql.Query) int { return strings.Compare(a.Hash(), b.Hash()) })
 }
 
 type Meta struct {

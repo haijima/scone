@@ -4,6 +4,7 @@ import (
 	"go/ast"
 	"go/constant"
 	"go/token"
+	"log/slog"
 	"regexp"
 	"slices"
 	"strconv"
@@ -23,18 +24,27 @@ func GetPosition(pkg *ssa.Package, pos []token.Pos) token.Position {
 }
 
 func ValueToStrings(v ssa.Value) ([]string, bool) {
+	return valueToStrings(v, 0)
+}
+
+func valueToStrings(v ssa.Value, depth int) ([]string, bool) {
+	if depth > 10 {
+		slog.Debug("valueToStrings: too deep", slog.Any("value", v))
+		return []string{}, false
+	}
+	depth++
 	switch t := v.(type) {
 	case *ssa.Const:
 		return constToStrings(t)
 	case *ssa.BinOp:
-		return binOpToStrings(t)
+		return binOpToStrings(t, depth)
 	case *ssa.Phi:
-		return phiToStrings(t)
+		return phiToStrings(t, depth)
 	case *ssa.Call:
 		if IsFunc(t.Common(), "fmt", "Sprintf") {
-			return fmtSprintfToStrings(t)
+			return fmtSprintfToStrings(t, depth)
 		} else if IsFunc(t.Common(), "strings", "Join") {
-			return stringsJoinToStrings(t)
+			return stringsJoinToStrings(t, depth)
 		}
 	}
 	return []string{}, false
@@ -49,9 +59,9 @@ func constToStrings(t *ssa.Const) ([]string, bool) {
 	return []string{}, false
 }
 
-func binOpToStrings(t *ssa.BinOp) ([]string, bool) {
-	x, xok := ValueToStrings(t.X)
-	y, yok := ValueToStrings(t.Y)
+func binOpToStrings(t *ssa.BinOp, depth int) ([]string, bool) {
+	x, xok := valueToStrings(t.X, depth)
+	y, yok := valueToStrings(t.Y, depth)
 	if xok && yok && len(x) > 0 && len(y) > 0 && t.Op == token.ADD {
 		res := make([]string, 0, len(x)*len(y))
 		for _, xx := range x {
@@ -64,10 +74,10 @@ func binOpToStrings(t *ssa.BinOp) ([]string, bool) {
 	return []string{}, false
 }
 
-func phiToStrings(t *ssa.Phi) ([]string, bool) {
+func phiToStrings(t *ssa.Phi, depth int) ([]string, bool) {
 	res := make([]string, 0, len(t.Edges))
 	for _, edge := range t.Edges {
-		if s, ok := ValueToStrings(edge); ok {
+		if s, ok := valueToStrings(edge, depth); ok {
 			res = append(res, s...)
 		}
 	}
@@ -77,8 +87,8 @@ func phiToStrings(t *ssa.Phi) ([]string, bool) {
 var fmtVerbRegexp = regexp.MustCompile(`(^|[^%]|(?:%%)+)(%(?:-?\d+|\+|#)?)(\w)`)
 
 // fmtSprintfToStrings returns the possible string values of fmt.Sprintf.
-func fmtSprintfToStrings(t *ssa.Call) ([]string, bool) {
-	fs, ok := ValueToStrings(t.Call.Args[0])
+func fmtSprintfToStrings(t *ssa.Call, depth int) ([]string, bool) {
+	fs, ok := valueToStrings(t.Call.Args[0], depth)
 	if !ok && len(fs) == 1 {
 		return []string{}, false
 	}
@@ -119,9 +129,9 @@ func fmtSprintfToStrings(t *ssa.Call) ([]string, bool) {
 }
 
 // stringsJoinToStrings returns the possible string values of strings.Join.
-func stringsJoinToStrings(t *ssa.Call) ([]string, bool) {
+func stringsJoinToStrings(t *ssa.Call, depth int) ([]string, bool) {
 	// strings.Join
-	joiner, ok := ValueToStrings(t.Call.Args[1])
+	joiner, ok := valueToStrings(t.Call.Args[1], depth)
 	if !ok || len(joiner) != 1 {
 		return []string{}, false
 	}

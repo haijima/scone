@@ -103,6 +103,9 @@ func runQuery(cmd *cobra.Command, v *viper.Viper) error {
 			} else if len(qr.Queries()) > 1 {
 				r[0] = "P"
 			}
+			if qr.Meta.FromComment {
+				r[0] += "C"
+			}
 			if !printOpt.NoRowNum {
 				r = append([]string{strconv.Itoa(i + 1)}, r...)
 			}

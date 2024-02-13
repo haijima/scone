@@ -32,6 +32,7 @@ func handleComments(ctx context.Context, ssaProg *buildssa.SSA, files []*ast.Fil
 	foundQueryResults := make([]*QueryResult, 0)
 	analysisutil.WalkCommentGroup(ssaProg.Pkg.Prog.Fset, files, func(n ast.Node, cg *ast.CommentGroup) bool {
 		qr := NewQueryResult(NewMeta(&ssa.Function{}, cg.Pos()))
+		qr.Meta.FromComment = true
 		if i := slices.IndexFunc(ssaProg.SrcFuncs, func(fn *ssa.Function) bool { return analysisutil.Include(fn.Syntax(), n) }); i >= 0 {
 			qr.Meta.Func = ssaProg.SrcFuncs[i]
 			qr.Meta.Pos = append(qr.Meta.Pos, ssaProg.SrcFuncs[i].Pos())

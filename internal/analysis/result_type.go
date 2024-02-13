@@ -60,8 +60,9 @@ func (qr *QueryResult) Compare(other *QueryResult) int {
 }
 
 type Meta struct {
-	Func *ssa.Function
-	Pos  []token.Pos
+	Func        *ssa.Function
+	Pos         []token.Pos
+	FromComment bool
 }
 
 func NewMeta(fn *ssa.Function, pos ...token.Pos) *Meta {

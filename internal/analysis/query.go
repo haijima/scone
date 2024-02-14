@@ -73,6 +73,18 @@ func AnalyzeFunc(ctx context.Context, fn *ssa.Function, opt *Option) QueryResult
 			// 2. Check if the call is a target function and extract the target argument
 			targetArg, ok := CheckIfTargetFunction(ctx, callCommon, opt)
 			if !ok {
+				if slog.Default().Enabled(ctx, slog.LevelWarn) {
+					for _, arg := range callCommon.Args {
+						if strs, ok := analysisutil.ValueToStrings(arg); ok {
+							for _, str := range strs {
+								if q, ok := sql.ParseString(str); ok {
+									meta := NewMeta(fn, arg.Pos(), callCommon.Pos(), instr.Pos(), fn.Pos())
+									slog.WarnContext(ctx, "Found a query in a non-target function", slog.Any("call", callCommon), slog.Any("SQL", q), slog.Any("analysis", meta))
+								}
+							}
+						}
+					}
+				}
 				continue
 			}
 

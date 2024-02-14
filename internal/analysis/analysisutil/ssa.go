@@ -180,51 +180,79 @@ func IsFunc(common *ssa.CallCommon, pkgPath, funcName string) bool {
 }
 
 func GetFuncInfo(common *ssa.CallCommon) (pkgPath, funcName string, ok bool) {
-	switch fn := common.Value.(type) {
-	case *ssa.Builtin:
-		// built-in function call
-		// fmt.Fprintf(os.Stderr, "built-in function call: %v\n", fn)
-	case *ssa.MakeClosure:
-		// static function closure call
-		// fmt.Fprintf(os.Stderr, "static function closure call: %v\n", fn)
-	case *ssa.Function:
-		if fn.Signature.Recv() != nil {
-			if fn.Signature.Recv().Pkg() != nil {
-				// static method call
-				// fmt.Fprintf(os.Stderr, "static method call: %v\n", fn)
-				return fn.Signature.Recv().Pkg().Path(), fn.Name(), true
-			} else {
-				// builtin?
-				// fmt.Fprintf(os.Stderr, "static method call(%s) should have package\n", fn.Name())
-			}
+	if common.IsInvoke() {
+		if common.Method.Pkg() != nil {
+			// dynamic method call
+			// e.g.
+			// func Something(foo Foo) {
+			//     foo.Bar() // <--- foo.Bar() is dynamic method call
+			_ = common.Value.Type().String()
+			return common.Method.Pkg().Path(), common.Method.Name(), true
 		} else {
-			if fn.Pkg != nil {
-				// static function call
-				// fmt.Fprintf(os.Stderr, "static function call: %v\n", fn)
-				return fn.Pkg.Pkg.Path(), fn.Name(), true
-			} else if fn.Origin() != nil && fn.Origin().Pkg != nil {
-				// generics?
-				// static function call
-				// fmt.Fprintf(os.Stderr, "static function call: %v\n", fn)
-				return fn.Origin().Pkg.Pkg.Path(), fn.Origin().Name(), true
-			}
+			// builtin dynamic method call
+			// e.g.
+			// var err error
+			// err.Error() // <--- err.Error() is builtin dynamic method call
+			return "", common.Method.Name(), true
 		}
-	default:
-		if common.IsInvoke() {
-			if common.Method.Pkg() != nil {
-				// dynamic method call
-				// fmt.Fprintf(os.Stderr, "dynamic method call: %v\n", common.Method)
-				return common.Method.Pkg().Path(), common.Method.Name(), true
-			} else {
-				// builtin dynamic method call
-				// fmt.Fprintf(os.Stderr, "builtin dynamic method call: %v\n", common.Method)
+	} else {
+		switch fn := common.Value.(type) {
+		case *ssa.Builtin:
+			// built-in function call
+			// e.g. len, append, etc.
+			return "", fn.Name(), true
+		case *ssa.MakeClosure:
+			// static function closure call
+			// e.g. func() { ... }()
+			// names are described as xxxFunc$1()
+			var pkgPath, funcName string
+			if fn.Parent() != nil {
+				pkgPath = fn.Parent().Package().Pkg.Name()
 			}
-		} else {
+			if fn.Fn != nil {
+				funcName = fn.Fn.Name()
+			}
+			return pkgPath, funcName, pkgPath != "" || funcName != ""
+		case *ssa.Function:
+			if fn.Signature.Recv() != nil {
+				if fn.Signature.Recv().Pkg() != nil {
+					// static method call
+					// e.g.
+					// foo := GetFoo()
+					// foo.Bar() // <--- foo.Bar() is static method call
+					return fn.Signature.Recv().Pkg().Path(), fn.Name(), true
+				} else {
+					// builtin?
+					// TODO: need to check if this is correct
+					fmt.Fprintf(os.Stderr, "unknown method call(1): %s\n", fn.Name())
+					return "", fn.Name(), true
+				}
+			} else {
+				if fn.Pkg != nil {
+					// static function call
+					return fn.Pkg.Pkg.Path(), fn.Name(), true
+				} else if fn.Origin() != nil && fn.Origin().Pkg != nil {
+					// generics?
+					// static function call
+					// TODO: need to check if this is correct
+					fmt.Fprintf(os.Stderr, "unknown method call(2): %s\n", fn.Name())
+					return fn.Origin().Pkg.Pkg.Path(), fn.Origin().Name(), true
+				} else {
+					// TODO: need to check if this is correct
+					fmt.Fprintf(os.Stderr, "unknown method call(3): %s\n", fn.Name())
+					return "", fn.Name(), true
+				}
+			}
+		default:
 			// dynamic function call
-			// fmt.Fprintf(os.Stderr, "dynamic function call: %v\n", fn)
+			// e.g.
+			// func foo(fn func() string) {
+			//     s := fn() // <--- fn() is dynamic function call
+			//     fmt.Println(s)
+			// }
+			return fn.Type().String(), "", true
 		}
 	}
-	return "", "", false // Can't get package name of the function
 }
 
 func InstrToCallCommon(instr ssa.Instruction) (*ssa.CallCommon, bool) {

@@ -173,8 +173,8 @@ func parseInsertStmt(stmt *ast.InsertStmt, wholeSQL string) map[string]mapset.Se
 			return parseStmt(s.From, s.Where, wholeSQL)
 		case *ast.SetOprStmt:
 			return parseSetOprStmt(s, wholeSQL)
-		case *ast.SubqueryExpr:
-			return parseStmt(s.Query.(*ast.SelectStmt).From, s.Query.(*ast.SelectStmt).Where, wholeSQL)
+			//case *ast.SubqueryExpr:
+			//	return parseStmt(s.Query.(*ast.SelectStmt).From, s.Query.(*ast.SelectStmt).Where, wholeSQL)
 		}
 	}
 	return make(map[string]mapset.Set[string])

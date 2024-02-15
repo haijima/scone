@@ -27,10 +27,10 @@ func (qgs QueryGroups) AllTableMap() map[string]*Table {
 				tables[t].kinds.Add(q.Kind)
 			}
 			for t, cols := range q.FilterColumnMap {
-				if _, ok := tables[t]; !ok {
-					tables[t] = NewTable(t)
-					tables[t].filterColumns = nil
-				}
+				//if _, ok := tables[t]; !ok {
+				//	tables[t] = NewTable(t)
+				//	tables[t].filterColumns = nil
+				//}
 				if tables[t].filterColumns == nil {
 					tables[t].filterColumns = cols
 				} else {

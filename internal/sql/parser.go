@@ -147,16 +147,18 @@ func parse(sql string) (*Query, error) {
 }
 
 func parseSetOprStmt(stmt *ast.SetOprStmt, wholeSQL string) map[string]mapset.Set[string] {
+	return parseSetOprSelectList(stmt.SelectList, wholeSQL)
+}
+
+func parseSetOprSelectList(stmt *ast.SetOprSelectList, wholeSQL string) map[string]mapset.Set[string] {
 	res := util.NewSetMap[string, string]()
-	for _, s := range stmt.SelectList.Selects {
+	for _, s := range stmt.Selects {
 		if stmt, ok := s.(*ast.SelectStmt); ok {
-			m := parseStmt(stmt.From, stmt.Where, wholeSQL)
-			for k, v := range m {
+			for k, v := range parseStmt(stmt.From, stmt.Where, wholeSQL) {
 				res.Intersect(k, v)
 			}
-		} else if stmt, ok := s.(*ast.SetOprStmt); ok {
-			m := parseSetOprStmt(stmt, wholeSQL)
-			for k, v := range m {
+		} else if stmt, ok := s.(*ast.SetOprSelectList); ok {
+			for k, v := range parseSetOprSelectList(stmt, wholeSQL) {
 				res.Intersect(k, v)
 			}
 		}

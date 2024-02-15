@@ -22,14 +22,20 @@ func (qgs QueryGroups) AllTableMap() map[string]*Table {
 			for _, t := range q.Tables {
 				if _, ok := tables[t]; !ok {
 					tables[t] = NewTable(t)
+					tables[t].filterColumns = nil
 				}
 				tables[t].kinds.Add(q.Kind)
 			}
 			for t, cols := range q.FilterColumnMap {
 				if _, ok := tables[t]; !ok {
 					tables[t] = NewTable(t)
+					tables[t].filterColumns = nil
 				}
-				tables[t].filterColumns = tables[t].filterColumns.Intersect(cols)
+				if tables[t].filterColumns == nil {
+					tables[t].filterColumns = cols
+				} else {
+					tables[t].filterColumns = tables[t].filterColumns.Intersect(cols)
+				}
 			}
 		}
 	}
@@ -159,11 +165,7 @@ func (k QueryKind) ColorAttribute() color.Attribute {
 }
 
 func ParseString(str string) (*Query, bool) {
-	str, err := Normalize(str)
-	if err != nil {
-		return nil, false
-	}
-
+	str = Normalize(str)
 	q, err := parse(str)
 	if err != nil {
 		return nil, false
@@ -174,12 +176,11 @@ func ParseString(str string) (*Query, bool) {
 var namedParameterRegexp = regexp.MustCompile(`(?i):[a-z_]+`)
 var trailingCommentRegexp = regexp.MustCompile(`(?i)--.*\r?\n`)
 
-func Normalize(str string) (string, error) {
+func Normalize(str string) string {
 	str = namedParameterRegexp.ReplaceAllString(str, "?")  // replace named parameters with parameter of prepared statement
 	str = trailingCommentRegexp.ReplaceAllString(str, " ") // remove comments and join lines
 	str = strings.ReplaceAll(str, "\t", " ")               // remove tabs
 	str = strings.Join(strings.Fields(str), " ")           // remove duplicate spaces
 	str = strings.TrimSpace(str)                           // remove leading and trailing spaces
-
-	return str, nil
+	return str
 }

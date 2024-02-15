@@ -5,7 +5,6 @@ import (
 	"go/ast"
 	"log/slog"
 	"slices"
-	"strings"
 
 	"github.com/haijima/scone/internal/analysis/analysisutil"
 	"github.com/haijima/scone/internal/sql"
@@ -38,12 +37,16 @@ func handleComments(ctx context.Context, ssaProg *buildssa.SSA, files []*ast.Fil
 			qr.Meta.Pos = append(qr.Meta.Pos, ssaProg.SrcFuncs[i].Pos())
 		}
 		for _, comment := range cg.List {
-			if strings.HasPrefix(comment.Text, "// scone:sql") {
-				if q, ok := sql.ParseString(strings.TrimPrefix(comment.Text, "// scone:sql")); ok && opt.Filter(q, qr.Meta) {
+			v, arg, _ := analysisutil.GetCommentVerb(comment, "scone")
+			switch v {
+			case "sql":
+				if q, ok := sql.ParseString(arg); ok && opt.Filter(q, qr.Meta) {
 					qr.Append(q)
 					opt.commentedNodes = append(opt.commentedNodes, &NodeWithPackage{Node: n, Package: ssaProg.Pkg.Pkg})
+				} else {
+					slog.WarnContext(ctx, "Failed to parse string as SQL in scone:sql comment", slog.Any("string", arg), slog.Any("analysis", qr.Meta))
 				}
-			} else if strings.HasPrefix(comment.Text, "// scone:ignore") {
+			case "ignore":
 				opt.commentedNodes = append(opt.commentedNodes, &NodeWithPackage{Node: n, Package: ssaProg.Pkg.Pkg})
 			}
 		}

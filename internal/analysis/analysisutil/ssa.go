@@ -257,16 +257,12 @@ func GetFuncInfo(common *ssa.CallCommon) (pkgPath, funcName string, ok bool) {
 
 func InstrToCallCommon(instr ssa.Instruction) (*ssa.CallCommon, bool) {
 	switch i := instr.(type) {
-	case *ssa.Call:
+	case ssa.CallInstruction:
 		return i.Common(), true
 	case *ssa.Extract:
 		if call, ok := i.Tuple.(*ssa.Call); ok {
 			return call.Common(), true
 		}
-	case *ssa.Go:
-		return i.Common(), true
-	case *ssa.Defer:
-		return i.Common(), true
 	}
 	return nil, false
 }

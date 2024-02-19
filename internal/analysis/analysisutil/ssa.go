@@ -1,10 +1,12 @@
 package analysisutil
 
 import (
+	"fmt"
 	"go/ast"
 	"go/constant"
 	"go/token"
 	"log/slog"
+	"os"
 	"regexp"
 	"slices"
 	"strconv"

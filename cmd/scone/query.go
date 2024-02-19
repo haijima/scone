@@ -97,7 +97,7 @@ func runQuery(cmd *cobra.Command, v *viper.Viper) error {
 	}
 	for i, qr := range queryResults {
 		for j, q := range qr.Queries() {
-			r := append([]string{""}, row(q, qr.Meta, printOpt)...)
+			r := slices.Insert(row(q, qr.Meta, printOpt), 0, "")
 			if len(qr.Queries()) > 1 && expandQueryGroup {
 				r[0] = fmt.Sprintf("P%d", j+1)
 			} else if len(qr.Queries()) > 1 {
@@ -107,7 +107,7 @@ func runQuery(cmd *cobra.Command, v *viper.Viper) error {
 				r[0] += "C"
 			}
 			if !printOpt.NoRowNum {
-				r = append([]string{strconv.Itoa(i + 1)}, r...)
+				r = slices.Insert(r, 0, strconv.Itoa(i+1))
 			}
 			p.AddRow(r)
 			if !expandQueryGroup {

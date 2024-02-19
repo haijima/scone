@@ -80,7 +80,7 @@ func phiToStrings(t *ssa.Phi, depth int) ([]string, bool) {
 	res := make([]string, 0, len(t.Edges))
 	for _, edge := range t.Edges {
 		if s, ok := valueToStrings(edge, depth); ok {
-			res = append(res, s...)
+			res = slices.Concat(res, s)
 		}
 	}
 	return res, len(res) > 0

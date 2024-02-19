@@ -2,6 +2,7 @@ package analysis
 
 import (
 	"context"
+	"slices"
 
 	"github.com/haijima/scone/internal/analysis/analysisutil"
 	"golang.org/x/tools/go/ssa"
@@ -45,7 +46,7 @@ func analyzeSSA(ctx context.Context, dir, pattern string, opt *Option) (QueryRes
 			return nil, err
 		}
 
-		results = append(results, queryResults...)
+		results = slices.Concat(results, queryResults)
 	}
 
 	return results, nil

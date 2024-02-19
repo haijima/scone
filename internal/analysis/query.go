@@ -19,7 +19,7 @@ func ExtractQuery(ctx context.Context, ssaProg *buildssa.SSA, files []*ast.File,
 
 	// Get queries from source code
 	for _, member := range ssaProg.SrcFuncs {
-		foundQueryResults = append(foundQueryResults, AnalyzeFunc(ctx, member, opt)...)
+		foundQueryResults = slices.Concat(foundQueryResults, AnalyzeFunc(ctx, member, opt))
 	}
 
 	// Sort and compact
@@ -60,7 +60,7 @@ func AnalyzeFunc(ctx context.Context, fn *ssa.Function, opt *Option) QueryResult
 	foundQueryResults := make([]*QueryResult, 0)
 	// Analyze anonymous functions recursively
 	for _, anon := range fn.AnonFuncs {
-		foundQueryResults = append(foundQueryResults, AnalyzeFunc(ctx, anon, opt)...)
+		foundQueryResults = slices.Concat(foundQueryResults, AnalyzeFunc(ctx, anon, opt))
 	}
 
 	seen := map[*ssa.CallCommon]bool{}
@@ -179,7 +179,7 @@ var targetMethods = []methodArg{
 }
 
 func CheckIfTargetFunction(_ context.Context, c *ssa.CallCommon, opt *Option) (ssa.Value, bool) {
-	for _, t := range append(targetMethods, opt.AdditionalFuncSlice()...) {
+	for _, t := range slices.Concat(targetMethods, opt.AdditionalFuncSlice()) {
 		if analysisutil.IsFunc(c, t.Package, t.Method) {
 			if c.IsInvoke() {
 				return c.Args[t.ArgIndex], true

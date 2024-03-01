@@ -1,12 +1,10 @@
 package analysisutil
 
 import (
-	"fmt"
 	"go/ast"
 	"go/constant"
 	"go/token"
 	"log/slog"
-	"os"
 	"regexp"
 	"slices"
 	"strconv"
@@ -174,35 +172,53 @@ func Unquote(str string) (string, error) {
 	return str, nil
 }
 
+type FuncInfo struct {
+	PkgPath  string
+	RcvName  string
+	FuncName string
+}
+
+func (f *FuncInfo) String() string {
+	pkgPath := f.PkgPath
+	if pkgPath != "" {
+		pkgPath += "."
+	}
+	if f.RcvName != "" {
+		return "(" + pkgPath + f.RcvName + ")." + f.FuncName
+	}
+	return pkgPath + f.FuncName
+}
+
 func IsFunc(common *ssa.CallCommon, pkgPath, funcName string) bool {
-	if path, name, ok := GetFuncInfo(common); ok {
-		return path == pkgPath && name == funcName
+	if funcInfo, ok := GetFuncInfo(common); ok {
+		return funcInfo.PkgPath == pkgPath && funcInfo.FuncName == funcName
 	}
 	return false
 }
 
-func GetFuncInfo(common *ssa.CallCommon) (pkgPath, funcName string, ok bool) {
+func GetFuncInfo(common *ssa.CallCommon) (funcInfo *FuncInfo, ok bool) {
 	if common.IsInvoke() {
+		// dynamic method call
+		// e.g.
+		// func Something(s fmt.Stringer) {
+		//     s.String() // <--- s.String() is dynamic method call
+		// }
+		// or
+		// func another(err error) {
+		//     err.Error() // <--- err.Error() is built-in dynamic method call
+		rcvName := common.Value.Type().String()
+		var pkgPath string
 		if common.Method.Pkg() != nil {
-			// dynamic method call
-			// e.g.
-			// func Something(foo Foo) {
-			//     foo.Bar() // <--- foo.Bar() is dynamic method call
-			_ = common.Value.Type().String()
-			return common.Method.Pkg().Path(), common.Method.Name(), true
-		} else {
-			// builtin dynamic method call
-			// e.g.
-			// var err error
-			// err.Error() // <--- err.Error() is builtin dynamic method call
-			return "", common.Method.Name(), true
+			pkgPath = common.Method.Pkg().Path()
+			rcvName = strings.TrimPrefix(rcvName, pkgPath+".")
 		}
+		return &FuncInfo{PkgPath: pkgPath, RcvName: rcvName, FuncName: common.Method.Name()}, true
 	} else {
 		switch fn := common.Value.(type) {
 		case *ssa.Builtin:
 			// built-in function call
 			// e.g. len, append, etc.
-			return "", fn.Name(), true
+			return &FuncInfo{PkgPath: "", RcvName: "", FuncName: fn.Name()}, true
 		case *ssa.MakeClosure:
 			// static function closure call
 			// e.g. func() { ... }()
@@ -214,7 +230,7 @@ func GetFuncInfo(common *ssa.CallCommon) (pkgPath, funcName string, ok bool) {
 			if fn.Fn != nil {
 				funcName = fn.Fn.Name()
 			}
-			return pkgPath, funcName, pkgPath != "" || funcName != ""
+			return &FuncInfo{PkgPath: pkgPath, RcvName: "", FuncName: funcName}, pkgPath != "" || funcName != ""
 		case *ssa.Function:
 			if fn.Signature.Recv() != nil {
 				if fn.Signature.Recv().Pkg() != nil {
@@ -222,37 +238,46 @@ func GetFuncInfo(common *ssa.CallCommon) (pkgPath, funcName string, ok bool) {
 					// e.g.
 					// foo := GetFoo()
 					// foo.Bar() // <--- foo.Bar() is static method call
-					return fn.Signature.Recv().Pkg().Path(), fn.Name(), true
+					rcvName := fn.Signature.Recv().Type().String()
+					if i := strings.LastIndex(rcvName, "."); i > -1 {
+						rcvName = rcvName[i+1:]
+					}
+					return &FuncInfo{PkgPath: fn.Signature.Recv().Pkg().Path(), RcvName: rcvName, FuncName: fn.Name()}, true
 				} else {
-					// builtin?
-					// TODO: need to check if this is correct
-					fmt.Fprintf(os.Stderr, "unknown method call(1): %s\n", fn.Name())
-					return "", fn.Name(), true
+					// unreachable: no builtin struct
+					return &FuncInfo{PkgPath: "", RcvName: "", FuncName: fn.Name()}, true
 				}
 			} else {
 				if fn.Pkg != nil {
 					// static function call
-					return fn.Pkg.Pkg.Path(), fn.Name(), true
+					return &FuncInfo{PkgPath: fn.Pkg.Pkg.Path(), RcvName: "", FuncName: fn.Name()}, true
 				} else if fn.Origin() != nil && fn.Origin().Pkg != nil {
-					// generics?
-					// static function call
-					// TODO: need to check if this is correct
-					fmt.Fprintf(os.Stderr, "unknown method call(2): %s\n", fn.Name())
-					return fn.Origin().Pkg.Pkg.Path(), fn.Origin().Name(), true
+					// generics static function call
+					return &FuncInfo{PkgPath: fn.Origin().Pkg.Pkg.Path(), RcvName: "", FuncName: fn.Origin().Name()}, true
 				} else {
-					// TODO: need to check if this is correct
-					fmt.Fprintf(os.Stderr, "unknown method call(3): %s\n", fn.Name())
-					return "", fn.Name(), true
+					// unreachable?
+					return &FuncInfo{PkgPath: "", RcvName: "", FuncName: fn.Name()}, true
 				}
 			}
-		default:
+		case *ssa.Parameter:
 			// dynamic function call
 			// e.g.
 			// func foo(fn func() string) {
 			//     s := fn() // <--- fn() is dynamic function call
 			//     fmt.Println(s)
 			// }
-			return fn.Type().String(), "", true
+			return &FuncInfo{PkgPath: "", RcvName: "", FuncName: fn.Name()}, true
+		case *ssa.Call:
+			// dynamic function call
+			// e.g.
+			// func foo() {
+			//     c := getCallable()
+			//     fmt.Println(c())  // <--- c() is dynamic function call
+			// }
+			return &FuncInfo{PkgPath: "", RcvName: "", FuncName: fn.Call.Value.Name()}, true
+		default:
+			// dynamic function call
+			return &FuncInfo{PkgPath: "", RcvName: "", FuncName: fn.Name()}, true
 		}
 	}
 }

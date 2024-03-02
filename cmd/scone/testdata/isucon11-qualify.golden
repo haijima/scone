@@ -1,0 +1,25 @@
++----+---+---------+--------------------+-----------------+--------------------------+--------+------------------------+----------+------------------------------------------------------------+
+| #  | * | PACKAGE |    PACKAGE PATH    |      FILE       |         FUNCTION         |  TYPE  |         TABLES         |   HASH   |                           QUERY                            |
++----+---+---------+--------------------+-----------------+--------------------------+--------+------------------------+----------+------------------------------------------------------------+
+|  1 |   | main    | g/i/i/isucondition | main.go:281:14  | getUserIDFromSession     | SELECT | user                   | b35985f4 | SELECT COUNT(*) FROM `user` WHERE `jia_user_id` = ?        |
+|  2 |   | main    | g/i/i/isucondition | main.go:296:15  | getJIAServiceURL         | SELECT | isu_association_config | f0b11e1a | SELECT * FROM `isu_association_config` WHERE `name` = ?    |
+|  3 |   | main    | g/i/i/isucondition | main.go:324:18  | postInitialize           | INSERT | isu_association_config | cd00993f | INSERT INTO `isu_association_config` (`name`, `url`) ...   |
+|  4 |   | main    | g/i/i/isucondition | main.go:374:18  | postAuthentication       | INSERT | user                   | dc6ea159 | INSERT IGNORE INTO user (`jia_user_id`) VALUES (?)         |
+|  5 |   | main    | g/i/i/isucondition | main.go:463:17  | getIsuList               | SELECT | isu                    | cbfe4dd7 | SELECT * FROM `isu` WHERE `jia_user_id` = ? ORDER BY ...   |
+|  6 |   | main    | g/i/i/isucondition | main.go:476:15  | getIsuList               | SELECT | isu_condition          | 5a8b4bff | SELECT * FROM `isu_condition` WHERE `jia_isu_uuid` = ? ... |
+|  7 |   | main    | g/i/i/isucondition | main.go:579:18  | postIsu                  | INSERT | isu                    | d1c6b0b7 | INSERT INTO `isu` (`jia_isu_uuid`, `name`, `image`, ...    |
+|  8 |   | main    | g/i/i/isucondition | main.go:633:18  | postIsu                  | UPDATE | isu                    | 94508169 | UPDATE `isu` SET `character` = ? WHERE `jia_isu_uuid` = ?  |
+|  9 |   | main    | g/i/i/isucondition | main.go:640:14  | postIsu                  | SELECT | isu                    | 82fc0e73 | SELECT * FROM `isu` WHERE `jia_user_id` = ? AND ...        |
+| 10 |   | main    | g/i/i/isucondition | main.go:674:14  | getIsuID                 | SELECT | isu                    | 82fc0e73 | SELECT * FROM `isu` WHERE `jia_user_id` = ? AND ...        |
+| 11 |   | main    | g/i/i/isucondition | main.go:704:14  | getIsuIcon               | SELECT | isu                    | cdb7deeb | SELECT `image` FROM `isu` WHERE `jia_user_id` = ? AND ...  |
+| 12 |   | main    | g/i/i/isucondition | main.go:750:14  | getIsuGraph              | SELECT | isu                    | 70870782 | SELECT COUNT(*) FROM `isu` WHERE `jia_user_id` = ? AND ... |
+| 13 |   | main    | g/i/i/isucondition | main.go:783:24  | generateIsuGraphResponse | SELECT | isu_condition          | d538eda6 | SELECT * FROM `isu_condition` WHERE `jia_isu_uuid` = ? ... |
+| 14 |   | main    | g/i/i/isucondition | main.go:982:14  | getIsuConditions         | SELECT | isu                    | 6d91a74d | SELECT name FROM `isu` WHERE `jia_isu_uuid` = ? AND ...    |
+| 15 |   | main    | g/i/i/isucondition | main.go:1011:18 | getIsuConditionsFromDB   | SELECT | isu_condition          | 976b8c07 | SELECT * FROM `isu_condition` WHERE `jia_isu_uuid` = ? ... |
+| 16 |   | main    | g/i/i/isucondition | main.go:1018:18 | getIsuConditionsFromDB   | SELECT | isu_condition          | a30d8213 | SELECT * FROM `isu_condition` WHERE `jia_isu_uuid` = ? ... |
+| 17 |   | main    | g/i/i/isucondition | main.go:1081:18 | getTrend                 | SELECT | isu                    | eee9c067 | SELECT `character` FROM `isu` GROUP BY `character`         |
+| 18 |   | main    | g/i/i/isucondition | main.go:1091:18 | getTrend                 | SELECT | isu                    | b16bc842 | SELECT * FROM `isu` WHERE `character` = ?                  |
+| 19 |   | main    | g/i/i/isucondition | main.go:1105:19 | getTrend                 | SELECT | isu_condition          | d5ba46d0 | SELECT * FROM `isu_condition` WHERE `jia_isu_uuid` = ? ... |
+| 20 |   | main    | g/i/i/isucondition | main.go:1189:14 | postIsuCondition         | SELECT | isu                    | 8e70e008 | SELECT COUNT(*) FROM `isu` WHERE `jia_isu_uuid` = ?        |
+| 21 |   | main    | g/i/i/isucondition | main.go:1205:19 | postIsuCondition         | INSERT | isu_condition          | 61683274 | INSERT INTO `isu_condition` (`jia_isu_uuid`, ...           |
++----+---+---------+--------------------+-----------------+--------------------------+--------+------------------------+----------+------------------------------------------------------------+

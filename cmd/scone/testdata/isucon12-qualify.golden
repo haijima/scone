@@ -1,0 +1,27 @@
++----+---+----------+--------------+---------------------+-----------------------------+---------+---------------+----------+--------------------------------------------------------------+
+| #  | * | PACKAGE  | PACKAGE PATH |        FILE         |          FUNCTION           |  TYPE   |    TABLES     |   HASH   |                            QUERY                             |
++----+---+----------+--------------+---------------------+-----------------------------+---------+---------------+----------+--------------------------------------------------------------+
+|  1 |   | isuports | g/i/i/w/go   | isuports.go:106:34  | dispenseID                  | REPLACE | id_generator  | f686bf6b | REPLACE INTO id_generator (stub) VALUES (?);                 |
+|  2 |   | isuports | g/i/i/w/go   | isuports.go:336:30  | retrieveTenantRowFromHeader | SELECT  | tenant        | b0984cad | SELECT * FROM tenant WHERE name = ?                          |
+|  3 |   | isuports | g/i/i/w/go   | isuports.go:373:31  | retrievePlayer              | SELECT  | player        | 16186a0b | SELECT * FROM player WHERE id = ?                            |
+|  4 |   | isuports | g/i/i/w/go   | isuports.go:407:31  | retrieveCompetition         | SELECT  | competition   | d70772b1 | SELECT * FROM competition WHERE id = ?                       |
+|  5 |   | isuports | g/i/i/w/go   | isuports.go:472:39  | tenantsAddHandler           | INSERT  | tenant        | 1888ab60 | INSERT INTO tenant (name, display_name, created_at, ...      |
+|  6 |   | isuports | g/i/i/w/go   | isuports.go:549:33  | billingReportByCompetition  | SELECT  | visit_history | 877dfcc2 | SELECT player_id, MIN(created_at) AS min_created_at FROM ... |
+|  7 |   | isuports | g/i/i/w/go   | isuports.go:576:34  | billingReportByCompetition  | SELECT  | player_score  | e4980f2e | SELECT DISTINCT(player_id) FROM player_score WHERE ...       |
+|  8 |   | isuports | g/i/i/w/go   | isuports.go:661:33  | tenantsBillingHandler       | SELECT  | tenant        | ac92d547 | SELECT * FROM tenant ORDER BY id DESC                        |
+|  9 |   | isuports | g/i/i/w/go   | isuports.go:681:36  | tenantsBillingHandler$1     | SELECT  | competition   | 90e2df06 | SELECT * FROM competition WHERE tenant_id=?                  |
+| 10 |   | isuports | g/i/i/w/go   | isuports.go:743:34  | playersListHandler          | SELECT  | player        | bf095adf | SELECT * FROM player WHERE tenant_id=? ORDER BY ...          |
+| 11 |   | isuports | g/i/i/w/go   | isuports.go:802:36  | playersAddHandler           | INSERT  | player        | e66faa51 | INSERT INTO player (id, tenant_id, display_name, ...         |
+| 12 |   | isuports | g/i/i/w/go   | isuports.go:854:35  | playerDisqualifiedHandler   | UPDATE  | player        | b7021056 | UPDATE player SET is_disqualified = ?, updated_at = ? ...    |
+| 13 |   | isuports | g/i/i/w/go   | isuports.go:918:35  | competitionsAddHandler      | INSERT  | competition   | d984a73a | INSERT INTO competition (id, tenant_id, title, ...           |
+| 14 |   | isuports | g/i/i/w/go   | isuports.go:971:35  | competitionFinishHandler    | UPDATE  | competition   | f9053e84 | UPDATE competition SET finished_at = ?, updated_at = ? ...   |
+| 15 |   | isuports | g/i/i/w/go   | isuports.go:1101:35 | competitionScoreHandler     | DELETE  | player_score  | 4f802826 | DELETE FROM player_score WHERE tenant_id = ? AND ...         |
+| 16 |   | isuports | g/i/i/w/go   | isuports.go:1110:41 | competitionScoreHandler     | INSERT  | player_score  | c1e8f44e | INSERT INTO player_score (id, tenant_id, player_id, ...      |
+| 17 |   | isuports | g/i/i/w/go   | isuports.go:1153:34 | billingHandler              | SELECT  | competition   | 3a542069 | SELECT * FROM competition WHERE tenant_id=? ORDER BY ...     |
+| 18 |   | isuports | g/i/i/w/go   | isuports.go:1225:34 | playerHandler               | SELECT  | competition   | c0b4b175 | SELECT * FROM competition WHERE tenant_id = ? ORDER BY ...   |
+| 19 |   | isuports | g/i/i/w/go   | isuports.go:1243:32 | playerHandler               | SELECT  | player_score  | 8da9ca2e | SELECT * FROM player_score WHERE tenant_id = ? AND ...       |
+| 20 |   | isuports | g/i/i/w/go   | isuports.go:1339:30 | competitionRankingHandler   | SELECT  | tenant        | 4b5cacd1 | SELECT * FROM tenant WHERE id = ?                            |
+| 21 |   | isuports | g/i/i/w/go   | isuports.go:1343:34 | competitionRankingHandler   | INSERT  | visit_history | 70207bdc | INSERT INTO visit_history (player_id, tenant_id, ...         |
+| 22 |   | isuports | g/i/i/w/go   | isuports.go:1369:34 | competitionRankingHandler   | SELECT  | player_score  | a8dbc6e7 | SELECT * FROM player_score WHERE tenant_id = ? AND ...       |
+| 23 |   | isuports | g/i/i/w/go   | isuports.go:1489:34 | competitionsHandler         | SELECT  | competition   | 3a542069 | SELECT * FROM competition WHERE tenant_id=? ORDER BY ...     |
++----+---+----------+--------------+---------------------+-----------------------------+---------+---------------+----------+--------------------------------------------------------------+

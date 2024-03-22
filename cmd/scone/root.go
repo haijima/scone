@@ -11,7 +11,6 @@ func NewRootCmd(v *viper.Viper, fs afero.Fs) *cobra.Command {
 	cmd := cobrax.NewRoot(v)
 	cmd.Use = "scone"
 	cmd.Short = "scone is a static analysis tool for SQL"
-	cmd.Version = cobrax.VersionFunc()
 	cmd.PersistentPreRunE = func(cmd *cobra.Command, args []string) error {
 		return cobrax.RootPersistentPreRunE(cmd, v, fs, args)
 	}

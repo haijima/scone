@@ -16,8 +16,15 @@ import (
 	"github.com/spf13/viper"
 )
 
-var v *viper.Viper
-var rootCmd *cobra.Command
+var (
+	// https://goreleaser.com/cookbooks/using-main.version/
+	version string
+	commit  string
+	date    string
+
+	v       *viper.Viper
+	rootCmd *cobra.Command
+)
 
 func init() {
 	cobra.OnInitialize(func() {
@@ -37,6 +44,7 @@ func main() {
 	fs := afero.NewOsFs()
 	v.SetFs(fs)
 	rootCmd = NewRootCmd(v, fs)
+	rootCmd.Version = cobrax.VersionFunc(version, commit, date)
 	rootCmd.SetOut(colorable.NewColorableStdout())
 	rootCmd.SetErr(colorable.NewColorableStderr())
 	rootCmd.SetContext(context.Background())

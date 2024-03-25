@@ -34,7 +34,8 @@ func TestGetFuncInfo(t *testing.T) {
 		{"anonymous static function call", "anonymousStaticFunc", 0, "github.com/haijima/scone/test", "", "anonymousStaticFunc$1"},
 		{"generics static function call", "genericsStaticFunc", 0, "github.com/haijima/scone/test", "", "foo"},
 		{"dynamic function call", "dynamicFuncCall", 0, "", "", "fn"},
-		{"dynamic function call", "dynamicFuncCall2", 1, "", "", "getCallable"},
+		{"dynamic function call", "dynamicFuncCall2", 0, "", "", "callableVar"},
+		{"dynamic function call", "dynamicFuncCall3", 1, "", "", "getCallable"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

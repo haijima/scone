@@ -15,6 +15,7 @@ func main() {
 	builtinDynamicMethod(errors.New("error"))
 	dynamicFuncCall(func() string { return "foo" })
 	dynamicFuncCall2()
+	dynamicFuncCall3()
 	genericsStaticFunc()
 }
 
@@ -45,7 +46,13 @@ func dynamicFuncCall(fn func() string) {
 	fmt.Println(fn())
 }
 
+var callableVar = func() string { return "foo" }
+
 func dynamicFuncCall2() {
+	fmt.Println(callableVar())
+}
+
+func dynamicFuncCall3() {
 	c := getCallable()
 	fmt.Println(c())
 }

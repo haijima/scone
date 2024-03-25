@@ -275,6 +275,14 @@ func GetFuncInfo(common *ssa.CallCommon) (funcInfo *FuncInfo, ok bool) {
 			//     fmt.Println(c())  // <--- c() is dynamic function call
 			// }
 			return &FuncInfo{PkgPath: "", RcvName: "", FuncName: fn.Call.Value.Name()}, true
+		case *ssa.UnOp:
+			// dynamic function call
+			// e.g.
+			// var callableVar = func() string { return "foo" }
+			// func foo() {
+			//     fmt.Println(callableVar())  // <--- callableVar() is dynamic function call
+			// }
+			return &FuncInfo{PkgPath: "", RcvName: "", FuncName: fn.X.Name()}, true
 		default:
 			// dynamic function call
 			return &FuncInfo{PkgPath: "", RcvName: "", FuncName: fn.Name()}, true

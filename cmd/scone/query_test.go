@@ -32,7 +32,7 @@ func Test_runQuery(t *testing.T) {
 			assert.NoError(t, err)
 
 			g := goldie.New(t)
-			g.Assert(t, tt, buf.Bytes())
+			g.Assert(t, tt+".query", buf.Bytes())
 		})
 	}
 }

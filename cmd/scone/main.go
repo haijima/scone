@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"fmt"
 	"log/slog"
 	"os"
@@ -18,12 +17,9 @@ import (
 
 var (
 	// https://goreleaser.com/cookbooks/using-main.version/
-	version string
-	commit  string
-	date    string
+	version, commit, date string
 
-	v       *viper.Viper
-	rootCmd *cobra.Command
+	v *viper.Viper
 )
 
 func init() {
@@ -32,7 +28,7 @@ func init() {
 		color.NoColor = color.NoColor || v.GetBool("no-color")
 		// Set Logger
 		lv := cobrax.VerbosityLevel(v)
-		l := slog.New(tint.NewHandler(rootCmd.ErrOrStderr(), &tint.Options{Level: lv, AddSource: lv < slog.LevelDebug, NoColor: color.NoColor, TimeFormat: time.Kitchen}))
+		l := slog.New(tint.NewHandler(colorable.NewColorableStderr(), &tint.Options{Level: lv, AddSource: lv < slog.LevelDebug, NoColor: color.NoColor, TimeFormat: time.Kitchen}))
 		slog.SetDefault(l)
 		cobrax.SetLogger(l)
 	})
@@ -43,11 +39,10 @@ func main() {
 	v = viper.NewWithOptions(viper.WithLogger(slog.Default()))
 	fs := afero.NewOsFs()
 	v.SetFs(fs)
-	rootCmd = NewRootCmd(v, fs)
+	rootCmd := NewRootCmd(v, fs)
 	rootCmd.Version = cobrax.VersionFunc(version, commit, date)
 	rootCmd.SetOut(colorable.NewColorableStdout())
 	rootCmd.SetErr(colorable.NewColorableStderr())
-	rootCmd.SetContext(context.Background())
 	if err := rootCmd.Execute(); err != nil {
 		if slog.Default().Enabled(rootCmd.Context(), slog.LevelDebug) {
 			slog.Error(fmt.Sprintf("%+v", err))

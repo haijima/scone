@@ -4,7 +4,6 @@ import (
 	"go/ast"
 	"go/constant"
 	"go/token"
-	"log/slog"
 	"regexp"
 	"slices"
 	"strconv"
@@ -29,7 +28,6 @@ func ValueToStrings(v ssa.Value) ([]string, bool) {
 
 func valueToStrings(v ssa.Value, depth int) ([]string, bool) {
 	if depth > 10 {
-		slog.Debug("valueToStrings: too deep", slog.Any("value", v))
 		return []string{}, false
 	}
 	depth++

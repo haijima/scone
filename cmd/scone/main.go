@@ -4,14 +4,10 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
-	"time"
 
-	"github.com/fatih/color"
 	"github.com/haijima/cobrax"
-	"github.com/lmittmann/tint"
 	"github.com/mattn/go-colorable"
 	"github.com/spf13/afero"
-	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
 
@@ -22,20 +18,7 @@ var (
 	v *viper.Viper
 )
 
-func init() {
-	cobra.OnInitialize(func() {
-		// Colorization settings
-		color.NoColor = color.NoColor || v.GetBool("no-color")
-		// Set Logger
-		lv := cobrax.VerbosityLevel(v)
-		l := slog.New(tint.NewHandler(colorable.NewColorableStderr(), &tint.Options{Level: lv, AddSource: lv < slog.LevelDebug, NoColor: color.NoColor, TimeFormat: time.Kitchen}))
-		slog.SetDefault(l)
-		cobrax.SetLogger(l)
-	})
-}
-
 func main() {
-	slog.SetLogLoggerLevel(slog.LevelError)
 	v = viper.NewWithOptions(viper.WithLogger(slog.Default()))
 	fs := afero.NewOsFs()
 	v.SetFs(fs)

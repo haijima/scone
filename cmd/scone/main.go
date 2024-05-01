@@ -11,15 +11,11 @@ import (
 	"github.com/spf13/viper"
 )
 
-var (
-	// https://goreleaser.com/cookbooks/using-main.version/
-	version, commit, date string
-
-	v *viper.Viper
-)
+// https://goreleaser.com/cookbooks/using-main.version/
+var version, commit, date string
 
 func main() {
-	v = viper.NewWithOptions(viper.WithLogger(slog.Default()))
+	v := viper.NewWithOptions(viper.WithLogger(slog.Default()))
 	fs := afero.NewOsFs()
 	v.SetFs(fs)
 	rootCmd := NewRootCmd(v, fs)

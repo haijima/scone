@@ -1,5 +1,5 @@
 +----+---+----------+--------------+---------------------+-----------------------------+---------+---------------+----------+--------------------------------------------------------------+
-| #  | * | PACKAGE  | PACKAGE PATH |        FILE         |          FUNCTION           |  TYPE   |    TABLES     |   HASH   |                            QUERY                             |
+|  # | * | PACKAGE  | PACKAGE PATH | FILE                | FUNCTION                    | TYPE    | TABLES        | HASH     | QUERY                                                        |
 +----+---+----------+--------------+---------------------+-----------------------------+---------+---------------+----------+--------------------------------------------------------------+
 |  1 |   | isuports | g/i/i/w/go   | isuports.go:106:34  | dispenseID                  | REPLACE | id_generator  | f686bf6b | REPLACE INTO id_generator (stub) VALUES (?);                 |
 |  2 |   | isuports | g/i/i/w/go   | isuports.go:336:30  | retrieveTenantRowFromHeader | SELECT  | tenant        | b0984cad | SELECT * FROM tenant WHERE name = ?                          |

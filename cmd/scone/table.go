@@ -11,10 +11,9 @@ import (
 	mapset "github.com/deckarep/golang-set/v2"
 	"github.com/fatih/color"
 	"github.com/haijima/scone/internal/analysis"
-	internalio "github.com/haijima/scone/internal/io"
 	"github.com/haijima/scone/internal/sql"
 	"github.com/haijima/scone/internal/util"
-	"github.com/olekukonko/tablewriter"
+	prettyTable "github.com/jedib0t/go-pretty/v6/table"
 	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -167,17 +166,22 @@ func printTableResult(w io.Writer, table *sql.Table, queryResults analysis.Query
 		return err
 	}
 
-	// Print queries by TablePrinter
-	p := internalio.NewSimplePrinter(w, internalio.WithColWidth(tablewriter.MAX_ROW_WIDTH*5), internalio.WithAutoWrapText(true))
-	p.SetHeader([]string{"", "#", "file", "function", "t", "query"})
+	// Print queries
+	t := prettyTable.NewWriter()
+	t.SetOutputMirror(w)
+	t.Style().Options.DrawBorder = false
+	t.Style().Options.SeparateHeader = false
+	t.Style().Options.SeparateRows = false
+	t.Style().Box.MiddleVertical = " "
+	t.AppendHeader(prettyTable.Row{"", "#", "file", "function", "t", "query"})
 	for i, qr := range qrs {
 		for _, q := range qr.Queries() {
 			if slices.Contains(q.Tables, table.Name) {
-				p.AddRow([]string{"   ", strconv.Itoa(i + 1), qr.Meta.FLC(), qr.Meta.Func.Name(), q.Kind.Color(q.Kind.CRUD()), q.Raw})
+				t.AppendRow(prettyTable.Row{"   ", strconv.Itoa(i + 1), qr.Meta.FLC(), qr.Meta.Func.Name(), q.Kind.Color(q.Kind.CRUD()), q.Raw})
 			}
 		}
 	}
-	p.Print()
+	t.Render()
 	return nil
 }
 

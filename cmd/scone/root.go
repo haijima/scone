@@ -34,7 +34,6 @@ func NewRootCmd(v *viper.Viper, fs afero.Fs) *cobra.Command {
 		if err := v.BindPFlags(cmd.Flags()); err != nil {
 			return err
 		}
-
 		slog.Debug("bind flags and config values")
 		slog.Debug(cobrax.DebugViper(v))
 		return nil

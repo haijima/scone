@@ -1,5 +1,5 @@
 +----+---+---------+--------------+----------------+----------------------------------+---------+--------+----------+--------------------------------------------------------------+
-| #  | * | PACKAGE | PACKAGE PATH |      FILE      |             FUNCTION             |  TYPE   | TABLES |   HASH   |                            QUERY                             |
+|  # | * | PACKAGE | PACKAGE PATH | FILE           | FUNCTION                         | TYPE    | TABLES | HASH     | QUERY                                                        |
 +----+---+---------+--------------+----------------+----------------------------------+---------+--------+----------+--------------------------------------------------------------+
 |  1 |   | main    | g/i/i/isuumo | main.go:325:14 | getChairDetail                   | SELECT  | chair  | d9075d8e | SELECT * FROM chair WHERE id = ?                             |
 |  2 |   | main    | g/i/i/isuumo | main.go:384:20 | postChair                        | INSERT  | chair  | 72c1b045 | INSERT INTO chair(id, name, description, thumbnail, ...      |

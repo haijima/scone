@@ -1,5 +1,5 @@
 +----+---+---------+--------------------+-----------------+--------------------------+--------+------------------------+----------+------------------------------------------------------------+
-| #  | * | PACKAGE |    PACKAGE PATH    |      FILE       |         FUNCTION         |  TYPE  |         TABLES         |   HASH   |                           QUERY                            |
+|  # | * | PACKAGE | PACKAGE PATH       | FILE            | FUNCTION                 | TYPE   | TABLES                 | HASH     | QUERY                                                      |
 +----+---+---------+--------------------+-----------------+--------------------------+--------+------------------------+----------+------------------------------------------------------------+
 |  1 |   | main    | g/i/i/isucondition | main.go:281:14  | getUserIDFromSession     | SELECT | user                   | b35985f4 | SELECT COUNT(*) FROM `user` WHERE `jia_user_id` = ?        |
 |  2 |   | main    | g/i/i/isucondition | main.go:296:15  | getJIAServiceURL         | SELECT | isu_association_config | f0b11e1a | SELECT * FROM `isu_association_config` WHERE `name` = ?    |

@@ -7,9 +7,9 @@ require (
 	github.com/deckarep/golang-set/v2 v2.6.0
 	github.com/fatih/color v1.16.0
 	github.com/haijima/cobrax v0.3.1
+	github.com/jedib0t/go-pretty/v6 v6.5.8
 	github.com/lmittmann/tint v1.0.4
 	github.com/mattn/go-colorable v0.1.13
-	github.com/olekukonko/tablewriter v0.0.5
 	github.com/pingcap/tidb/pkg/parser v0.0.0-20240415145106-cd9c676e9ba4
 	github.com/sebdah/goldie/v2 v2.5.3
 	github.com/spf13/afero v1.11.0

@@ -1,5 +1,5 @@
 +-----+---+---------+--------------+-----------------+-------------------------------+--------+-----------------------------------+----------+--------------------------------------------------------------+
-|  #  | * | PACKAGE | PACKAGE PATH |      FILE       |           FUNCTION            |  TYPE  |              TABLES               |   HASH   |                            QUERY                             |
+|   # | * | PACKAGE | PACKAGE PATH | FILE            | FUNCTION                      | TYPE   | TABLES                            | HASH     | QUERY                                                        |
 +-----+---+---------+--------------+-----------------+-------------------------------+--------+-----------------------------------+----------+--------------------------------------------------------------+
 |   1 |   | main    | g/i/i/w/go   | admin.go:25:21  | adminSessionCheckMiddleware$1 | SELECT | admin_sessions                    | 360e08eb | SELECT * FROM admin_sessions WHERE session_id=? AND ...      |
 |   2 |   | main    | g/i/i/w/go   | admin.go:39:25  | adminSessionCheckMiddleware$1 | UPDATE | admin_sessions                    | 751243ea | UPDATE admin_sessions SET deleted_at=? WHERE session_id=?    |

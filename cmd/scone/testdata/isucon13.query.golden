@@ -1,5 +1,5 @@
 +----+---+---------+--------------+-------------------------------+--------------------------------+--------+-----------------------------------------+----------+--------------------------------------------------------------+
-| #  | * | PACKAGE | PACKAGE PATH |             FILE              |            FUNCTION            |  TYPE  |                 TABLES                  |   HASH   |                            QUERY                             |
+|  # | * | PACKAGE | PACKAGE PATH | FILE                          | FUNCTION                       | TYPE   | TABLES                                  | HASH     | QUERY                                                        |
 +----+---+---------+--------------+-------------------------------+--------------------------------+--------+-----------------------------------------+----------+--------------------------------------------------------------+
 |  1 | P | main    | g/i/i/w/go   | livecomment_handler.go:87:2   | getLivecommentsHandler         | SELECT | livecomments                            | 72e92fbb | SELECT * FROM livecomments WHERE livestream_id = ? ORDER ... |
 |  2 |   | main    | g/i/i/w/go   | livecomment_handler.go:146:28 | getNgwords                     | SELECT | ng_words                                | 684b565f | SELECT * FROM ng_words WHERE user_id = ? AND ...             |

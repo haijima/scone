@@ -4,15 +4,13 @@ import (
 	"fmt"
 	"regexp"
 	"slices"
-	"strconv"
 	"strings"
 
 	"github.com/cockroachdb/errors"
 	mapset "github.com/deckarep/golang-set/v2"
 	"github.com/haijima/scone/internal/analysis"
-	internalio "github.com/haijima/scone/internal/io"
 	"github.com/haijima/scone/internal/sql"
-	"github.com/olekukonko/tablewriter"
+	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -78,22 +76,20 @@ func runQuery(cmd *cobra.Command, v *viper.Viper) error {
 		}
 	}
 
-	var p internalio.TablePrinter
-	if format == "table" {
-		includeRawQuery := printOpt.Cols != nil && slices.Contains(printOpt.Cols, slices.Index(headerColumns, "raw-query"))
-		p = internalio.NewTablePrinter(cmd.OutOrStdout(), internalio.WithColWidth(tablewriter.MAX_ROW_WIDTH*4), internalio.WithAutoWrapText(includeRawQuery))
-	} else if format == "md" {
-		p = internalio.NewMarkdownPrinter(cmd.OutOrStdout())
-	} else if format == "simple" {
-		p = internalio.NewSimplePrinter(cmd.OutOrStdout())
-	} else if format == "csv" {
-		p = internalio.NewCSVPrinter(cmd.OutOrStdout())
-	} else if format == "tsv" {
-		p = internalio.NewTSVPrinter(cmd.OutOrStdout())
-	}
+	t := table.NewWriter()
+	t.SetOutputMirror(cmd.OutOrStdout())
 
 	if !printOpt.NoHeader {
-		p.SetHeader(makeHeader(printOpt))
+		var header table.Row
+		if printOpt.NoRowNum {
+			header = table.Row{"*"}
+		} else {
+			header = table.Row{"#", "*"}
+		}
+		for _, col := range printOpt.Cols {
+			header = append(header, strings.ReplaceAll(headerColumns[col], "-", " "))
+		}
+		t.AppendHeader(header)
 	}
 	for i, qr := range queryResults {
 		for j, q := range qr.Queries() {
@@ -104,18 +100,34 @@ func runQuery(cmd *cobra.Command, v *viper.Viper) error {
 				r[0] = "P"
 			}
 			if qr.Meta.FromComment {
-				r[0] += "C"
+				r[0] = fmt.Sprintf("%sC", r[0])
 			}
 			if !printOpt.NoRowNum {
-				r = slices.Insert(r, 0, strconv.Itoa(i+1))
+				r = append(table.Row{i + 1}, r...)
 			}
-			p.AddRow(r)
+			t.AppendRow(r)
 			if !expandQueryGroup {
 				break // only print the first query in the group
 			}
 		}
 	}
-	p.Print()
+
+	switch format {
+	case "table":
+		t.Render()
+	case "md":
+		t.RenderMarkdown()
+	case "csv":
+		t.RenderCSV()
+	case "tsv":
+		t.RenderCSV()
+	case "simple":
+		t.Style().Options.DrawBorder = false
+		t.Style().Options.SeparateHeader = false
+		t.Style().Options.SeparateRows = false
+		t.Style().Box.MiddleVertical = " "
+		t.Render()
+	}
 	return nil
 }
 
@@ -146,19 +158,7 @@ type PrintQueryOption struct {
 	ShowFullPackagePath bool
 }
 
-func makeHeader(opt *PrintQueryOption) []string {
-	header := make([]string, 0, len(opt.Cols)+2)
-	if !opt.NoRowNum {
-		header = append(header, "#")
-	}
-	header = append(header, "*")
-	for _, col := range opt.Cols {
-		header = append(header, strings.ReplaceAll(headerColumns[col], "-", " "))
-	}
-	return header
-}
-
-func row(q *sql.Query, meta *analysis.Meta, opt *PrintQueryOption) []string {
+func row(q *sql.Query, meta *analysis.Meta, opt *PrintQueryOption) table.Row {
 	fullRow := []string{
 		meta.Package().Name(),
 		abbreviatePackagePath(meta.Package().Path(), opt),
@@ -170,7 +170,7 @@ func row(q *sql.Query, meta *analysis.Meta, opt *PrintQueryOption) []string {
 		q.String(),
 		q.Raw,
 	}
-	res := make([]string, 0, len(opt.Cols))
+	var res table.Row
 	for _, col := range opt.Cols {
 		res = append(res, fullRow[col])
 	}

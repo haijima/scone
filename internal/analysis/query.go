@@ -6,7 +6,8 @@ import (
 	"log/slog"
 	"slices"
 
-	"github.com/haijima/scone/internal/analysis/analysisutil"
+	"github.com/haijima/analysisutil/astutil"
+	"github.com/haijima/analysisutil/ssautil"
 	"github.com/haijima/scone/internal/sql"
 	"golang.org/x/tools/go/analysis/passes/buildssa"
 	"golang.org/x/tools/go/ssa"
@@ -29,15 +30,15 @@ func ExtractQuery(ctx context.Context, ssaProg *buildssa.SSA, files []*ast.File,
 
 func handleComments(ctx context.Context, ssaProg *buildssa.SSA, files []*ast.File, opt *Option) []*QueryResult {
 	foundQueryResults := make([]*QueryResult, 0)
-	analysisutil.WalkCommentGroup(ssaProg.Pkg.Prog.Fset, files, func(n ast.Node, cg *ast.CommentGroup) bool {
+	astutil.WalkCommentGroup(ssaProg.Pkg.Prog.Fset, files, func(n ast.Node, cg *ast.CommentGroup) bool {
 		qr := NewQueryResult(NewMeta(&ssa.Function{}, cg.Pos()))
 		qr.Meta.FromComment = true
-		if i := slices.IndexFunc(ssaProg.SrcFuncs, func(fn *ssa.Function) bool { return analysisutil.Include(fn.Syntax(), n) }); i >= 0 {
+		if i := slices.IndexFunc(ssaProg.SrcFuncs, func(fn *ssa.Function) bool { return astutil.Include(fn.Syntax(), n) }); i >= 0 {
 			qr.Meta.Func = ssaProg.SrcFuncs[i]
 			qr.Meta.Pos = append(qr.Meta.Pos, ssaProg.SrcFuncs[i].Pos())
 		}
 		for _, comment := range cg.List {
-			v, arg, _ := analysisutil.GetCommentVerb(comment, "scone")
+			v, arg, _ := astutil.GetCommentVerb(comment, "scone")
 			switch v {
 			case "sql":
 				if q, ok := sql.ParseString(arg); ok && opt.Filter(q, qr.Meta) {
@@ -67,7 +68,7 @@ func AnalyzeFunc(ctx context.Context, fn *ssa.Function, opt *Option) QueryResult
 	for _, block := range fn.Blocks {
 		for _, instr := range block.Instrs {
 			// 1. Check if the instruction is a call
-			callCommon, ok := analysisutil.InstrToCallCommon(instr)
+			callCommon, ok := ssautil.InstrToCallCommon(instr)
 			if !ok || seen[callCommon] {
 				continue
 			}
@@ -77,11 +78,12 @@ func AnalyzeFunc(ctx context.Context, fn *ssa.Function, opt *Option) QueryResult
 			targetArg, ok := CheckIfTargetFunction(ctx, callCommon, opt)
 			if !ok {
 				if slog.Default().Enabled(ctx, slog.LevelWarn) {
-					for _, arg := range callCommon.Args {
-						if strs, ok := analysisutil.ValueToStrings(arg); ok {
+					c := ssautil.GetCallInfo(callCommon)
+					for i := 0; i < c.ArgsLen(); i++ {
+						if strs, ok := ssautil.ValueToStrings(c.Arg(i)); ok {
 							for _, str := range strs {
 								if q, ok := sql.ParseString(str); ok {
-									meta := NewMeta(fn, arg.Pos(), callCommon.Pos(), instr.Pos(), fn.Pos())
+									meta := NewMeta(fn, c.Arg(i).Pos(), callCommon.Pos(), instr.Pos(), fn.Pos())
 									slog.WarnContext(ctx, "Found a query in a non-target function", slog.Any("call", callCommon), slog.Any("SQL", q), slog.Any("analysis", meta))
 								}
 							}
@@ -107,7 +109,7 @@ func valueToValidQuery(ctx context.Context, v ssa.Value, opt *Option, meta *Meta
 
 	// 3-1. ssa.Value to string constants.
 	// Returns a slice considering the case where the argument value is a Phi node.
-	strs, ok := analysisutil.ValueToStrings(v)
+	strs, ok := ssautil.ValueToStrings(v)
 	if !ok {
 		if reason := unknownQueryIfNotSkipped(v, opt, meta); reason != "" {
 			slog.InfoContext(ctx, "Failed to convert ssa.Value to string constants: but warning is suppressed", slog.String("reason", string(reason)), slog.Any("value", v), slog.Any("analysis", meta))
@@ -118,6 +120,8 @@ func valueToValidQuery(ctx context.Context, v ssa.Value, opt *Option, meta *Meta
 	}
 
 	qr := NewQueryResult(meta)
+	slices.Sort(strs)
+	strs = slices.Compact(strs)
 	for _, str := range strs {
 		// 3-2. Convert string constants to sql.Query
 		q, ok := sql.ParseString(str)
@@ -141,50 +145,86 @@ func valueToValidQuery(ctx context.Context, v ssa.Value, opt *Option, meta *Meta
 	return qr
 }
 
-type methodArg struct {
-	Package  string
-	Method   string
-	ArgIndex int
+type TargetCall struct {
+	NamePattern string // function name pattern
+	ArgIndex    int
 }
 
-var targetMethods = []methodArg{
-	{Package: "database/sql", Method: "ExecContext", ArgIndex: 1},
-	{Package: "database/sql", Method: "Exec", ArgIndex: 0},
-	{Package: "database/sql", Method: "QueryContext", ArgIndex: 1},
-	{Package: "database/sql", Method: "Query", ArgIndex: 0},
-	{Package: "database/sql", Method: "QueryRowContext", ArgIndex: 1},
-	{Package: "database/sql", Method: "QueryRow", ArgIndex: 0},
-	{Package: "github.com/jmoiron/sqlx", Method: "Exec", ArgIndex: 0},
-	{Package: "github.com/jmoiron/sqlx", Method: "Rebind", ArgIndex: 0},
-	{Package: "github.com/jmoiron/sqlx", Method: "BindNamed", ArgIndex: 0},
-	{Package: "github.com/jmoiron/sqlx", Method: "NamedQuery", ArgIndex: 0},
-	{Package: "github.com/jmoiron/sqlx", Method: "NamedExec", ArgIndex: 0},
-	{Package: "github.com/jmoiron/sqlx", Method: "Select", ArgIndex: 1},
-	{Package: "github.com/jmoiron/sqlx", Method: "Get", ArgIndex: 1},
-	{Package: "github.com/jmoiron/sqlx", Method: "Queryx", ArgIndex: 0},
-	{Package: "github.com/jmoiron/sqlx", Method: "QueryRowx", ArgIndex: 0},
-	{Package: "github.com/jmoiron/sqlx", Method: "MustExec", ArgIndex: 0},
-	{Package: "github.com/jmoiron/sqlx", Method: "Preparex", ArgIndex: 0},
-	{Package: "github.com/jmoiron/sqlx", Method: "PrepareNamed", ArgIndex: 0},
-	{Package: "github.com/jmoiron/sqlx", Method: "PreparexContext", ArgIndex: 1},
-	{Package: "github.com/jmoiron/sqlx", Method: "PrepareNamedContext", ArgIndex: 1},
-	{Package: "github.com/jmoiron/sqlx", Method: "MustExecContext", ArgIndex: 1},
-	{Package: "github.com/jmoiron/sqlx", Method: "QueryxContext", ArgIndex: 1},
-	{Package: "github.com/jmoiron/sqlx", Method: "SelectContext", ArgIndex: 2},
-	{Package: "github.com/jmoiron/sqlx", Method: "GetContext", ArgIndex: 2},
-	{Package: "github.com/jmoiron/sqlx", Method: "QueryRowxContext", ArgIndex: 1},
-	{Package: "github.com/jmoiron/sqlx", Method: "NamedExecContext", ArgIndex: 1},
-	{Package: "github.com/jmoiron/sqlx", Method: "ExecContext", ArgIndex: 1},
-	{Package: "github.com/jmoiron/sqlx", Method: "In", ArgIndex: -1},
+// Use knife to cut the target function.
+// knife -template knife.template database/sql | sort | uniq
+// knife -template knife.template github.com/jmoiron/sqlx | sort | uniq
+var targetCalls = []TargetCall{
+	{NamePattern: "(*database/sql.*).Exec", ArgIndex: 0},
+	{NamePattern: "(*database/sql.*).ExecContext", ArgIndex: 1},
+	{NamePattern: "(*database/sql.*).Prepare", ArgIndex: 0},
+	{NamePattern: "(*database/sql.*).PrepareContext", ArgIndex: 1},
+	{NamePattern: "(*database/sql.*).Query", ArgIndex: 0},
+	{NamePattern: "(*database/sql.*).QueryContext", ArgIndex: 1},
+	{NamePattern: "(*database/sql.*).QueryRow", ArgIndex: 0},
+	{NamePattern: "(*database/sql.*).QueryRowContext", ArgIndex: 1},
+	{NamePattern: "(*github.com/jmoiron/sqlx.*).BindNamed", ArgIndex: 0},
+	{NamePattern: "(*github.com/jmoiron/sqlx.*).Exec", ArgIndex: 0},
+	{NamePattern: "(*github.com/jmoiron/sqlx.*).ExecContext", ArgIndex: 1},
+	{NamePattern: "(*github.com/jmoiron/sqlx.*).Get", ArgIndex: 1},
+	{NamePattern: "(*github.com/jmoiron/sqlx.*).GetContext", ArgIndex: 2},
+	{NamePattern: "(*github.com/jmoiron/sqlx.*).MustExec", ArgIndex: 0},
+	{NamePattern: "(*github.com/jmoiron/sqlx.*).MustExecContext", ArgIndex: 1},
+	{NamePattern: "(*github.com/jmoiron/sqlx.*).NamedExec", ArgIndex: 0},
+	{NamePattern: "(*github.com/jmoiron/sqlx.*).NamedExecContext", ArgIndex: 1},
+	{NamePattern: "(*github.com/jmoiron/sqlx.*).NamedQuery", ArgIndex: 0},
+	{NamePattern: "(*github.com/jmoiron/sqlx.*).NamedQueryContext", ArgIndex: 1},
+	{NamePattern: "(*github.com/jmoiron/sqlx.*).Prepare", ArgIndex: 0},
+	{NamePattern: "(*github.com/jmoiron/sqlx.*).PrepareContext", ArgIndex: 1},
+	{NamePattern: "(*github.com/jmoiron/sqlx.*).PrepareNamed", ArgIndex: 0},
+	{NamePattern: "(*github.com/jmoiron/sqlx.*).PrepareNamedContext", ArgIndex: 1},
+	{NamePattern: "(*github.com/jmoiron/sqlx.*).Preparex", ArgIndex: 0},
+	{NamePattern: "(*github.com/jmoiron/sqlx.*).PreparexContext", ArgIndex: 1},
+	{NamePattern: "(*github.com/jmoiron/sqlx.*).Query", ArgIndex: 0},
+	{NamePattern: "(*github.com/jmoiron/sqlx.*).QueryContext", ArgIndex: 1},
+	{NamePattern: "(*github.com/jmoiron/sqlx.*).QueryRow", ArgIndex: 0},
+	{NamePattern: "(*github.com/jmoiron/sqlx.*).QueryRowContext", ArgIndex: 1},
+	{NamePattern: "(*github.com/jmoiron/sqlx.*).QueryRowx", ArgIndex: 0},
+	{NamePattern: "(*github.com/jmoiron/sqlx.*).QueryRowxContext", ArgIndex: 1},
+	{NamePattern: "(*github.com/jmoiron/sqlx.*).Queryx", ArgIndex: 0},
+	{NamePattern: "(*github.com/jmoiron/sqlx.*).QueryxContext", ArgIndex: 1},
+	{NamePattern: "(*github.com/jmoiron/sqlx.*).Rebind", ArgIndex: 0},
+	{NamePattern: "(*github.com/jmoiron/sqlx.*).Select", ArgIndex: 1},
+	{NamePattern: "(*github.com/jmoiron/sqlx.*).SelectContext", ArgIndex: 2},
+	{NamePattern: "github.com/jmoiron/sqlx.*.BindNamed", ArgIndex: 0}, // not sure
+	{NamePattern: "github.com/jmoiron/sqlx.*.Exec", ArgIndex: 0},
+	{NamePattern: "github.com/jmoiron/sqlx.*.ExecContext", ArgIndex: 1},
+	{NamePattern: "github.com/jmoiron/sqlx.*.Prepare", ArgIndex: 0},
+	{NamePattern: "github.com/jmoiron/sqlx.*.PrepareContext", ArgIndex: 1},
+	{NamePattern: "github.com/jmoiron/sqlx.*.Query", ArgIndex: 0},
+	{NamePattern: "github.com/jmoiron/sqlx.*.QueryContext", ArgIndex: 1},
+	{NamePattern: "github.com/jmoiron/sqlx.*.QueryRowx", ArgIndex: 0},
+	{NamePattern: "github.com/jmoiron/sqlx.*.QueryRowxContext", ArgIndex: 1},
+	{NamePattern: "github.com/jmoiron/sqlx.*.Queryx", ArgIndex: 0},
+	{NamePattern: "github.com/jmoiron/sqlx.*.QueryxContext", ArgIndex: 1},
+	{NamePattern: "github.com/jmoiron/sqlx.*.Rebind", ArgIndex: 0}, // not sure
+	{NamePattern: "github.com/jmoiron/sqlx.BindNamed", ArgIndex: 1},
+	{NamePattern: "github.com/jmoiron/sqlx.Get", ArgIndex: 2},
+	{NamePattern: "github.com/jmoiron/sqlx.GetContext", ArgIndex: 3},
+	{NamePattern: "github.com/jmoiron/sqlx.In", ArgIndex: 0},
+	{NamePattern: "github.com/jmoiron/sqlx.MustExec", ArgIndex: 1},
+	{NamePattern: "github.com/jmoiron/sqlx.MustExecContext", ArgIndex: 2},
+	{NamePattern: "github.com/jmoiron/sqlx.Named", ArgIndex: 0},
+	{NamePattern: "github.com/jmoiron/sqlx.NamedExec", ArgIndex: 1},
+	{NamePattern: "github.com/jmoiron/sqlx.NamedExecContext", ArgIndex: 2},
+	{NamePattern: "github.com/jmoiron/sqlx.NamedQuery", ArgIndex: 1},
+	{NamePattern: "github.com/jmoiron/sqlx.NamedQueryContext", ArgIndex: 2},
+	{NamePattern: "github.com/jmoiron/sqlx.Preparex", ArgIndex: 1},
+	{NamePattern: "github.com/jmoiron/sqlx.PreparexContext", ArgIndex: 2},
+	{NamePattern: "github.com/jmoiron/sqlx.Rebind", ArgIndex: 1},
+	{NamePattern: "github.com/jmoiron/sqlx.Select", ArgIndex: 2},
+	{NamePattern: "github.com/jmoiron/sqlx.SelectContext", ArgIndex: 3},
 }
 
-func CheckIfTargetFunction(_ context.Context, c *ssa.CallCommon, opt *Option) (ssa.Value, bool) {
-	for _, t := range slices.Concat(targetMethods, opt.AdditionalFuncSlice()) {
-		if analysisutil.IsFunc(c, t.Package, t.Method) {
-			if c.IsInvoke() {
-				return c.Args[t.ArgIndex], true
-			}
-			return c.Args[t.ArgIndex+1], true // Set first argument as receiver
+func CheckIfTargetFunction(_ context.Context, call *ssa.CallCommon, opt *Option) (ssa.Value, bool) {
+	c := ssautil.GetCallInfo(call)
+	for _, t := range slices.Concat(targetCalls, opt.AdditionalFuncSlice()) {
+		if c.Match(t.NamePattern) {
+			return c.Arg(t.ArgIndex), true
 		}
 	}
 	return nil, false
@@ -198,11 +238,14 @@ func unknownQueryIfNotSkipped(v ssa.Value, opt *Option, meta *Meta) skipReason {
 	} else if !opt.Filter(&sql.Query{Kind: sql.Unknown}, meta) {
 		return "No need to warn if v is filtered out"
 	}
-	if c, ok := analysisutil.ValueToCallCommon(v); ok {
-		if analysisutil.IsFunc(c, "github.com/jmoiron/sqlx", "Rebind") {
-			return "No need to warn if v is the result of sqlx.Rebind()"
-		} else if analysisutil.IsFunc(c, "github.com/jmoiron/sqlx", "In") {
-			return "No need to warn if v is the result of sqlx.In()"
+	if call, ok := ssautil.ValueToCallCommon(v); ok {
+		switch ssautil.GetCallInfo(call).Name() {
+		case "(*github.com/jmoiron/sqlx.*).BindNamed", "github.com/jmoiron/sqlx.*.BindNamed", "github.com/jmoiron/sqlx.BindNamed":
+			return "No need to warn if v is the result of BindNamed()"
+		case "(*github.com/jmoiron/sqlx.*).Rebind", "github.com/jmoiron/sqlx.*.Rebind", "github.com/jmoiron/sqlx.Rebind":
+			return "No need to warn if v is the result of Rebind()"
+		case "github.com/jmoiron/sqlx.In":
+			return "No need to warn if v is the result of In()"
 		}
 	}
 	return ""

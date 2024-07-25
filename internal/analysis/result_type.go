@@ -4,11 +4,12 @@ import (
 	"go/token"
 	"go/types"
 	"log/slog"
+	"path/filepath"
 	"slices"
 	"strings"
 
 	mapset "github.com/deckarep/golang-set/v2"
-	"github.com/haijima/scone/internal/analysis/analysisutil"
+	"github.com/haijima/analysisutil/ssautil"
 	"github.com/haijima/scone/internal/sql"
 	"golang.org/x/exp/maps"
 	"golang.org/x/tools/go/ssa"
@@ -82,11 +83,11 @@ func (m *Meta) Position() token.Position {
 	if m.Func == nil {
 		return token.Position{}
 	}
-	return analysisutil.GetPosition(m.Func.Pkg, m.Pos)
+	return ssautil.GetPosition(m.Func.Pkg, m.Pos...)
 }
 
 func (m *Meta) FLC() string {
-	return analysisutil.FLC(m.Position())
+	return filepath.Base(m.Position().String())
 }
 
 func (m *Meta) Compare(other *Meta) int {

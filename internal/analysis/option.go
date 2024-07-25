@@ -82,15 +82,15 @@ func (o *Option) Filter(q *sql.Query, meta *Meta) bool {
 		(!slices.ContainsFunc(o.ExcludeQueries, func(s string) bool { return strings.HasPrefix(hash, s) }) || len(o.ExcludeQueries) == 0)
 }
 
-func (o *Option) AdditionalFuncSlice() []methodArg {
-	tms := make([]methodArg, 0)
+func (o *Option) AdditionalFuncSlice() []TargetCall {
+	tms := make([]TargetCall, 0)
 	if o.AdditionalFuncs != nil || len(o.AdditionalFuncs) > 0 {
 		for _, f := range o.AdditionalFuncs {
-			s := strings.Split(f, "#")
-			if len(s) != 3 {
+			s := strings.Split(f, "@")
+			if len(s) != 2 {
 				slog.Warn(fmt.Sprintf("Invalid format of additional function: %s", f))
-			} else if idx, err := strconv.Atoi(s[2]); err == nil {
-				tms = append(tms, methodArg{Package: s[0], Method: s[1], ArgIndex: idx})
+			} else if idx, err := strconv.Atoi(s[1]); err == nil {
+				tms = append(tms, TargetCall{NamePattern: s[0], ArgIndex: idx})
 			} else {
 				slog.Warn(fmt.Sprintf("Index of additional function should be integer: %s", f))
 			}

@@ -1,0 +1,60 @@
+{{- /* How to use */}}
+{{- /* $ knife -template knife.template database/sql | sort | uniq */}}
+{{- /* $ knife -template knife.template github.com/jmoiron/sqlx | sort | uniq */}}
+
+
+{{- $paramName := "query" }}
+{{- $paramType := "string" }}
+{{- $printFormat := "{NamePattern: %q, ArgIndex: %d}," }}
+
+
+{{- /* Static method call */}}
+
+{{- range exported .Types}}
+    {{- if ne (struct .) nil}}
+        {{- $n:=.Name}}
+        {{- range exported (methods .)}}
+            {{- $n := printf "(*%s.*).%s" $.Path .Name}}
+            {{- range $i, $p := .Signature.Params}}
+                {{- if eq $p.Name $paramName }}
+                    {{- printf $printFormat $n $i}}{{br}}
+                {{- else if and (eq $p.Name "") (eq $p.Type.String $paramType)}}
+                    {{- printf $printFormat $n $i}} // not sure{{br}}
+                {{- end}}
+            {{- end}}
+        {{- end}}
+    {{- end}}
+{{- end}}
+
+
+{{- /* Dynamic method call */}}
+
+{{- range exported .Types}}
+    {{- if ne (interface .) nil}}
+        {{- $n:=.Name}}
+        {{- range exported (methods .)}}
+            {{- $n := printf "%s.*.%s" $.Path .Name}}
+            {{- range $i, $p := .Signature.Params}}
+                {{- if eq $p.Name $paramName }}
+                    {{- printf $printFormat $n $i}}{{br}}
+                {{- else if and (eq $p.Name "") (eq $p.Type.String $paramType)}}
+                    {{- printf $printFormat $n $i}} // not sure{{br}}
+                {{- end}}
+            {{- end}}
+        {{- end}}
+    {{- end}}
+{{- end}}
+
+
+{{- /* Static function call */}}
+
+{{- range exported .Funcs}}
+    {{- $n := printf "%s.%s" $.Path .Name}}
+    {{- range $i, $p := .Signature.Params}}
+        {{- if eq $p.Name $paramName }}
+            {{- printf $printFormat $n $i}}{{br}}
+        {{- else if and (eq $p.Name "") (eq $p.Type.String $paramType)}}
+            {{- printf $printFormat $n $i}} // not sure{{br}}
+        {{- end}}
+    {{- end}}
+{{- end}}

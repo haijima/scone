@@ -9,7 +9,7 @@ import (
 	"github.com/sebdah/goldie/v2"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func Test_runQuery(t *testing.T) {
@@ -26,10 +26,10 @@ func Test_runQuery(t *testing.T) {
 			v.Set("pattern", "./...")
 			v.Set("format", "table")
 			v.Set("mode", "ssa-method")
-			v.Set("analyze-funcs", []string{"github.com/isucon/isucon12-qualify/webapp/go#GetContext#2", "github.com/isucon/isucon12-qualify/webapp/go#SelectContext#2", "github.com/isucon/isucon12-qualify/webapp/go#ExecContext#1"})
+			v.Set("analyze-funcs", []string{"github.com/isucon/isucon12-qualify/webapp/go.dbOrTx.GetContext@2", "github.com/isucon/isucon12-qualify/webapp/go.dbOrTx.SelectContext@2", "github.com/isucon/isucon12-qualify/webapp/go.dbOrTx.ExecContext@1"})
 
 			err := runQuery(cmd, v)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 
 			g := goldie.New(t)
 			g.Assert(t, tt+".query", buf.Bytes())

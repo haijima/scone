@@ -4,7 +4,8 @@ import (
 	"context"
 	"slices"
 
-	"github.com/haijima/scone/internal/analysis/analysisutil"
+	"github.com/haijima/analysisutil"
+	"github.com/haijima/analysisutil/ssautil"
 	"golang.org/x/tools/go/ssa"
 )
 
@@ -36,7 +37,7 @@ func analyzeSSA(ctx context.Context, dir, pattern string, opt *Option) (QueryRes
 
 	results := make([]*QueryResult, 0, len(pkgs))
 	for _, pkg := range pkgs {
-		ssaProg, err := analysisutil.BuildSSA(pkg)
+		ssaProg, err := ssautil.BuildSSA(pkg)
 		if err != nil {
 			return nil, err
 		}

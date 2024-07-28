@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"regexp"
 	"slices"
 	"strings"
 
@@ -161,7 +160,7 @@ type PrintQueryOption struct {
 func row(q *sql.Query, meta *analysis.Meta, opt *PrintQueryOption) table.Row {
 	fullRow := []string{
 		meta.Package().Name(),
-		abbreviatePackagePath(meta.Package().Path(), opt),
+		meta.PackagePath(!opt.ShowFullPackagePath),
 		meta.FLC(),
 		meta.Func.Name(),
 		q.Kind.ColoredString(),
@@ -175,13 +174,4 @@ func row(q *sql.Query, meta *analysis.Meta, opt *PrintQueryOption) table.Row {
 		res = append(res, fullRow[col])
 	}
 	return res
-}
-
-var pathDirRegex = regexp.MustCompile(`([^/]+)/`)
-
-func abbreviatePackagePath(path string, opt *PrintQueryOption) string {
-	if opt.ShowFullPackagePath {
-		return path
-	}
-	return pathDirRegex.ReplaceAllStringFunc(path, func(m string) string { return m[:1] + "/" })
 }

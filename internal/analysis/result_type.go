@@ -5,6 +5,7 @@ import (
 	"go/types"
 	"log/slog"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"strings"
 
@@ -79,6 +80,15 @@ func (m *Meta) Package() *types.Package {
 	return m.Func.Pkg.Pkg
 }
 
+var pathDirRegex = regexp.MustCompile(`([^/]+)/`)
+
+func (m *Meta) PackagePath(abbreviate bool) string {
+	if abbreviate {
+		return pathDirRegex.ReplaceAllStringFunc(m.Package().Path(), func(m string) string { return m[:1] + "/" })
+	}
+	return m.Package().Path()
+}
+
 func (m *Meta) Position() token.Position {
 	if m.Func == nil {
 		return token.Position{}
@@ -107,7 +117,7 @@ func (m *Meta) Equal(other *Meta) bool {
 
 func (m *Meta) LogValue() slog.Value {
 	return slog.GroupValue(
-		slog.String("package", m.Package().Path()),
+		slog.String("package", m.PackagePath(true)),
 		slog.String("file", m.FLC()),
 		slog.String("function", m.Func.Name()),
 	)

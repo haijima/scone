@@ -119,6 +119,6 @@ func (m *Meta) LogValue() slog.Value {
 	return slog.GroupValue(
 		slog.String("package", m.PackagePath(true)),
 		slog.String("file", m.FLC()),
-		slog.String("function", m.Func.Name()),
+		slog.String("func", m.Func.Name()),
 	)
 }

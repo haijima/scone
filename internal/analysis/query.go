@@ -45,7 +45,7 @@ func handleComments(ctx context.Context, ssaProg *buildssa.SSA, files []*ast.Fil
 					qr.Append(q)
 					opt.commentedNodes = append(opt.commentedNodes, &NodeWithPackage{Node: n, Package: ssaProg.Pkg.Pkg})
 				} else {
-					slog.WarnContext(ctx, "Failed to parse string as SQL in scone:sql comment", slog.Any("string", arg), slog.Any("analysis", qr.Meta))
+					slog.WarnContext(ctx, "Failed to parse string as SQL in scone:sql comment", slog.Any("", qr.Meta), slog.Any("string", arg))
 				}
 			case "ignore":
 				opt.commentedNodes = append(opt.commentedNodes, &NodeWithPackage{Node: n, Package: ssaProg.Pkg.Pkg})
@@ -84,7 +84,7 @@ func AnalyzeFunc(ctx context.Context, fn *ssa.Function, opt *Option) QueryResult
 							for _, str := range strs {
 								if q, ok := sql.ParseString(str); ok {
 									meta := NewMeta(fn, c.Arg(i).Pos(), callCommon.Pos(), instr.Pos(), fn.Pos())
-									slog.WarnContext(ctx, "Found a query in a non-target function", slog.Any("call", callCommon), slog.Any("SQL", q), slog.Any("analysis", meta))
+									slog.WarnContext(ctx, "Found a query in a non-target call", slog.Any("", meta), slog.String("call", c.Name()), slog.Int("index", i), slog.Any("SQL", q))
 								}
 							}
 						}
@@ -112,10 +112,10 @@ func valueToValidQuery(ctx context.Context, v ssa.Value, opt *Option, meta *Meta
 	strs, ok := ssautil.ValueToStrings(v)
 	if !ok {
 		if reason := unknownQueryIfNotSkipped(v, opt, meta); reason != "" {
-			slog.InfoContext(ctx, "Failed to convert ssa.Value to string constants: but warning is suppressed", slog.String("reason", string(reason)), slog.Any("value", v), slog.Any("analysis", meta))
+			slog.DebugContext(ctx, "Failed to convert ssa.Value to string constants: but warning is suppressed", slog.Any("", meta), slog.String("reason", string(reason)), slog.Any("value", v))
 			return nil
 		}
-		slog.WarnContext(ctx, "Failed to convert ssa.Value to string constants", slog.Any("value", v), slog.Any("analysis", meta))
+		slog.WarnContext(ctx, "Failed to convert ssa.Value to string constants", slog.Any("", meta), slog.Any("value", v))
 		return &QueryResult{QueryGroup: sql.NewQueryGroupFrom(&sql.Query{Kind: sql.Unknown}), Meta: meta}
 	}
 
@@ -127,17 +127,17 @@ func valueToValidQuery(ctx context.Context, v ssa.Value, opt *Option, meta *Meta
 		q, ok := sql.ParseString(str)
 		if !ok {
 			if reason := unknownQueryIfNotSkipped(v, opt, meta); reason != "" {
-				slog.InfoContext(ctx, "Failed to parse string as SQL: but warning is suppressed", slog.String("reason", string(reason)), slog.Any("string", str), slog.Any("analysis", meta))
+				slog.InfoContext(ctx, "Failed to parse string as SQL: but warning is suppressed", slog.Any("", meta), slog.String("reason", string(reason)), slog.Any("string", str))
 			} else {
-				slog.WarnContext(ctx, "Failed to parse string as SQL", slog.Any("string", str), slog.Any("analysis", meta))
 				qr.Append(&sql.Query{Kind: sql.Unknown})
+				slog.WarnContext(ctx, "Failed to parse string as SQL", slog.Any("", meta), slog.Any("string", str))
 			}
 			continue
 		}
 
 		// 3-3. Filter query
 		if !opt.Filter(q, meta) {
-			slog.InfoContext(ctx, "Filtered query out", slog.Any("SQL", q), slog.Any("analysis", meta))
+			slog.InfoContext(ctx, "Filtered query out", slog.Any("", meta), slog.Any("SQL", q))
 			continue
 		}
 		qr.Append(q)

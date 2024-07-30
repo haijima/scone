@@ -122,6 +122,7 @@ func valueToValidQuery(ctx context.Context, v ssa.Value, opt *Option, meta *Meta
 	qr := NewQueryResult(meta)
 	slices.Sort(strs)
 	strs = slices.Compact(strs)
+	hasUnknown := false
 	for _, str := range strs {
 		// 3-2. Convert string constants to sql.Query
 		q, ok := sql.ParseString(str)
@@ -129,8 +130,8 @@ func valueToValidQuery(ctx context.Context, v ssa.Value, opt *Option, meta *Meta
 			if reason := unknownQueryIfNotSkipped(v, opt, meta); reason != "" {
 				slog.InfoContext(ctx, "Failed to parse string as SQL: but warning is suppressed", slog.Any("", meta), slog.String("reason", string(reason)), slog.Any("string", str))
 			} else {
-				qr.Append(&sql.Query{Kind: sql.Unknown})
 				slog.WarnContext(ctx, "Failed to parse string as SQL", slog.Any("", meta), slog.Any("string", str))
+				hasUnknown = true
 			}
 			continue
 		}
@@ -141,6 +142,9 @@ func valueToValidQuery(ctx context.Context, v ssa.Value, opt *Option, meta *Meta
 			continue
 		}
 		qr.Append(q)
+	}
+	if hasUnknown && len(qr.Queries()) == 0 {
+		qr.Append(&sql.Query{Kind: sql.Unknown})
 	}
 	return qr
 }

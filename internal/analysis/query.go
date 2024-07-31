@@ -85,6 +85,7 @@ func AnalyzeFunc(ctx context.Context, fn *ssa.Function, opt *Option) QueryResult
 								if q, ok := sql.ParseString(str); ok {
 									meta := NewMeta(fn, c.Arg(i).Pos(), callCommon.Pos(), instr.Pos(), fn.Pos())
 									slog.WarnContext(ctx, "Found a query in a non-target call", slog.Any("", meta), slog.String("call", c.Name()), slog.Int("index", i), slog.Any("SQL", q))
+									break
 								}
 							}
 						}

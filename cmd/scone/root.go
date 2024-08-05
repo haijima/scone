@@ -2,11 +2,9 @@ package main
 
 import (
 	"log/slog"
-	"time"
 
 	"github.com/fatih/color"
 	"github.com/haijima/cobrax"
-	"github.com/lmittmann/tint"
 	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -19,11 +17,8 @@ func NewRootCmd(v *viper.Viper, fs afero.Fs) *cobra.Command {
 	cmd.PersistentPreRunE = func(cmd *cobra.Command, args []string) error {
 		// Colorization settings
 		color.NoColor = color.NoColor || v.GetBool("no-color")
-		// Set Logger
-		lv := cobrax.VerbosityLevel(v)
-		l := slog.New(tint.NewHandler(cmd.ErrOrStderr(), &tint.Options{Level: lv, AddSource: lv < slog.LevelDebug, NoColor: color.NoColor, TimeFormat: time.Kitchen}))
-		slog.SetDefault(l)
-		cobrax.SetLogger(l)
+		// Set Log level
+		lv.Set(cobrax.VerbosityLevel(v))
 
 		// Read config file
 		opts := []cobrax.ConfigOption{cobrax.WithConfigFileFlag(cmd, "config"), cobrax.WithOverrideBy(cmd.Name())}

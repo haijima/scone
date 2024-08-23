@@ -26,6 +26,7 @@ func NewTableCommand(v *viper.Viper, _ afero.Fs) *cobra.Command {
 	cmd.RunE = func(cmd *cobra.Command, _ []string) error { return runTable(cmd, v) }
 
 	cmd.Flags().Bool("summary", false, "Print summary only")
+	cmd.Flags().Bool("collapse-phi", false, "Collapse phi queries")
 	SetQueryOptionFlags(cmd)
 
 	return cmd
@@ -35,6 +36,7 @@ func runTable(cmd *cobra.Command, v *viper.Viper) error {
 	dir := v.GetString("dir")
 	pattern := v.GetString("pattern")
 	summaryOnly := v.GetBool("summary")
+	collapsePhi := v.GetBool("collapse-phi")
 	opt := QueryOptionFromViper(v)
 
 	queryResults, cgs, err := analysis.Analyze(cmd.Context(), dir, pattern, opt)
@@ -48,7 +50,7 @@ func runTable(cmd *cobra.Command, v *viper.Viper) error {
 	}
 	if !summaryOnly {
 		for _, t := range queryResults.AllTables() {
-			if err := printTableResult(cmd.OutOrStdout(), t, queryResults, tableConn); err != nil {
+			if err := printTableResult(cmd.OutOrStdout(), t, queryResults, tableConn, collapsePhi); err != nil {
 				return err
 			}
 		}
@@ -144,7 +146,7 @@ const tmplTableResult = `
 {{/* Show queries by TablePrinter */}}
 `
 
-func printTableResult(w io.Writer, table *sql.Table, queryResults analysis.QueryResults, tableConn util.Connection) error {
+func printTableResult(w io.Writer, table *sql.Table, queryResults analysis.QueryResults, tableConn util.Connection, collapsePhi bool) error {
 	qrs := make([]*analysis.QueryResult, 0)
 	for _, qr := range queryResults {
 		if slices.ContainsFunc(qr.Queries(), func(q *sql.Query) bool { return slices.Contains(q.Tables, table.Name) }) {
@@ -178,6 +180,9 @@ func printTableResult(w io.Writer, table *sql.Table, queryResults analysis.Query
 		for _, q := range qr.Queries() {
 			if slices.Contains(q.Tables, table.Name) {
 				t.AppendRow(prettyTable.Row{"   ", strconv.Itoa(i + 1), qr.Meta.FLC(), qr.Meta.Func.Name(), q.Kind.Color(q.Kind.CRUD()), q.Raw})
+				if collapsePhi {
+					break
+				}
 			}
 		}
 	}

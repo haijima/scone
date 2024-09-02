@@ -2,6 +2,8 @@ module github.com/haijima/scone
 
 go 1.22.2
 
+toolchain go1.23.0
+
 require (
 	github.com/cockroachdb/errors v1.11.3
 	github.com/deckarep/golang-set/v2 v2.6.0

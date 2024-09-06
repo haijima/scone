@@ -2,24 +2,24 @@ module github.com/haijima/scone
 
 go 1.22.2
 
-toolchain go1.23.0
+toolchain go1.23.1
 
 require (
 	github.com/cockroachdb/errors v1.11.3
 	github.com/deckarep/golang-set/v2 v2.6.0
 	github.com/fatih/color v1.17.0
-	github.com/haijima/analysisutil v0.0.1
+	github.com/haijima/analysisutil v0.0.2
 	github.com/haijima/cobrax v0.4.0
 	github.com/jedib0t/go-pretty/v6 v6.5.9
 	github.com/lmittmann/tint v1.0.5
 	github.com/mattn/go-colorable v0.1.13
-	github.com/pingcap/tidb/pkg/parser v0.0.0-20240809162011-6df7aba3b84c
+	github.com/pingcap/tidb/pkg/parser v0.0.0-20240905152818-c403cd555d3a
 	github.com/sebdah/goldie/v2 v2.5.5
 	github.com/spf13/afero v1.11.0
 	github.com/spf13/cobra v1.8.1
 	github.com/spf13/viper v1.19.0
 	github.com/stretchr/testify v1.9.0
-	golang.org/x/exp v0.0.0-20240808152545-0cdaa3abc0fa
+	golang.org/x/exp v0.0.0-20240904232852-e7e105dedf7e
 	golang.org/x/tools v0.24.0
 )
 
@@ -39,7 +39,7 @@ require (
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/mattn/go-runewidth v0.0.16 // indirect
 	github.com/mitchellh/mapstructure v1.5.0 // indirect
-	github.com/pelletier/go-toml/v2 v2.2.2 // indirect
+	github.com/pelletier/go-toml/v2 v2.2.3 // indirect
 	github.com/pingcap/errors v0.11.5-0.20240311024730-e056997136bb // indirect
 	github.com/pingcap/failpoint v0.0.0-20240528011301-b51a646c7c86 // indirect
 	github.com/pingcap/log v1.1.1-0.20230317032135-a0d097d16e22 // indirect
@@ -58,11 +58,11 @@ require (
 	go.uber.org/atomic v1.11.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	go.uber.org/zap v1.27.0 // indirect
-	golang.org/x/mod v0.20.0 // indirect
+	golang.org/x/mod v0.21.0 // indirect
 	golang.org/x/sync v0.8.0 // indirect
-	golang.org/x/sys v0.24.0 // indirect
-	golang.org/x/term v0.23.0 // indirect
-	golang.org/x/text v0.17.0 // indirect
+	golang.org/x/sys v0.25.0 // indirect
+	golang.org/x/term v0.24.0 // indirect
+	golang.org/x/text v0.18.0 // indirect
 	gopkg.in/ini.v1 v1.67.0 // indirect
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect

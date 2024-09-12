@@ -22,7 +22,6 @@ func NewCallgraphCommand(v *viper.Viper, _ afero.Fs) *cobra.Command {
 	}
 
 	cmd.Flags().String("format", "dot", "The output format {dot|mermaid|text}")
-	SetQueryOptionFlags(cmd)
 
 	return cmd
 }
@@ -30,9 +29,10 @@ func NewCallgraphCommand(v *viper.Viper, _ afero.Fs) *cobra.Command {
 func runCallgraph(cmd *cobra.Command, v *viper.Viper) error {
 	dir := v.GetString("dir")
 	pattern := v.GetString("pattern")
-	opt := QueryOptionFromViper(v)
+	filter := v.GetString("filter")
+	additionalFuncs := v.GetStringSlice("analyze-funcs")
 
-	_, cgs, err := analysis.Analyze(cmd.Context(), dir, pattern, opt)
+	_, cgs, err := analysis.Analyze(cmd.Context(), dir, pattern, analysis.NewOption(filter, additionalFuncs))
 	if err != nil {
 		return err
 	}

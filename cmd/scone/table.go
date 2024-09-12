@@ -22,12 +22,12 @@ import (
 func NewTableCommand(v *viper.Viper, _ afero.Fs) *cobra.Command {
 	cmd := &cobra.Command{}
 	cmd.Use = "table"
+	cmd.Aliases = []string{"tables"}
 	cmd.Short = "List tables information from queries"
 	cmd.RunE = func(cmd *cobra.Command, _ []string) error { return runTable(cmd, v) }
 
 	cmd.Flags().Bool("summary", false, "Print summary only")
 	cmd.Flags().Bool("collapse-phi", false, "Collapse phi queries")
-	SetQueryOptionFlags(cmd)
 
 	return cmd
 }
@@ -37,9 +37,10 @@ func runTable(cmd *cobra.Command, v *viper.Viper) error {
 	pattern := v.GetString("pattern")
 	summaryOnly := v.GetBool("summary")
 	collapsePhi := v.GetBool("collapse-phi")
-	opt := QueryOptionFromViper(v)
+	filter := v.GetString("filter")
+	additionalFuncs := v.GetStringSlice("analyze-funcs")
 
-	queryResults, cgs, err := analysis.Analyze(cmd.Context(), dir, pattern, opt)
+	queryResults, cgs, err := analysis.Analyze(cmd.Context(), dir, pattern, analysis.NewOption(filter, additionalFuncs))
 	if err != nil {
 		return err
 	}

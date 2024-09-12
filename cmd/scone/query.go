@@ -18,6 +18,7 @@ import (
 func NewQueryCommand(v *viper.Viper, _ afero.Fs) *cobra.Command {
 	cmd := &cobra.Command{}
 	cmd.Use = "query"
+	cmd.Aliases = []string{"queries"}
 	cmd.Short = "List SQL queries"
 	cmd.RunE = func(cmd *cobra.Command, _ []string) error { return runQuery(cmd, v) }
 
@@ -28,7 +29,6 @@ func NewQueryCommand(v *viper.Viper, _ afero.Fs) *cobra.Command {
 	cmd.Flags().Bool("no-rownum", false, "Hide row number")
 	cmd.Flags().Bool("full-package-path", false, "Show full package path")
 	cmd.Flags().Bool("expand-query-group", false, "Expand query group")
-	SetQueryOptionFlags(cmd)
 
 	return cmd
 }
@@ -47,7 +47,8 @@ func runQuery(cmd *cobra.Command, v *viper.Viper) error {
 	sortKeys := v.GetStringSlice("sort")
 	expandQueryGroup := v.GetBool("expand-query-group")
 	showFullPackagePath := v.GetBool("full-package-path")
-	opt := QueryOptionFromViper(v)
+	filter := v.GetString("filter")
+	additionalFuncs := v.GetStringSlice("analyze-funcs")
 	if !mapset.NewSet(sortKeys...).IsSubset(mapset.NewSet(sortableColumns...)) {
 		return errors.Newf("unknown sort key: %s", mapset.NewSet(sortKeys...).Difference(mapset.NewSet(sortableColumns...)).ToSlice())
 	}
@@ -61,7 +62,7 @@ func runQuery(cmd *cobra.Command, v *viper.Viper) error {
 		return errors.Newf("unknown format: %s", format)
 	}
 
-	queryResults, _, err := analysis.Analyze(cmd.Context(), dir, pattern, opt)
+	queryResults, _, err := analysis.Analyze(cmd.Context(), dir, pattern, analysis.NewOption(filter, additionalFuncs))
 	if err != nil {
 		return err
 	}

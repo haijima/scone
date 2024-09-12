@@ -36,7 +36,7 @@ func NewRootCmd(v *viper.Viper, fs afero.Fs) *cobra.Command {
 	cmd.PersistentFlags().StringP("dir", "d", ".", "The directory to analyze")
 	cmd.PersistentFlags().StringP("pattern", "p", "./...", "The pattern to analyze")
 	cmd.PersistentFlags().String("filter", "", "filter queries by `pattern`")
-	cmd.PersistentFlags().StringSlice("analyze-funcs", []string{}, "The names of functions to analyze additionally. format: `<package>#<function>#<argument index>`")
+	cmd.PersistentFlags().StringSlice("analyze-funcs", []string{}, "The names of functions to analyze additionally. format: `<func pattern>@<argument index>`")
 	_ = cmd.MarkFlagDirname("dir")
 
 	cmd.AddCommand(NewCallgraphCommand(v, fs))

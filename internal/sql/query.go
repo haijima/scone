@@ -142,7 +142,7 @@ func (k QueryKind) CRUD() string {
 }
 
 func (k QueryKind) ColoredString() string {
-	return k.Color(k.String())
+	return k.Color(k.String()) //nolint:govet
 }
 
 func (k QueryKind) Color(format string, a ...interface{}) string {

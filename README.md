@@ -1,5 +1,9 @@
 # scone
 
+[![CI Status](https://github.com/haijima/scone/workflows/CI/badge.svg?branch=main)](https://github.com/haijima/scone/actions)
+[![Go Reference](https://pkg.go.dev/badge/github.com/haijima/scone.svg)](https://pkg.go.dev/github.com/haijima/scone)
+[![Go report](https://goreportcard.com/badge/github.com/haijima/scone)](https://goreportcard.com/report/github.com/haijima/scone)
+
 Analyze SQL in source code.
 
 ```

@@ -10,25 +10,23 @@ require (
 	github.com/fatih/color v1.17.0
 	github.com/google/cel-go v0.21.0
 	github.com/haijima/analysisutil v0.0.2
-	github.com/haijima/cobrax v0.5.1
+	github.com/haijima/cobrax v0.6.0
 	github.com/haijima/epf v0.0.1
 	github.com/jedib0t/go-pretty/v6 v6.5.9
 	github.com/lmittmann/tint v1.0.5
 	github.com/mattn/go-colorable v0.1.13
-	github.com/pelletier/go-toml/v2 v2.2.3
 	github.com/pingcap/tidb/pkg/parser v0.0.0-20240905152818-c403cd555d3a
 	github.com/sebdah/goldie/v2 v2.5.5
 	github.com/spf13/afero v1.11.0
 	github.com/spf13/cobra v1.8.1
 	github.com/spf13/viper v1.19.0
 	github.com/stretchr/testify v1.9.0
-	golang.org/x/exp v0.0.0-20240904232852-e7e105dedf7e
-	golang.org/x/tools v0.24.0
-	gopkg.in/yaml.v3 v3.0.1
+	golang.org/x/exp v0.0.0-20240909161429-701f63a606c0
+	golang.org/x/tools v0.25.0
 )
 
 require (
-	github.com/BurntSushi/toml v1.2.1 // indirect
+	github.com/BurntSushi/toml v1.4.0 // indirect
 	github.com/antlr4-go/antlr/v4 v4.13.0 // indirect
 	github.com/cockroachdb/logtags v0.0.0-20230118201751-21c54148d20b // indirect
 	github.com/cockroachdb/redact v1.1.5 // indirect
@@ -45,6 +43,7 @@ require (
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/mattn/go-runewidth v0.0.16 // indirect
 	github.com/mitchellh/mapstructure v1.5.0 // indirect
+	github.com/pelletier/go-toml/v2 v2.2.3 // indirect
 	github.com/pingcap/errors v0.11.5-0.20240311024730-e056997136bb // indirect
 	github.com/pingcap/failpoint v0.0.0-20240528011301-b51a646c7c86 // indirect
 	github.com/pingcap/log v1.1.1-0.20230317032135-a0d097d16e22 // indirect
@@ -74,4 +73,5 @@ require (
 	google.golang.org/protobuf v1.33.0 // indirect
 	gopkg.in/ini.v1 v1.67.0 // indirect
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1 // indirect
+	gopkg.in/yaml.v3 v3.0.1 // indirect
 )

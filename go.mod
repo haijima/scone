@@ -11,7 +11,7 @@ require (
 	github.com/google/cel-go v0.21.0
 	github.com/haijima/analysisutil v0.0.2
 	github.com/haijima/cobrax v0.6.0
-	github.com/haijima/epf v0.0.1
+	github.com/haijima/epf v0.1.0
 	github.com/jedib0t/go-pretty/v6 v6.5.9
 	github.com/lmittmann/tint v1.0.5
 	github.com/mattn/go-colorable v0.1.13

@@ -180,7 +180,7 @@ func printTableResult(w io.Writer, table *sql.Table, queryResults analysis.Query
 	for i, qr := range qrs {
 		for _, q := range qr.Queries() {
 			if slices.Contains(q.Tables, table.Name) {
-				t.AppendRow(prettyTable.Row{"   ", strconv.Itoa(i + 1), qr.Meta.FLC(), qr.Meta.Func.Name(), q.Kind.Color(q.Kind.CRUD()), q.Raw}) //nolint:govet
+				t.AppendRow(prettyTable.Row{"   ", strconv.Itoa(i + 1), qr.Posx.PositionString(), qr.Posx.Func.Name(), q.Kind.Color(q.Kind.CRUD()), q.Raw}) //nolint:govet
 				if collapsePhi {
 					break
 				}

@@ -135,10 +135,10 @@ func BuildCallGraph(pkg *ssa.Package, qrs []*QueryResult) (*CallGraph, error) {
 	result := &CallGraph{Nodes: make(map[string]*Node)}
 	callerFuncs := make([]*ssa.Function, 0, len(qrs))
 	for _, qr := range qrs {
-		callerFuncs = append(callerFuncs, qr.Meta.Func)
+		callerFuncs = append(callerFuncs, qr.Posx.Func)
 		for _, q := range qr.Queries() {
 			for _, t := range q.Tables {
-				result.AddQueryEdge(qr.Meta.Func, t, &SqlValue{Kind: q.Kind, RawSQL: q.Raw})
+				result.AddQueryEdge(qr.Posx.Func, t, &SqlValue{Kind: q.Kind, RawSQL: q.Raw})
 			}
 		}
 	}

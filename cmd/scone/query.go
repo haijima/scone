@@ -7,6 +7,7 @@ import (
 
 	"github.com/cockroachdb/errors"
 	mapset "github.com/deckarep/golang-set/v2"
+	"github.com/haijima/analysisutil/ssautil"
 	"github.com/haijima/scone/internal/analysis"
 	"github.com/haijima/scone/internal/sql"
 	"github.com/jedib0t/go-pretty/v6/table"
@@ -93,13 +94,13 @@ func runQuery(cmd *cobra.Command, v *viper.Viper) error {
 	}
 	for i, qr := range queryResults {
 		for j, q := range qr.Queries() {
-			r := slices.Insert(row(q, qr.Meta, printOpt), 0, "")
+			r := slices.Insert(row(q, qr.Posx, printOpt), 0, "")
 			if len(qr.Queries()) > 1 && expandQueryGroup {
 				r[0] = fmt.Sprintf("P%d", j+1)
 			} else if len(qr.Queries()) > 1 {
 				r[0] = "P"
 			}
-			if qr.Meta.FromComment {
+			if qr.FromComment {
 				r[0] = fmt.Sprintf("%sC", r[0])
 			}
 			if !printOpt.NoRowNum {
@@ -141,9 +142,9 @@ func sortQuery(sortKeys []string) func(a, b *analysis.QueryResult) int {
 			} else if k == "hash" {
 				return strings.Compare(aa.Queries()[0].Hash(), bb.Queries()[0].Hash())
 			} else if k == "function" {
-				return strings.Compare(aa.Meta.Func.Name(), bb.Meta.Func.Name())
+				return strings.Compare(aa.Posx.Func.Name(), bb.Posx.Func.Name())
 			} else if k == "file" {
-				return aa.Meta.Compare(bb.Meta)
+				return aa.Posx.Compare(bb.Posx)
 			}
 			return 0
 		})
@@ -158,12 +159,12 @@ type PrintQueryOption struct {
 	ShowFullPackagePath bool
 }
 
-func row(q *sql.Query, meta *analysis.Meta, opt *PrintQueryOption) table.Row {
+func row(q *sql.Query, pos *ssautil.Posx, opt *PrintQueryOption) table.Row {
 	fullRow := []string{
-		meta.Package().Name(),
-		meta.PackagePath(!opt.ShowFullPackagePath),
-		meta.FLC(),
-		meta.Func.Name(),
+		pos.Package().Name(),
+		pos.PackagePath(!opt.ShowFullPackagePath),
+		pos.PositionString(),
+		pos.Func.Name(),
 		q.Kind.ColoredString(),
 		strings.Join(q.Tables, ", "),
 		q.Hash(),

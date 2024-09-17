@@ -31,21 +31,21 @@ func ExtractQuery(ctx context.Context, ssaProg *buildssa.SSA, files []*ast.File,
 func handleComments(ctx context.Context, ssaProg *buildssa.SSA, files []*ast.File, opt *Option) []*QueryResult {
 	foundQueryResults := make([]*QueryResult, 0)
 	astutil.WalkCommentGroup(ssaProg.Pkg.Prog.Fset, files, func(n ast.Node, cg *ast.CommentGroup) bool {
-		qr := NewQueryResult(NewMeta(&ssa.Function{}, cg.Pos()))
-		qr.Meta.FromComment = true
+		qr := NewQueryResult(ssautil.NewPos(&ssa.Function{}, cg.Pos()))
+		qr.FromComment = true
 		if i := slices.IndexFunc(ssaProg.SrcFuncs, func(fn *ssa.Function) bool { return astutil.Include(fn.Syntax(), n) }); i >= 0 {
-			qr.Meta.Func = ssaProg.SrcFuncs[i]
-			qr.Meta.Pos = append(qr.Meta.Pos, ssaProg.SrcFuncs[i].Pos())
+			qr.Posx.Func = ssaProg.SrcFuncs[i]
+			qr.Posx.Pos = append(qr.Posx.Pos, ssaProg.SrcFuncs[i].Pos())
 		}
 		for _, comment := range cg.List {
 			v, arg, _ := astutil.GetCommentVerb(comment, "scone")
 			switch v {
 			case "sql":
-				if q, ok := sql.ParseString(arg); ok && opt.Filter(q, qr.Meta) {
+				if q, ok := sql.ParseString(arg); ok && opt.Filter(q, qr.Posx) {
 					qr.Append(q)
 					opt.commentedNodes = append(opt.commentedNodes, &NodeWithPackage{Node: n, Package: ssaProg.Pkg.Pkg})
 				} else {
-					slog.WarnContext(ctx, "Failed to parse string as SQL in scone:sql comment", slog.Any("", qr.Meta), slog.Any("string", arg))
+					slog.WarnContext(ctx, "Failed to parse string as SQL in scone:sql comment", slog.Any("", qr.Posx), slog.Any("string", arg))
 				}
 			case "ignore":
 				opt.commentedNodes = append(opt.commentedNodes, &NodeWithPackage{Node: n, Package: ssaProg.Pkg.Pkg})
@@ -83,8 +83,8 @@ func AnalyzeFunc(ctx context.Context, fn *ssa.Function, opt *Option) QueryResult
 						if strs, ok := ssautil.ValueToStrings(c.Arg(i)); ok {
 							for _, str := range strs {
 								if q, ok := sql.ParseString(str); ok {
-									meta := NewMeta(fn, c.Arg(i).Pos(), callCommon.Pos(), instr.Pos(), fn.Pos())
-									slog.WarnContext(ctx, "Found a query in a non-target call", slog.Any("", meta), slog.String("call", c.Name()), slog.Int("index", i), slog.Any("SQL", q))
+									pos := ssautil.NewPos(fn, c.Arg(i).Pos(), callCommon.Pos(), instr.Pos(), fn.Pos())
+									slog.WarnContext(ctx, "Found a query in a non-target call", slog.Any("", pos), slog.String("call", c.Name()), slog.Int("index", i), slog.Any("SQL", q))
 									break
 								}
 							}
@@ -95,8 +95,8 @@ func AnalyzeFunc(ctx context.Context, fn *ssa.Function, opt *Option) QueryResult
 			}
 
 			// 3. ssa.Value to filtered sql.Query
-			meta := NewMeta(fn, targetArg.Pos(), callCommon.Pos(), instr.Pos(), fn.Pos())
-			qr := valueToValidQuery(ctx, targetArg, opt, meta)
+			pos := ssautil.NewPos(fn, targetArg.Pos(), callCommon.Pos(), instr.Pos(), fn.Pos())
+			qr := valueToValidQuery(ctx, targetArg, opt, pos)
 			if qr != nil && len(qr.Queries()) > 0 {
 				foundQueryResults = append(foundQueryResults, qr)
 			}
@@ -106,21 +106,21 @@ func AnalyzeFunc(ctx context.Context, fn *ssa.Function, opt *Option) QueryResult
 	return foundQueryResults
 }
 
-func valueToValidQuery(ctx context.Context, v ssa.Value, opt *Option, meta *Meta) *QueryResult {
+func valueToValidQuery(ctx context.Context, v ssa.Value, opt *Option, pos *ssautil.Posx) *QueryResult {
 
 	// 3-1. ssa.Value to string constants.
 	// Returns a slice considering the case where the argument value is a Phi node.
 	strs, ok := ssautil.ValueToStrings(v)
 	if !ok {
-		if reason := unknownQueryIfNotSkipped(v, opt, meta); reason != "" {
-			slog.DebugContext(ctx, "Failed to convert ssa.Value to string constants: but warning is suppressed", slog.Any("", meta), slog.String("reason", string(reason)), slog.Any("value", v))
+		if reason := unknownQueryIfNotSkipped(v, opt, pos); reason != "" {
+			slog.DebugContext(ctx, "Failed to convert ssa.Value to string constants: but warning is suppressed", slog.Any("", pos), slog.String("reason", string(reason)), slog.Any("value", v))
 			return nil
 		}
-		slog.WarnContext(ctx, "Failed to convert ssa.Value to string constants", slog.Any("", meta), slog.Any("value", v))
-		return &QueryResult{QueryGroup: sql.NewQueryGroupFrom(&sql.Query{Kind: sql.Unknown}), Meta: meta}
+		slog.WarnContext(ctx, "Failed to convert ssa.Value to string constants", slog.Any("", pos), slog.Any("value", v))
+		return &QueryResult{QueryGroup: sql.NewQueryGroupFrom(&sql.Query{Kind: sql.Unknown}), Posx: pos}
 	}
 
-	qr := NewQueryResult(meta)
+	qr := NewQueryResult(pos)
 	slices.Sort(strs)
 	strs = slices.Compact(strs)
 	hasUnknown := false
@@ -128,18 +128,18 @@ func valueToValidQuery(ctx context.Context, v ssa.Value, opt *Option, meta *Meta
 		// 3-2. Convert string constants to sql.Query
 		q, ok := sql.ParseString(str)
 		if !ok {
-			if reason := unknownQueryIfNotSkipped(v, opt, meta); reason != "" {
-				slog.InfoContext(ctx, "Failed to parse string as SQL: but warning is suppressed", slog.Any("", meta), slog.String("reason", string(reason)), slog.Any("string", str))
+			if reason := unknownQueryIfNotSkipped(v, opt, pos); reason != "" {
+				slog.InfoContext(ctx, "Failed to parse string as SQL: but warning is suppressed", slog.Any("", pos), slog.String("reason", string(reason)), slog.Any("string", str))
 			} else {
-				slog.WarnContext(ctx, "Failed to parse string as SQL", slog.Any("", meta), slog.Any("string", str))
+				slog.WarnContext(ctx, "Failed to parse string as SQL", slog.Any("", pos), slog.Any("string", str))
 				hasUnknown = true
 			}
 			continue
 		}
 
 		// 3-3. Filter query
-		if !opt.Filter(q, meta) {
-			slog.InfoContext(ctx, "Filtered query out", slog.Any("", meta), slog.Any("SQL", q))
+		if !opt.Filter(q, pos) {
+			slog.InfoContext(ctx, "Filtered query out", slog.Any("", pos), slog.Any("SQL", q))
 			continue
 		}
 		qr.Append(q)
@@ -237,10 +237,10 @@ func CheckIfTargetFunction(_ context.Context, call *ssa.CallCommon, opt *Option)
 
 type skipReason string
 
-func unknownQueryIfNotSkipped(v ssa.Value, opt *Option, meta *Meta) skipReason {
-	if opt.IsCommented(meta.Package(), meta.Pos...) {
+func unknownQueryIfNotSkipped(v ssa.Value, opt *Option, pos *ssautil.Posx) skipReason {
+	if opt.IsCommented(pos.Package(), pos.Pos...) {
 		return "No need to warn if v is commented by scone:sql or scone:ignore"
-	} else if !opt.Filter(&sql.Query{Kind: sql.Unknown}, meta) {
+	} else if !opt.Filter(&sql.Query{Kind: sql.Unknown}, pos) {
 		return "No need to warn if v is filtered out"
 	}
 	if call, ok := ssautil.ValueToCallCommon(v); ok {

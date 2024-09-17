@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/google/cel-go/cel"
+	"github.com/haijima/analysisutil/ssautil"
 	"github.com/haijima/scone/internal/sql"
 )
 
@@ -74,11 +75,11 @@ func (o *Option) AdditionalFuncSlice() []TargetCall {
 	return tms
 }
 
-func (o *Option) Filter(q *sql.Query, meta *Meta) bool {
+func (o *Option) Filter(q *sql.Query, pos *ssautil.Posx) bool {
 	if o.expr == nil {
 		return true
 	}
-	res, err := o.expr.Run(q, meta)
+	res, err := o.expr.Run(q, pos)
 	if err != nil {
 		panic(err)
 	}
@@ -119,11 +120,11 @@ func NewFilterExpr(code string) (*FilterExpr, error) {
 	return &FilterExpr{program: prg}, nil
 }
 
-func (f *FilterExpr) Run(q *sql.Query, meta *Meta) (bool, error) {
-	pkgName := meta.Package().Name()
-	pkgPath := meta.Package().Path()
-	file := meta.Position().Filename
-	funcName := meta.Func.Name()
+func (f *FilterExpr) Run(q *sql.Query, pos *ssautil.Posx) (bool, error) {
+	pkgName := pos.Package().Name()
+	pkgPath := pos.Package().Path()
+	file := pos.Position().Filename
+	funcName := pos.Func.Name()
 	queryType := q.Kind.String()
 	tables := q.Tables
 	hash := q.Hash()

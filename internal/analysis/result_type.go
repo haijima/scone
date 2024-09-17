@@ -1,11 +1,6 @@
 package analysis
 
 import (
-	"go/token"
-	"go/types"
-	"log/slog"
-	"path/filepath"
-	"regexp"
 	"slices"
 	"strings"
 
@@ -13,7 +8,6 @@ import (
 	"github.com/haijima/analysisutil/ssautil"
 	"github.com/haijima/scone/internal/sql"
 	"golang.org/x/exp/maps"
-	"golang.org/x/tools/go/ssa"
 )
 
 type QueryResults []*QueryResult
@@ -38,11 +32,12 @@ func (qrs QueryResults) allTableMap() map[string]*sql.Table {
 
 type QueryResult struct {
 	*sql.QueryGroup
-	Meta *Meta
+	Posx        *ssautil.Posx
+	FromComment bool
 }
 
-func NewQueryResult(meta *Meta) *QueryResult {
-	return &QueryResult{QueryGroup: sql.NewQueryGroup(), Meta: meta}
+func NewQueryResult(pos *ssautil.Posx) *QueryResult {
+	return &QueryResult{QueryGroup: sql.NewQueryGroup(), Posx: pos}
 }
 
 func (qr *QueryResult) Append(qs ...*sql.Query) {
@@ -55,70 +50,8 @@ func (qr *QueryResult) Append(qs ...*sql.Query) {
 }
 
 func (qr *QueryResult) Compare(other *QueryResult) int {
-	if !qr.Meta.Equal(other.Meta) {
-		return qr.Meta.Compare(other.Meta)
+	if !qr.Posx.Equal(other.Posx) {
+		return qr.Posx.Compare(other.Posx)
 	}
 	return slices.CompareFunc(qr.Queries(), other.Queries(), func(a, b *sql.Query) int { return strings.Compare(a.Hash(), b.Hash()) })
-}
-
-type Meta struct {
-	Func        *ssa.Function
-	Pos         []token.Pos
-	FromComment bool
-}
-
-func NewMeta(fn *ssa.Function, pos ...token.Pos) *Meta {
-	return &Meta{Func: fn, Pos: pos}
-}
-
-func (m *Meta) Package() *types.Package {
-	//return m.pkg.Pkg
-
-	if m.Func == nil || m.Func.Pkg == nil {
-		return &types.Package{}
-	}
-	return m.Func.Pkg.Pkg
-}
-
-var pathDirRegex = regexp.MustCompile(`([^/]+)/`)
-
-func (m *Meta) PackagePath(abbreviate bool) string {
-	if abbreviate {
-		return pathDirRegex.ReplaceAllStringFunc(m.Package().Path(), func(m string) string { return m[:1] + "/" })
-	}
-	return m.Package().Path()
-}
-
-func (m *Meta) Position() token.Position {
-	if m.Func == nil {
-		return token.Position{}
-	}
-	return ssautil.GetPosition(m.Func.Pkg, m.Pos...)
-}
-
-func (m *Meta) FLC() string {
-	return filepath.Base(m.Position().String())
-}
-
-func (m *Meta) Compare(other *Meta) int {
-	if m.Package().Path() != other.Package().Path() {
-		return strings.Compare(m.Package().Path(), other.Package().Path())
-	} else if m.Position().Filename != other.Position().Filename {
-		return strings.Compare(m.Position().Filename, other.Position().Filename)
-	} else if m.Position().Offset != other.Position().Offset {
-		return m.Position().Offset - other.Position().Offset
-	}
-	return 0
-}
-
-func (m *Meta) Equal(other *Meta) bool {
-	return m.Compare(other) == 0
-}
-
-func (m *Meta) LogValue() slog.Value {
-	return slog.GroupValue(
-		slog.String("package", m.PackagePath(true)),
-		slog.String("file", m.FLC()),
-		slog.String("func", m.Func.Name()),
-	)
 }

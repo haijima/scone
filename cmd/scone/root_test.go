@@ -18,5 +18,5 @@ func TestNewRootCmd(t *testing.T) {
 
 	assert.Equal(t, "scone", cmd.Use)
 	assert.NotNil(t, cmd.Commands())
-	assert.Equal(t, 4, len(cmd.Commands()))
+	assert.Equal(t, 5, len(cmd.Commands()))
 }

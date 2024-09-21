@@ -44,6 +44,7 @@ func NewRootCmd(v *viper.Viper, fs afero.Fs) *cobra.Command {
 	cmd.AddCommand(NewTableCommand(v, fs))
 	cmd.AddCommand(NewGenConfCmd(v, fs))
 	cmd.AddCommand(NewCrudCmd(v, fs))
+	cmd.AddCommand(NewLoopCmd(v, fs))
 
 	cmd.SetGlobalNormalizationFunc(cobrax.SnakeToKebab)
 

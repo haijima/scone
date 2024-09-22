@@ -121,7 +121,7 @@ func runQuery(cmd *cobra.Command, v *viper.Viper) error {
 	case "csv":
 		t.RenderCSV()
 	case "tsv":
-		t.RenderCSV()
+		t.RenderTSV()
 	case "simple":
 		t.Style().Options.DrawBorder = false
 		t.Style().Options.SeparateHeader = false

@@ -91,8 +91,6 @@ type FilterExpr struct {
 }
 
 func NewFilterExpr(code string) (*FilterExpr, error) {
-	fmt.Println("code: ", code)
-
 	if code == "" {
 		code = "true"
 	}

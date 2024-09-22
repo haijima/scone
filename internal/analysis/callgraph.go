@@ -138,7 +138,11 @@ func BuildCallGraph(pkg *ssa.Package, qrs []*QueryResult) (*CallGraph, error) {
 		callerFuncs = append(callerFuncs, qr.Posx.Func)
 		for _, q := range qr.Queries() {
 			for _, t := range q.Tables {
-				result.AddQueryEdge(qr.Posx.Func, t, &SqlValue{Kind: q.Kind, RawSQL: q.Raw})
+				if q.MainTable == t {
+					result.AddQueryEdge(qr.Posx.Func, t, &SqlValue{Kind: q.Kind, RawSQL: q.Raw})
+				} else {
+					result.AddQueryEdge(qr.Posx.Func, t, &SqlValue{Kind: sql.Select, RawSQL: q.Raw})
+				}
 			}
 		}
 	}

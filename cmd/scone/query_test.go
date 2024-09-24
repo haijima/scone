@@ -25,7 +25,6 @@ func Test_runQuery(t *testing.T) {
 			v.Set("dir", "./testdata/src/"+tt)
 			v.Set("pattern", "./...")
 			v.Set("format", "table")
-			v.Set("mode", "ssa-method")
 			v.Set("analyze-funcs", []string{"github.com/isucon/isucon12-qualify/webapp/go.dbOrTx.GetContext@2", "github.com/isucon/isucon12-qualify/webapp/go.dbOrTx.SelectContext@2", "github.com/isucon/isucon12-qualify/webapp/go.dbOrTx.ExecContext@1"})
 
 			err := runQuery(cmd, v)

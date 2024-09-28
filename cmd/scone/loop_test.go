@@ -20,6 +20,7 @@ func Test_runLoop_singleProject(t *testing.T) {
 	v := viper.New()
 	v.Set("dir", "./testdata/src/loop")
 	v.Set("pattern", "./...")
+	v.Set("format", "table")
 	v.Set("v", 1)
 
 	err := runLoop(cmd, v)

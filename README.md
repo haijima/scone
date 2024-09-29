@@ -14,7 +14,9 @@ Usage:
 
 Available Commands:
   callgraph   Generate a call graph
+  crud        Show the CRUD operations for each endpoint
   genconf     Generate configuration file
+  loop        Find N+1 queries
   query       List SQL queries
   table       List tables information from queries
 

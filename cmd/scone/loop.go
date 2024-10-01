@@ -14,6 +14,7 @@ import (
 	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+	"golang.org/x/tools/go/packages"
 	"golang.org/x/tools/go/ssa"
 )
 
@@ -67,36 +68,17 @@ func runLoop(cmd *cobra.Command, v *viper.Viper) error {
 		if err != nil {
 			return err
 		}
-
-		for _, srcFunc := range ssaProg.SrcFuncs {
-			results = append(results, analyzeForLoops(cgs, pkg.Syntax, srcFunc)...)
-			//for _, anonFunc := range srcFunc.AnonFuncs {
-			//	results = append(results, analyzeForLoops(cgs, pkg.Syntax, anonFunc)...)
-			//}
-		}
-		for _, result := range results {
-			result.Position = pkg.Fset.Position(result.Call.Pos())
-		}
+		bodies := getForRangeBodies(pkg.Syntax)
+		results = append(results, analyzeForLoopBody(cgs, pkg, ssaProg.SrcFuncs, bodies)...)
 	}
 
 	slices.SortFunc(results, func(a, b *FoundLoopedQuery) int { return strings.Compare(a.Position.String(), b.Position.String()) })
-	cloned := slices.Clone(results)
-	compacted := slices.CompactFunc(results, func(a, b *FoundLoopedQuery) bool { return a.Position.String() == b.Position.String() })
-	for _, result := range compacted {
-		count := 0
-		for _, r := range cloned {
-			if r.Position.String() == result.Position.String() {
-				count++
-			}
-		}
-		result.N = count
-	}
 
 	t := table.NewWriter()
 	t.SetOutputMirror(cmd.OutOrStdout())
 	t.AppendHeader(table.Row{"#", "Function Name", "Callee", "N", "Position"})
 
-	for i, res := range compacted {
+	for i, res := range results {
 		t.AppendRow(table.Row{i + 1, res.Func.Name(), res.Callee.Package().Pkg.Path() + "." + res.Callee.Name(), res.N, res.Position})
 	}
 
@@ -121,33 +103,35 @@ func runLoop(cmd *cobra.Command, v *viper.Viper) error {
 	return nil
 }
 
-func analyzeForLoops(cgs map[string]*analysis.CallGraph, astFiles []*ast.File, fn *ssa.Function) []*FoundLoopedQuery {
-	results := make([]*FoundLoopedQuery, 0)
+func getForRangeBodies(astFiles []*ast.File) []*ast.BlockStmt {
+	bodies := make([]*ast.BlockStmt, 0)
 	for _, astFile := range astFiles {
 		ast.Inspect(astFile, func(n ast.Node) bool {
 			switch n := n.(type) {
 			case *ast.ForStmt:
-				results = append(results, analyzeForLoopBody(cgs, fn, n.Body)...)
+				bodies = append(bodies, n.Body)
 			case *ast.RangeStmt:
-				results = append(results, analyzeForLoopBody(cgs, fn, n.Body)...)
+				bodies = append(bodies, n.Body)
 			}
 			return true
 		})
 	}
-	return results
+	return bodies
 }
 
-func analyzeForLoopBody(cgs map[string]*analysis.CallGraph, fn *ssa.Function, body *ast.BlockStmt) []*FoundLoopedQuery {
+func analyzeForLoopBody(cgs map[string]*analysis.CallGraph, pkg *packages.Package, fns []*ssa.Function, bodies []*ast.BlockStmt) []*FoundLoopedQuery {
 	results := make([]*FoundLoopedQuery, 0)
-	for _, block := range fn.Blocks {
-		for _, instr := range block.Instrs {
-			if instr.Pos() != 0 && body.Pos() <= instr.Pos() && instr.Pos() <= body.End() { // Check within the for loop
-				if call, ok := instr.(*ssa.Call); ok {
-					if callee := call.Call.StaticCallee(); callee != nil && callee.Pkg != nil {
-						if callee.Pkg.Pkg.Path() == "database/sql" || callee.Pkg.Pkg.Path() == "github.com/jmoiron/sqlx" {
-							results = append(results, &FoundLoopedQuery{Func: fn, Callee: callee, Call: call})
-						} else if cgs[callee.Pkg.Pkg.Path()] != nil && cgs[callee.Pkg.Pkg.Path()].Nodes[callee.Name()] != nil {
-							results = append(results, &FoundLoopedQuery{Func: fn, Callee: callee, Call: call})
+	for _, fn := range fns {
+		for _, block := range fn.Blocks {
+			for _, instr := range block.Instrs {
+				if n := withInForLoop(instr, bodies); n > 0 { // Check within the for loop
+					if call, ok := instr.(*ssa.Call); ok {
+						if callee := call.Call.StaticCallee(); callee != nil && callee.Pkg != nil {
+							if callee.Pkg.Pkg.Path() == "database/sql" ||
+								callee.Pkg.Pkg.Path() == "github.com/jmoiron/sqlx" ||
+								(cgs[callee.Pkg.Pkg.Path()] != nil && cgs[callee.Pkg.Pkg.Path()].Nodes[callee.Name()] != nil) {
+								results = append(results, &FoundLoopedQuery{Func: fn, Callee: callee, Call: call, Position: pkg.Fset.Position(call.Pos()), N: n})
+							}
 						}
 					}
 				}
@@ -155,4 +139,17 @@ func analyzeForLoopBody(cgs map[string]*analysis.CallGraph, fn *ssa.Function, bo
 		}
 	}
 	return results
+}
+
+func withInForLoop(instr ssa.Instruction, bodies []*ast.BlockStmt) int {
+	if instr.Pos() == 0 {
+		return 0
+	}
+	var cnt int
+	for _, body := range bodies {
+		if body.Pos() <= instr.Pos() && instr.Pos() <= body.End() {
+			cnt++
+		}
+	}
+	return cnt
 }

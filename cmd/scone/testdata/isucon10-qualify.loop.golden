@@ -1,0 +1,7 @@
++---+---------------------+-----------------------------+---+--------------------------------------------------------------------------------------------------------------+
+| # | FUNCTION NAME       | CALLEE                      | N | POSITION                                                                                                     |
++---+---------------------+-----------------------------+---+--------------------------------------------------------------------------------------------------------------+
+| 1 | postChair           | database/sql.Exec           | 1 | /Users/haijima/workspace/src/github.com/haijima/scone/cmd/scone/testdata/src/isucon10-qualify/main.go:384:20 |
+| 2 | postEstate          | database/sql.Exec           | 1 | /Users/haijima/workspace/src/github.com/haijima/scone/cmd/scone/testdata/src/isucon10-qualify/main.go:685:20 |
+| 3 | searchEstateNazotte | github.com/jmoiron/sqlx.Get | 1 | /Users/haijima/workspace/src/github.com/haijima/scone/cmd/scone/testdata/src/isucon10-qualify/main.go:892:15 |
++---+---------------------+-----------------------------+---+--------------------------------------------------------------------------------------------------------------+

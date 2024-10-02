@@ -1,0 +1,25 @@
++----+------------------+-------------------------------------------------------+---+-------------------------------------------------------------------------------------------------------------+
+|  # | FUNCTION NAME    | CALLEE                                                | N | POSITION                                                                                                    |
++----+------------------+-------------------------------------------------------+---+-------------------------------------------------------------------------------------------------------------+
+|  1 | drawGacha        | github.com/isucon/isucon12-final/webapp/go.generateID | 1 | /Users/haijima/workspace/src/github.com/haijima/scone/cmd/scone/testdata/src/isucon12-final/main.go:1131:27 |
+|  2 | drawGacha        | database/sql.Exec                                     | 1 | /Users/haijima/workspace/src/github.com/haijima/scone/cmd/scone/testdata/src/isucon12-final/main.go:1147:23 |
+|  3 | receivePresent   | database/sql.Exec                                     | 1 | /Users/haijima/workspace/src/github.com/haijima/scone/cmd/scone/testdata/src/isucon12-final/main.go:1290:20 |
+|  4 | receivePresent   | github.com/isucon/isucon12-final/webapp/go.obtainItem | 1 | /Users/haijima/workspace/src/github.com/haijima/scone/cmd/scone/testdata/src/isucon12-final/main.go:1295:30 |
+|  5 | addExpToCard     | github.com/jmoiron/sqlx.Get                           | 1 | /Users/haijima/workspace/src/github.com/haijima/scone/cmd/scone/testdata/src/isucon12-final/main.go:1468:20 |
+|  6 | addExpToCard     | database/sql.Exec                                     | 1 | /Users/haijima/workspace/src/github.com/haijima/scone/cmd/scone/testdata/src/isucon12-final/main.go:1512:22 |
+|  7 | generateID       | database/sql.Exec                                     | 1 | /Users/haijima/workspace/src/github.com/haijima/scone/cmd/scone/testdata/src/isucon12-final/main.go:1858:24 |
+|  8 | obtainLoginBonus | github.com/jmoiron/sqlx.Get                           | 1 | /Users/haijima/workspace/src/github.com/haijima/scone/cmd/scone/testdata/src/isucon12-final/main.go:359:19  |
+|  9 | obtainLoginBonus | github.com/isucon/isucon12-final/webapp/go.generateID | 1 | /Users/haijima/workspace/src/github.com/haijima/scone/cmd/scone/testdata/src/isucon12-final/main.go:365:29  |
+| 10 | obtainLoginBonus | github.com/jmoiron/sqlx.Get                           | 1 | /Users/haijima/workspace/src/github.com/haijima/scone/cmd/scone/testdata/src/isucon12-final/main.go:397:19  |
+| 11 | obtainLoginBonus | github.com/isucon/isucon12-final/webapp/go.obtainItem | 1 | /Users/haijima/workspace/src/github.com/haijima/scone/cmd/scone/testdata/src/isucon12-final/main.go:404:31  |
+| 12 | obtainLoginBonus | database/sql.Exec                                     | 1 | /Users/haijima/workspace/src/github.com/haijima/scone/cmd/scone/testdata/src/isucon12-final/main.go:412:23  |
+| 13 | obtainLoginBonus | database/sql.Exec                                     | 1 | /Users/haijima/workspace/src/github.com/haijima/scone/cmd/scone/testdata/src/isucon12-final/main.go:417:23  |
+| 14 | obtainPresent    | github.com/jmoiron/sqlx.Get                           | 1 | /Users/haijima/workspace/src/github.com/haijima/scone/cmd/scone/testdata/src/isucon12-final/main.go:440:16  |
+| 15 | obtainPresent    | github.com/isucon/isucon12-final/webapp/go.generateID | 1 | /Users/haijima/workspace/src/github.com/haijima/scone/cmd/scone/testdata/src/isucon12-final/main.go:449:27  |
+| 16 | obtainPresent    | database/sql.Exec                                     | 1 | /Users/haijima/workspace/src/github.com/haijima/scone/cmd/scone/testdata/src/isucon12-final/main.go:465:23  |
+| 17 | obtainPresent    | github.com/isucon/isucon12-final/webapp/go.generateID | 1 | /Users/haijima/workspace/src/github.com/haijima/scone/cmd/scone/testdata/src/isucon12-final/main.go:469:28  |
+| 18 | obtainPresent    | database/sql.Exec                                     | 1 | /Users/haijima/workspace/src/github.com/haijima/scone/cmd/scone/testdata/src/isucon12-final/main.go:482:23  |
+| 19 | createUser       | github.com/isucon/isucon12-final/webapp/go.generateID | 1 | /Users/haijima/workspace/src/github.com/haijima/scone/cmd/scone/testdata/src/isucon12-final/main.go:707:27  |
+| 20 | createUser       | database/sql.Exec                                     | 1 | /Users/haijima/workspace/src/github.com/haijima/scone/cmd/scone/testdata/src/isucon12-final/main.go:722:23  |
+| 21 | listGacha        | github.com/jmoiron/sqlx.Select                        | 1 | /Users/haijima/workspace/src/github.com/haijima/scone/cmd/scone/testdata/src/isucon12-final/main.go:962:20  |
++----+------------------+-------------------------------------------------------+---+-------------------------------------------------------------------------------------------------------------+

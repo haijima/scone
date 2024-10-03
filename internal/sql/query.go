@@ -22,16 +22,12 @@ func (qgs QueryGroups) AllTableMap() map[string]*Table {
 			for _, t := range q.Tables {
 				if _, ok := tables[t]; !ok {
 					tables[t] = NewTable(t)
-					tables[t].filterColumns = nil
+					tables[t].filterColumns = mapset.NewSet[string]()
 				}
 				tables[t].kinds.Add(q.Kind)
 			}
 			for t, cols := range q.FilterColumnMap {
-				//if _, ok := tables[t]; !ok {
-				//	tables[t] = NewTable(t)
-				//	tables[t].filterColumns = nil
-				//}
-				if tables[t].filterColumns == nil {
+				if tables[t].filterColumns.IsEmpty() {
 					tables[t].filterColumns = cols
 				} else {
 					tables[t].filterColumns = tables[t].filterColumns.Intersect(cols)

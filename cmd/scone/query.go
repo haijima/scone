@@ -23,7 +23,7 @@ func NewQueryCommand(v *viper.Viper, _ afero.Fs) *cobra.Command {
 	cmd.Short = "List SQL queries"
 	cmd.RunE = func(cmd *cobra.Command, _ []string) error { return runQuery(cmd, v) }
 
-	cmd.Flags().String("format", "table", "The output format {table|md|csv|tsv|simple}")
+	cmd.Flags().String("format", "table", "The output format {table|md|csv|tsv|html|simple}")
 	cmd.Flags().StringSlice("sort", []string{"file"}, "The sort `keys` {"+strings.Join(sortableColumns, "|")+"}")
 	cmd.Flags().StringSlice("cols", []string{}, "The `columns` to show {"+strings.Join(headerColumns, "|")+"}")
 	cmd.Flags().Bool("no-header", false, "Hide header")
@@ -59,7 +59,7 @@ func runQuery(cmd *cobra.Command, v *viper.Viper) error {
 	if !mapset.NewSet(cols...).IsSubset(mapset.NewSet(headerColumns...)) {
 		return errors.Newf("unknown columns: %s", mapset.NewSet(cols...).Difference(mapset.NewSet(headerColumns...)).ToSlice())
 	}
-	if !slices.Contains([]string{"table", "md", "csv", "tsv", "simple"}, format) {
+	if !slices.Contains([]string{"table", "md", "csv", "tsv", "html", "simple"}, format) {
 		return errors.Newf("unknown format: %s", format)
 	}
 
@@ -122,6 +122,8 @@ func runQuery(cmd *cobra.Command, v *viper.Viper) error {
 		t.RenderCSV()
 	case "tsv":
 		t.RenderTSV()
+	case "html":
+		t.RenderHTML()
 	case "simple":
 		t.Style().Options.DrawBorder = false
 		t.Style().Options.SeparateHeader = false

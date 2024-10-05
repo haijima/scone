@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"go/ast"
 	"go/token"
 	"slices"
@@ -52,7 +53,8 @@ func runLoop(cmd *cobra.Command, v *viper.Viper) error {
 		return errors.Newf("unknown format: %s", format)
 	}
 
-	_, cgs, err := analysis.Analyze(cmd.Context(), dir, pattern, analysis.NewOption(filter, additionalFuncs))
+	opt := analysis.NewOption(filter, additionalFuncs)
+	_, cgs, err := analysis.Analyze(cmd.Context(), dir, pattern, opt)
 	if err != nil {
 		return err
 	}
@@ -69,7 +71,7 @@ func runLoop(cmd *cobra.Command, v *viper.Viper) error {
 			return err
 		}
 		bodies := getForRangeBodies(pkg.Syntax)
-		results = append(results, analyzeForLoopBody(cgs, pkg, ssaProg.SrcFuncs, bodies)...)
+		results = append(results, analyzeForLoopBody(cmd.Context(), cgs, pkg, ssaProg.SrcFuncs, bodies, opt)...)
 	}
 
 	slices.SortFunc(results, func(a, b *FoundLoopedQuery) int { return strings.Compare(a.Position.String(), b.Position.String()) })
@@ -119,7 +121,7 @@ func getForRangeBodies(astFiles []*ast.File) []*ast.BlockStmt {
 	return bodies
 }
 
-func analyzeForLoopBody(cgs map[string]*analysis.CallGraph, pkg *packages.Package, fns []*ssa.Function, bodies []*ast.BlockStmt) []*FoundLoopedQuery {
+func analyzeForLoopBody(ctx context.Context, cgs map[string]*analysis.CallGraph, pkg *packages.Package, fns []*ssa.Function, bodies []*ast.BlockStmt, opt *analysis.Option) []*FoundLoopedQuery {
 	results := make([]*FoundLoopedQuery, 0)
 	for _, fn := range fns {
 		for _, block := range fn.Blocks {
@@ -127,8 +129,7 @@ func analyzeForLoopBody(cgs map[string]*analysis.CallGraph, pkg *packages.Packag
 				if n := withInForLoop(instr, bodies); n > 0 { // Check within the for loop
 					if call, ok := instr.(*ssa.Call); ok {
 						if callee := call.Call.StaticCallee(); callee != nil && callee.Pkg != nil {
-							if callee.Pkg.Pkg.Path() == "database/sql" ||
-								callee.Pkg.Pkg.Path() == "github.com/jmoiron/sqlx" ||
+							if _, ok := analysis.CheckIfTargetFunction(ctx, &call.Call, opt); ok ||
 								(cgs[callee.Pkg.Pkg.Path()] != nil && cgs[callee.Pkg.Pkg.Path()].Nodes[callee.Name()] != nil) {
 								results = append(results, &FoundLoopedQuery{Func: fn, Callee: callee, Call: call, Position: pkg.Fset.Position(call.Pos()), N: n})
 							}

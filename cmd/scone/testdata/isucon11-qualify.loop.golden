@@ -1,9 +1,8 @@
-+---+--------------------------+------------------------------------+---+---------------------------------------------------------------------------------------------------------------+
-| # | FUNCTION NAME            | CALLEE                             | N | POSITION                                                                                                      |
-+---+--------------------------+------------------------------------+---+---------------------------------------------------------------------------------------------------------------+
-| 1 | getTrend                 | github.com/jmoiron/sqlx.Select     | 1 | /Users/haijima/workspace/src/github.com/haijima/scone/cmd/scone/testdata/src/isucon11-qualify/main.go:1091:18 |
-| 2 | getTrend                 | github.com/jmoiron/sqlx.Select     | 2 | /Users/haijima/workspace/src/github.com/haijima/scone/cmd/scone/testdata/src/isucon11-qualify/main.go:1105:19 |
-| 3 | postIsuCondition         | database/sql.Exec                  | 1 | /Users/haijima/workspace/src/github.com/haijima/scone/cmd/scone/testdata/src/isucon11-qualify/main.go:1205:19 |
-| 4 | getIsuList               | github.com/jmoiron/sqlx.Get        | 1 | /Users/haijima/workspace/src/github.com/haijima/scone/cmd/scone/testdata/src/isucon11-qualify/main.go:476:15  |
-| 5 | generateIsuGraphResponse | github.com/jmoiron/sqlx.StructScan | 1 | /Users/haijima/workspace/src/github.com/haijima/scone/cmd/scone/testdata/src/isucon11-qualify/main.go:789:24  |
-+---+--------------------------+------------------------------------+---+---------------------------------------------------------------------------------------------------------------+
++---+------------------+--------------------------------+---+---------------------------------------------------------------------------------------------------------------+
+| # | FUNCTION NAME    | CALLEE                         | N | POSITION                                                                                                      |
++---+------------------+--------------------------------+---+---------------------------------------------------------------------------------------------------------------+
+| 1 | getTrend         | github.com/jmoiron/sqlx.Select | 1 | /Users/haijima/workspace/src/github.com/haijima/scone/cmd/scone/testdata/src/isucon11-qualify/main.go:1091:18 |
+| 2 | getTrend         | github.com/jmoiron/sqlx.Select | 2 | /Users/haijima/workspace/src/github.com/haijima/scone/cmd/scone/testdata/src/isucon11-qualify/main.go:1105:19 |
+| 3 | postIsuCondition | database/sql.Exec              | 1 | /Users/haijima/workspace/src/github.com/haijima/scone/cmd/scone/testdata/src/isucon11-qualify/main.go:1205:19 |
+| 4 | getIsuList       | github.com/jmoiron/sqlx.Get    | 1 | /Users/haijima/workspace/src/github.com/haijima/scone/cmd/scone/testdata/src/isucon11-qualify/main.go:476:15  |
++---+------------------+--------------------------------+---+---------------------------------------------------------------------------------------------------------------+

@@ -4,6 +4,8 @@ import (
 	"context"
 	"go/ast"
 	"go/token"
+	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 
@@ -80,8 +82,16 @@ func runLoop(cmd *cobra.Command, v *viper.Viper) error {
 	t.SetOutputMirror(cmd.OutOrStdout())
 	t.AppendHeader(table.Row{"#", "Function Name", "Callee", "N", "Position"})
 
+	cwd, err := os.Getwd()
+	if err != nil {
+		return err
+	}
 	for i, res := range results {
-		t.AppendRow(table.Row{i + 1, res.Func.Name(), res.Callee.Package().Pkg.Path() + "." + res.Callee.Name(), res.N, res.Position})
+		relPath, err := filepath.Rel(cwd, res.Position.String())
+		if err != nil {
+			return err
+		}
+		t.AppendRow(table.Row{i + 1, res.Func.Name(), res.Callee.Package().Pkg.Path() + "." + res.Callee.Name(), res.N, relPath})
 	}
 
 	switch format {

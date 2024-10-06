@@ -1,15 +1,15 @@
-+----+----------------------+--------------------------------+---+-------------------------------------------------------------------------------------------------------------+
-|  # | FUNCTION NAME        | CALLEE                         | N | POSITION                                                                                                    |
-+----+----------------------+--------------------------------+---+-------------------------------------------------------------------------------------------------------------+
-|  1 | Initialize           | database/sql.Exec              | 1 | /Users/haijima/workspace/src/github.com/haijima/scone/cmd/scone/testdata/src/isucon11-final/main.go:110:30  |
-|  2 | RegisterScores       | database/sql.Exec              | 1 | /Users/haijima/workspace/src/github.com/haijima/scone/cmd/scone/testdata/src/isucon11-final/main.go:1199:23 |
-|  3 | AddAnnouncement      | database/sql.Exec              | 1 | /Users/haijima/workspace/src/github.com/haijima/scone/cmd/scone/testdata/src/isucon11-final/main.go:1471:23 |
-|  4 | GetRegisteredCourses | github.com/jmoiron/sqlx.Get    | 1 | /Users/haijima/workspace/src/github.com/haijima/scone/cmd/scone/testdata/src/isucon11-final/main.go:387:19  |
-|  5 | RegisterCourses      | github.com/jmoiron/sqlx.Get    | 1 | /Users/haijima/workspace/src/github.com/haijima/scone/cmd/scone/testdata/src/isucon11-final/main.go:447:19  |
-|  6 | RegisterCourses      | github.com/jmoiron/sqlx.Get    | 1 | /Users/haijima/workspace/src/github.com/haijima/scone/cmd/scone/testdata/src/isucon11-final/main.go:462:19  |
-|  7 | RegisterCourses      | database/sql.Exec              | 1 | /Users/haijima/workspace/src/github.com/haijima/scone/cmd/scone/testdata/src/isucon11-final/main.go:498:19  |
-|  8 | GetGrades            | github.com/jmoiron/sqlx.Select | 1 | /Users/haijima/workspace/src/github.com/haijima/scone/cmd/scone/testdata/src/isucon11-final/main.go:585:24  |
-|  9 | GetGrades            | github.com/jmoiron/sqlx.Get    | 2 | /Users/haijima/workspace/src/github.com/haijima/scone/cmd/scone/testdata/src/isucon11-final/main.go:595:22  |
-| 10 | GetGrades            | github.com/jmoiron/sqlx.Get    | 2 | /Users/haijima/workspace/src/github.com/haijima/scone/cmd/scone/testdata/src/isucon11-final/main.go:601:22  |
-| 11 | GetGrades            | github.com/jmoiron/sqlx.Select | 1 | /Users/haijima/workspace/src/github.com/haijima/scone/cmd/scone/testdata/src/isucon11-final/main.go:635:24  |
-+----+----------------------+--------------------------------+---+-------------------------------------------------------------------------------------------------------------+
++----+----------------------+--------------------------------+---+---------------------------------------------+
+|  # | FUNCTION NAME        | CALLEE                         | N | POSITION                                    |
++----+----------------------+--------------------------------+---+---------------------------------------------+
+|  1 | Initialize           | database/sql.Exec              | 1 | testdata/src/isucon11-final/main.go:110:30  |
+|  2 | RegisterScores       | database/sql.Exec              | 1 | testdata/src/isucon11-final/main.go:1199:23 |
+|  3 | AddAnnouncement      | database/sql.Exec              | 1 | testdata/src/isucon11-final/main.go:1471:23 |
+|  4 | GetRegisteredCourses | github.com/jmoiron/sqlx.Get    | 1 | testdata/src/isucon11-final/main.go:387:19  |
+|  5 | RegisterCourses      | github.com/jmoiron/sqlx.Get    | 1 | testdata/src/isucon11-final/main.go:447:19  |
+|  6 | RegisterCourses      | github.com/jmoiron/sqlx.Get    | 1 | testdata/src/isucon11-final/main.go:462:19  |
+|  7 | RegisterCourses      | database/sql.Exec              | 1 | testdata/src/isucon11-final/main.go:498:19  |
+|  8 | GetGrades            | github.com/jmoiron/sqlx.Select | 1 | testdata/src/isucon11-final/main.go:585:24  |
+|  9 | GetGrades            | github.com/jmoiron/sqlx.Get    | 2 | testdata/src/isucon11-final/main.go:595:22  |
+| 10 | GetGrades            | github.com/jmoiron/sqlx.Get    | 2 | testdata/src/isucon11-final/main.go:601:22  |
+| 11 | GetGrades            | github.com/jmoiron/sqlx.Select | 1 | testdata/src/isucon11-final/main.go:635:24  |
++----+----------------------+--------------------------------+---+---------------------------------------------+

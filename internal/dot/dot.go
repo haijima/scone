@@ -1,4 +1,4 @@
-package io
+package dot
 
 import (
 	"bytes"
@@ -8,49 +8,49 @@ import (
 	"text/template"
 )
 
-type DotGraph struct {
+type Graph struct {
 	Title    string
-	Attrs    DotAttrs
-	Clusters map[string]*DotCluster
-	Nodes    []*DotNode
-	Edges    []*DotEdge
+	Attrs    Attrs
+	Clusters map[string]*Cluster
+	Nodes    []*Node
+	Edges    []*Edge
 	Options  map[string]string
-	Ranks    []*DotRank
+	Ranks    []*Rank
 }
 
-type DotCluster struct {
+type Cluster struct {
 	ID       string
-	Clusters map[string]*DotCluster
-	Nodes    []*DotNode
-	Attrs    DotAttrs
+	Clusters map[string]*Cluster
+	Nodes    []*Node
+	Attrs    Attrs
 }
 
-func (c *DotCluster) String() string {
+func (c *Cluster) String() string {
 	return fmt.Sprintf("cluster_%s", c.ID)
 }
 
-type DotNode struct {
+type Node struct {
 	ID    string
-	Attrs DotAttrs
+	Attrs Attrs
 }
 
-func (n *DotNode) String() string {
+func (n *Node) String() string {
 	return n.ID
 }
 
-type DotEdge struct {
+type Edge struct {
 	From  string
 	To    string
-	Attrs DotAttrs
+	Attrs Attrs
 }
 
-func (e *DotEdge) String() string {
+func (e *Edge) String() string {
 	return fmt.Sprintf("%s -> %s", e.From, e.To)
 }
 
-type DotAttrs map[string]string
+type Attrs map[string]string
 
-func (p DotAttrs) List() []string {
+func (p Attrs) List() []string {
 	l := make([]string, 0, len(p))
 	for k, v := range p {
 		l = append(l, fmt.Sprintf("%s=%q", k, v))
@@ -58,23 +58,23 @@ func (p DotAttrs) List() []string {
 	return l
 }
 
-func (p DotAttrs) String() string {
+func (p Attrs) String() string {
 	return strings.Join(p.List(), " ")
 }
 
-func (p DotAttrs) Lines() string {
+func (p Attrs) Lines() string {
 	if len(p) == 0 {
 		return ""
 	}
 	return fmt.Sprintf("%s;", strings.Join(p.List(), ";\n"))
 }
 
-type DotRank struct {
+type Rank struct {
 	Name  string
 	Nodes []string
 }
 
-func (r *DotRank) List() []string {
+func (r *Rank) List() []string {
 	l := make([]string, 0, len(r.Nodes))
 	for _, v := range r.Nodes {
 		l = append(l, fmt.Sprintf("%q", v))
@@ -82,7 +82,7 @@ func (r *DotRank) List() []string {
 	return l
 }
 
-func (r *DotRank) String() string {
+func (r *Rank) String() string {
 	return fmt.Sprintf("{rank = %s; %s}", r.Name, strings.Join(r.List(), "; "))
 }
 
@@ -128,7 +128,7 @@ const tmplGraph = `digraph scone {
 }
 `
 
-func WriteDotGraph(w io.Writer, g DotGraph) error {
+func WriteGraph(w io.Writer, g Graph) error {
 	t := template.New("dot")
 	for _, s := range []string{tmplCluster, tmplGraph} {
 		if _, err := t.Parse(s); err != nil {

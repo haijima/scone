@@ -1,6 +1,6 @@
 # scone
 
-[![CI Status](https://github.com/haijima/scone/workflows/CI/badge.svg?branch=main)](https://github.com/haijima/scone/actions)
+[![CI](https://github.com/haijima/scone/actions/workflows/ci.yaml/badge.svg?branch=main)](https://github.com/haijima/scone/actions/workflows/ci.yaml)
 [![Go Reference](https://pkg.go.dev/badge/github.com/haijima/scone.svg)](https://pkg.go.dev/github.com/haijima/scone)
 [![Go report](https://goreportcard.com/badge/github.com/haijima/scone)](https://goreportcard.com/report/github.com/haijima/scone)
 
@@ -82,6 +82,7 @@ scone callgraph --dir path/to/project
 - `-d, --dir string`: The directory to analyze (default `.`)
 - `-p, --pattern string`: The pattern to analyze (default `./...`)
 
+
 #### Options for `scone query`
 
 - `--cols columns`: The columns to show {`package`|`package-path`|`file`|`function`|`type`|`tables`|`hash`|`query`|`raw-query`}
@@ -98,6 +99,7 @@ scone callgraph --dir path/to/project
 - `--collapse-phi`: Collapse phi queries
 - `--summary`: Print summary only
 
+
 #### Options for `scone crud`
 
 - `--format string`: The output format {`table`|`md`|`csv`|`tsv`|`html`|`simple`} (default `"table"`)
@@ -105,7 +107,8 @@ scone callgraph --dir path/to/project
 
 #### Options for `scone loop`
 
-None
+- `--format string`: The output format {`table`|`md`|`csv`|`tsv`|`html`|`simple`} (default `"table"`)
+
 
 #### Options for `scone callgraph`
 

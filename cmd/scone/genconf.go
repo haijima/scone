@@ -10,12 +10,9 @@ import (
 func NewGenConfCmd(_ *viper.Viper, _ afero.Fs) *cobra.Command {
 	genConfCmd := cobrax.PrintConfigCmd("genconf")
 	genConfCmd.SetHelpFunc(func(cmd *cobra.Command, args []string) {
-		cmd.Flag("dir").Hidden = true
-		cmd.Flag("pattern").Hidden = true
-		cmd.Flag("filter").Hidden = true
-		cmd.Flag("analyze-funcs").Hidden = true
-		cmd.Flag("config").Hidden = true
-		cmd.Flag("no-color").Hidden = true
+		for _, flag := range []string{"dir", "pattern", "filter", "analyze-funcs", "config", "no-color"} {
+			cmd.Flag(flag).Hidden = true
+		}
 		cmd.Root().HelpFunc()(cmd, args)
 	})
 	return genConfCmd

@@ -1,16 +1,34 @@
 {{- /* How to use */}}
+{{- /* https://github.com/gostaticanalysis/knife */}}
 {{- /* $ knife -template knife.template database/sql | sort | uniq */}}
 {{- /* $ knife -template knife.template github.com/jmoiron/sqlx | sort | uniq */}}
+{{- /* $ knife -template knife.template -data=private:true your/own/package | sort | uniq */}}
+
 
 
 {{- $paramName := "query" }}
 {{- $paramType := "string" }}
-{{- $printFormat := "{NamePattern: %q, ArgIndex: %d}," }}
+
+{{- /* $printFormat := "{NamePattern: %q, ArgIndex: %d}," */}}
+{{- /* $notSurePrintFormat := "{NamePattern: %q, ArgIndex: %d}, // not sure" */}}
+{{- $printFormat := "- %s@%d" }}
+{{- $notSurePrintFormat := "- %s@%d # not sure" }}
+
+{{- $private := and (ne (data "private") nil) (eq (data "private") "true")}}
+{{- $types := exported .Types }}
+{{- if $private }}
+    {{- $types = .Types }}
+{{- end}}
+{{- $funcs := exported .Funcs }}
+{{- if $private }}
+    {{- $funcs = .Funcs }}
+{{- end}}
+
 
 
 {{- /* Static method call */}}
 
-{{- range exported .Types}}
+{{- range $types}}
     {{- if ne (struct .) nil}}
         {{- $n:=.Name}}
         {{- range exported (methods .)}}
@@ -19,7 +37,7 @@
                 {{- if eq $p.Name $paramName }}
                     {{- printf $printFormat $n $i}}{{br}}
                 {{- else if and (eq $p.Name "") (eq $p.Type.String $paramType)}}
-                    {{- printf $printFormat $n $i}} // not sure{{br}}
+                    {{- printf $notSurePrintFormat $n $i}}{{br}}
                 {{- end}}
             {{- end}}
         {{- end}}
@@ -29,7 +47,7 @@
 
 {{- /* Dynamic method call */}}
 
-{{- range exported .Types}}
+{{- range $types}}
     {{- if ne (interface .) nil}}
         {{- $n:=.Name}}
         {{- range exported (methods .)}}
@@ -38,7 +56,7 @@
                 {{- if eq $p.Name $paramName }}
                     {{- printf $printFormat $n $i}}{{br}}
                 {{- else if and (eq $p.Name "") (eq $p.Type.String $paramType)}}
-                    {{- printf $printFormat $n $i}} // not sure{{br}}
+                    {{- printf $notSurePrintFormat $n $i}}{{br}}
                 {{- end}}
             {{- end}}
         {{- end}}
@@ -48,13 +66,13 @@
 
 {{- /* Static function call */}}
 
-{{- range exported .Funcs}}
+{{- range $funcs}}
     {{- $n := printf "%s.%s" $.Path .Name}}
     {{- range $i, $p := .Signature.Params}}
         {{- if eq $p.Name $paramName }}
             {{- printf $printFormat $n $i}}{{br}}
         {{- else if and (eq $p.Name "") (eq $p.Type.String $paramType)}}
-            {{- printf $printFormat $n $i}} // not sure{{br}}
+            {{- printf $notSurePrintFormat $n $i}}{{br}}
         {{- end}}
     {{- end}}
 {{- end}}

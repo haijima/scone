@@ -49,6 +49,7 @@ func handleComments(ctx context.Context, ssaProg *buildssa.SSA, files []*ast.Fil
 				}
 			case "ignore":
 				opt.commentedNodes = append(opt.commentedNodes, &NodeWithPackage{Node: n, Package: ssaProg.Pkg.Pkg})
+				return true
 			}
 		}
 		foundQueryResults = append(foundQueryResults, qr)

@@ -6,26 +6,30 @@ import (
 	"io"
 	"testing"
 
+	"github.com/sebdah/goldie/v2"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
 )
 
-func Test_runCrud_singleProject(t *testing.T) {
-	cmd := &cobra.Command{}
-	cmd.SetContext(context.Background())
-	buf := &bytes.Buffer{}
-	cmd.SetOut(buf)
-	cmd.SetErr(io.Discard)
-	v := viper.New()
-	v.Set("dir", "./testdata/src/isucon13")
-	//v.Set("dir", "../../../../risuwork/risuwork/webapp/go")
-	v.Set("pattern", "./...")
-	//v.Set("format", "table")
-	//v.Set("filter", "hash == '2ecb4a0c'")
-	v.Set("v", 1)
-	//v.Set("analyze-funcs", []string{"github.com/isucon/isucon12-qualify/webapp/go.GetContext@2", "github.com/isucon/isucon12-qualify/webapp/go.SelectContext@2", "github.com/isucon/isucon12-qualify/webapp/go.ExecContext@1"})
+func Test_runCrud(t *testing.T) {
+	tests := []string{"isucon10-qualify", "isucon10-final", "isucon11-qualify", "isucon11-final", "isucon12-qualify", "isucon12-final", "isucon13"}
+	for _, tt := range tests {
+		t.Run(tt, func(t *testing.T) {
+			cmd := &cobra.Command{}
+			cmd.SetContext(context.Background())
+			buf := &bytes.Buffer{}
+			cmd.SetOut(buf)
+			cmd.SetErr(io.Discard)
+			v := viper.New()
+			v.Set("dir", "./testdata/src/"+tt)
+			v.Set("pattern", "./...")
 
-	err := runCrud(cmd, v)
-	assert.NoError(t, err)
+			err := runCrud(cmd, v)
+			assert.NoError(t, err)
+
+			g := goldie.New(t)
+			g.Assert(t, tt+".crud", buf.Bytes())
+		})
+	}
 }

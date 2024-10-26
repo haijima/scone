@@ -16,6 +16,7 @@ func Test_runQuery(t *testing.T) {
 	tests := []string{"isucon10-qualify", "isucon10-final", "isucon11-qualify", "isucon11-final", "isucon12-qualify", "isucon12-final", "isucon13"}
 	for _, tt := range tests {
 		t.Run(tt, func(t *testing.T) {
+			t.Parallel()
 			cmd := &cobra.Command{}
 			cmd.SetContext(context.Background())
 			buf := &bytes.Buffer{}

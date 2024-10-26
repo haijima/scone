@@ -10,6 +10,7 @@ import (
 )
 
 func TestNewRootCmd(t *testing.T) {
+	t.Parallel()
 	v := viper.New()
 	fs := afero.NewMemMapFs()
 	cmd := NewRootCmd(v, fs)

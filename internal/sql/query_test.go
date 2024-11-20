@@ -26,17 +26,17 @@ func TestQueryGroups_AllTableMap(t *testing.T) {
 	assert.Equalf(t, []QueryKind{Select, Insert}, tables["t1"].Kinds(), "tables[t1].Kinds()")
 	assert.Equalf(t, []string{}, tables["t1"].PartitionKeys(), "tables[t1].PartitionKeys()")
 	assert.Equalf(t, Insert, tables["t1"].MaxKind(), "tables[t1].MaxKind()")
-	assert.Equalf(t, ReadThrough, tables["t1"].Cacheability(), "tables[t1].Cacheability()")
+	assert.Equalf(t, Immutable, tables["t1"].Cacheability(), "tables[t1].Cacheability()")
 	assert.Equalf(t, "t2", tables["t2"].Name, "tables[t2].Name")
 	assert.Equalf(t, []QueryKind{Select, Insert}, tables["t2"].Kinds(), "tables[t2].Kinds()") // FIXME: should be just Select
 	assert.Equalf(t, []string{"id"}, tables["t2"].PartitionKeys(), "tables[t2].PartitionKeys()")
 	assert.Equalf(t, Insert, tables["t2"].MaxKind(), "tables[t2].MaxKind()")
-	assert.Equalf(t, ReadThrough, tables["t2"].Cacheability(), "tables[t2].Cacheability()")
+	assert.Equalf(t, Immutable, tables["t2"].Cacheability(), "tables[t2].Cacheability()")
 	assert.Equalf(t, "t3", tables["t3"].Name, "tables[t3].Name")
 	assert.Equalf(t, []QueryKind{Select}, tables["t3"].Kinds(), "tables[t3].Kinds()")
 	assert.Equalf(t, []string{"id"}, tables["t3"].PartitionKeys(), "tables[t3].PartitionKeys()")
 	assert.Equalf(t, Select, tables["t3"].MaxKind(), "tables[t3].MaxKind()")
-	assert.Equalf(t, HardCoded, tables["t3"].Cacheability(), "tables[t3].Cacheability()")
+	assert.Equalf(t, Static, tables["t3"].Cacheability(), "tables[t3].Cacheability()")
 }
 
 func TestNewQueryGroupFrom(t *testing.T) {

@@ -36,11 +36,11 @@ func (t *Table) PartitionKeys() []string {
 func (t *Table) Cacheability() Cacheability {
 	switch t.MaxKind() {
 	case Select:
-		return HardCoded
+		return Static
 	case Insert:
-		return ReadThrough
+		return Immutable
 	case Delete, Replace, Update:
-		return WriteThrough
+		return Mutable
 	default:
 		return UnknownCacheability
 	}
@@ -49,20 +49,20 @@ func (t *Table) Cacheability() Cacheability {
 type Cacheability int
 
 const (
-	HardCoded Cacheability = iota
-	ReadThrough
-	WriteThrough
+	Static Cacheability = iota
+	Immutable
+	Mutable
 	UnknownCacheability
 )
 
 func (c Cacheability) String() string {
 	switch c {
-	case HardCoded:
-		return "Hard coded"
-	case ReadThrough:
-		return "Read-through"
-	case WriteThrough:
-		return "Write-through"
+	case Static:
+		return "Static"
+	case Immutable:
+		return "Immutable"
+	case Mutable:
+		return "Mutable"
 	default:
 		return "Unknown"
 	}
@@ -74,11 +74,11 @@ func (c Cacheability) ColoredString() string {
 
 func (c Cacheability) Color(str string) string {
 	switch c {
-	case HardCoded:
+	case Static:
 		return color.BlueString(str)
-	case ReadThrough:
+	case Immutable:
 		return color.GreenString(str)
-	case WriteThrough:
+	case Mutable:
 		return color.RedString(str)
 	default:
 		return color.HiBlackString(str)

@@ -97,7 +97,7 @@ const tmplSummary = `{{title "Summary"}}
   {{key "tables"}}          : {{.tables}}
   {{key "cacheability"}}
   {{- range $k, $v := .cacheability}}
-	{{colored $k}}	: {{len $v}}	{{printf "%q" $v}}
+	{{printf "%-19s" (colored $k)}}: {{len $v}}	{{printf "%q" $v}}
   {{- end}}
   {{key "table clusters"}}  : {{len .clusters}}
   {{- range .clusters}}

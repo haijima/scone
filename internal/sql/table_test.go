@@ -59,13 +59,13 @@ func TestTable_Cacheability(t1 *testing.T) {
 		kinds []QueryKind
 		want  Cacheability
 	}{
-		{"select", []QueryKind{Select}, HardCoded},
-		{"insert", []QueryKind{Insert}, ReadThrough},
-		{"update", []QueryKind{Update}, WriteThrough},
-		{"delete", []QueryKind{Delete}, WriteThrough},
-		{"replace", []QueryKind{Replace}, WriteThrough},
+		{"select", []QueryKind{Select}, Static},
+		{"insert", []QueryKind{Insert}, Immutable},
+		{"update", []QueryKind{Update}, Mutable},
+		{"delete", []QueryKind{Delete}, Mutable},
+		{"replace", []QueryKind{Replace}, Mutable},
 		{"unknown", []QueryKind{Unknown}, UnknownCacheability},
-		{"multiple", []QueryKind{Select, Insert}, ReadThrough},
+		{"multiple", []QueryKind{Select, Insert}, Immutable},
 	}
 	for _, tt := range tests {
 		t1.Run(tt.name, func(t1 *testing.T) {
@@ -85,9 +85,9 @@ func TestCacheability_String(t *testing.T) {
 		c    Cacheability
 		want string
 	}{
-		{"hardcoded", HardCoded, "Hard coded"},
-		{"readthrough", ReadThrough, "Read-through"},
-		{"writethrough", WriteThrough, "Write-through"},
+		{"hardcoded", Static, "Hard coded"},
+		{"readthrough", Immutable, "Read-through"},
+		{"writethrough", Mutable, "Write-through"},
 		{"unknown", UnknownCacheability, "Unknown"},
 	}
 	for _, tt := range tests {
@@ -107,9 +107,9 @@ func TestCacheability_ColoredString(t *testing.T) {
 		c    Cacheability
 		want string
 	}{
-		{"hardcoded", HardCoded, color.BlueString("Hard coded")},
-		{"readthrough", ReadThrough, color.GreenString("Read-through")},
-		{"writethrough", WriteThrough, color.RedString("Write-through")},
+		{"hardcoded", Static, color.BlueString("Hard coded")},
+		{"readthrough", Immutable, color.GreenString("Read-through")},
+		{"writethrough", Mutable, color.RedString("Write-through")},
 		{"unknown", UnknownCacheability, color.HiBlackString("Unknown")},
 	}
 	for _, tt := range tests {

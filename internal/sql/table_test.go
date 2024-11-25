@@ -85,9 +85,9 @@ func TestCacheability_String(t *testing.T) {
 		c    Cacheability
 		want string
 	}{
-		{"hardcoded", Static, "Hard coded"},
-		{"readthrough", Immutable, "Read-through"},
-		{"writethrough", Mutable, "Write-through"},
+		{"static", Static, "Static"},
+		{"immutable", Immutable, "Immutable"},
+		{"mutable", Mutable, "Mutable"},
 		{"unknown", UnknownCacheability, "Unknown"},
 	}
 	for _, tt := range tests {
@@ -107,9 +107,9 @@ func TestCacheability_ColoredString(t *testing.T) {
 		c    Cacheability
 		want string
 	}{
-		{"hardcoded", Static, color.BlueString("Hard coded")},
-		{"readthrough", Immutable, color.GreenString("Read-through")},
-		{"writethrough", Mutable, color.RedString("Write-through")},
+		{"static", Static, color.BlueString("Static")},
+		{"immutable", Immutable, color.GreenString("Immutable")},
+		{"mutable", Mutable, color.RedString("Mutable")},
 		{"unknown", UnknownCacheability, color.HiBlackString("Unknown")},
 	}
 	for _, tt := range tests {

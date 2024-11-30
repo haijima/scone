@@ -10,7 +10,7 @@ require (
 	github.com/fatih/color v1.17.0
 	github.com/google/cel-go v0.21.0
 	github.com/haijima/analysisutil v0.0.2
-	github.com/haijima/cobrax v0.6.1
+	github.com/haijima/cobrax v0.6.2
 	github.com/haijima/epf v0.1.0
 	github.com/jedib0t/go-pretty/v6 v6.6.0
 	github.com/lmittmann/tint v1.0.5

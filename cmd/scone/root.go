@@ -14,6 +14,7 @@ func NewRootCmd(v *viper.Viper, fs afero.Fs) *cobra.Command {
 	cmd := cobrax.NewRoot(v)
 	cmd.Use = "scone"
 	cmd.Short = "scone is a static analysis tool for SQL"
+	cmd.SetGlobalNormalizationFunc(cobrax.KebabToSnake)
 	cmd.PersistentPreRunE = func(cmd *cobra.Command, args []string) error {
 		// Colorization settings
 		color.NoColor = color.NoColor || v.GetBool("no-color")

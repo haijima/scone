@@ -1,5 +1,6 @@
 # scone
 
+[![GitHub Release](https://img.shields.io/github/v/release/haijima/scone)](https://github.com/haijima/scone/releases)
 [![CI](https://github.com/haijima/scone/actions/workflows/ci.yaml/badge.svg?branch=main)](https://github.com/haijima/scone/actions/workflows/ci.yaml)
 [![Go Reference](https://pkg.go.dev/badge/github.com/haijima/scone.svg)](https://pkg.go.dev/github.com/haijima/scone)
 [![Go report](https://goreportcard.com/badge/github.com/haijima/scone)](https://goreportcard.com/report/github.com/haijima/scone)

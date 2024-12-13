@@ -68,6 +68,8 @@ scone callgraph --dir path/to/project
 
 - `scone query`: List SQL queries
 - `scone table`: List tables information from queries
+- `scone crud`: Show the CRUD operations for each endpoint
+- `scone loop`: Find N+1 queries
 - `scone callgraph`: Generate a call graph
 
 ### Options

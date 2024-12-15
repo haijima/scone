@@ -56,7 +56,7 @@ or you can download binaries from [Releases](https://github.com/haijima/scone/re
 
 ``` sh
 scone query --dir path/to/project --filter="queryType!='SELECT' && 'users' in tables"
-scone table --dir path/to/project
+scone table --dir path/to/project --collapse-phi
 scone crud --dir path/to/project
 scone loop --dir path/to/project
 scone callgraph --dir path/to/project

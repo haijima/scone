@@ -42,8 +42,8 @@ github.com/haijima/analysisutil v0.0.3 h1:PHAnBUxPoLT7jnj0WM0RzdQgSpAZ1fa7P3zzsK
 github.com/haijima/analysisutil v0.0.3/go.mod h1:JQ4zLfOsvdicIB5ZJWZEaRysYQ7tdlc7Atf5BWROpUg=
 github.com/haijima/cobrax v0.6.2 h1:MqiHFApvUH60tyxf6ULjUDKmvwarAEqXjTeXVfh3U2s=
 github.com/haijima/cobrax v0.6.2/go.mod h1:Pb3a1MJHXIfEmhVagie0UTvTDog7edsxuJkD60Al1tc=
-github.com/haijima/epf v0.1.0 h1:EB7xcMZywaKsgxPufA//6LtUlsqpV/f6doGdcSRBQDM=
-github.com/haijima/epf v0.1.0/go.mod h1:bBYNSJmVz4JgMmu1SILm5WcTvdmdUF37CenI2xaZmoQ=
+github.com/haijima/epf v0.2.0 h1:JtN4K5MbEh120dGMd8juB5bgo2lg+k1HbDr51LnbU1Q=
+github.com/haijima/epf v0.2.0/go.mod h1:bBYNSJmVz4JgMmu1SILm5WcTvdmdUF37CenI2xaZmoQ=
 github.com/hashicorp/hcl v1.0.0 h1:0Anlzjpi4vEasTeNFn2mLJgTSwt0+6sfsiTG8qcWGx4=
 github.com/hashicorp/hcl v1.0.0/go.mod h1:E5yfLk+7swimpb2L/Alb/PJmXilQ/rhwaUYs4T20WEQ=
 github.com/inconshreveable/mousetrap v1.1.0 h1:wN+x4NVGpMsO7ErUn/mUI3vEoE6Jt13X2s0bqwp9tc8=
